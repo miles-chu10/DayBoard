@@ -106,8 +106,10 @@ notarized, self-updating betas. Two workflows share the signing setup:
 
 - **Signed macOS release** (`.github/workflows/macos-release.yml`) runs when a `v`-prefixed
   SemVer tag such as `v1.3.0-beta.12` is pushed for a commit on `main` whose `package.json`
-  version matches. The current workflow builds a free release (`DAYBOARD_RELEASE=1`
-  with `DAYBOARD_LICENSE=off`): Google required, in-app updates on, licensing off. It signs,
+  version matches. It builds a paid release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=on`
+  and the live license service, see [Launch: licensing on](#launch-licensing-on)): Google
+  required, in-app updates on, AI behind DayBoard Pro. Betas tagged before the launch were free
+  releases built with `DAYBOARD_LICENSE=off`. It signs,
   notarizes, staples, verifies and smoke-tests like the dry run below, then publishes the DMG,
   ZIP, blockmaps, `latest-mac.yml` and `SHA256SUMS.txt` as a GitHub prerelease (never marked
   latest for a prerelease version). This is how betas are distributed.
@@ -155,10 +157,35 @@ tags. That environment needs:
 | Secret   | `MACOS_CERTIFICATE_PASSWORD`   | The `.p12` export password                                 |
 | Secret   | `MACOS_NOTARY_KEY_P8`          | Contents of the App Store Connect `.p8` key                |
 | Secret   | `DAYBOARD_GOOGLE_OAUTH_JSON`   | `{"clientId": …, "clientSecret": …}` of the Desktop client |
+| Variable | `DAYBOARD_LICENSE_API_URL`     | `https://api.getdayboard.com` (tag releases only)          |
+| Variable | `DAYBOARD_STRIPE_PRODUCT_ID`   | `prod_VZ5SiyzDZ4ASHs`, the live product (tag releases)     |
 
-The free release ignores `DAYBOARD_LICENSE_API_URL` and `DAYBOARD_STRIPE_PRODUCT_ID`. The first
-Developer ID build replaces ad-hoc-signed installs, so verify on an owned installation that Google
-sign-in and the Keychain-held encryption key carry over when the app is replaced in Applications.
+The release workflow fixes `DAYBOARD_LICENSE_ENVIRONMENT=live`; the beta dry run ignores all three.
+The first Developer ID build replaces ad-hoc-signed installs, so verify on an owned installation
+that Google sign-in and the Keychain-held encryption key carry over when the app is replaced in
+Applications.
+
+## Launch: licensing on
+
+From the launch release, every `v*` tag (stable or prerelease) builds with licensing on. The
+build step sets `DAYBOARD_LICENSE: "on"`, and `electron.vite.config.ts` refuses a
+`DAYBOARD_RELEASE=1` build unless the API URL is an HTTPS origin, the product is a `prod_…` ID
+and the environment is `live`, so a missing or test configuration fails the run before signing
+and nothing is published. The format check cannot tell the live product from the test one, so
+confirm both variables above before tagging. Also before the first licensed tag:
+
+- The production `dayboard-billing` Worker answers `/buy` and `/v1/licenses/*` (not 503) with
+  `SERVICE_ORIGIN=https://api.getdayboard.com`, `PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`,
+  `ENVIRONMENT=live` and `ACTIVATION_LIMIT=3`. The app accepts only keys whose issuer, product
+  and environment match exactly.
+- Beta testers have their free Pro keys. Installed betas update into the AI trial: AI and Quick
+  Capture start a 7-day trial on first use, everything else stays free, and a key in Settings →
+  License unlocks Pro.
+- No further free betas can be tagged; a later free build needs `DAYBOARD_LICENSE: "off"` back
+  in the workflow and a new version.
+
+`build:beta` (the manual dry run and local beta packages), App Store builds and community builds
+keep licensing off.
 
 ## Local installation and QA copies
 
@@ -234,6 +261,5 @@ Keep GPL source/build instructions available with the official binary. Distribut
 
 The signed workflow runs on `v*` tag pushes and includes publication after verification.
 Do not push a tag merely to obtain a signing test or review artifact; use the manual beta
-workflow for that. The current release workflow keeps licensing off. Enabling paid licensing
-requires a separately approved workflow change and the corresponding release checks; removing
-`DAYBOARD_LICENSE: "off"` makes the workflow require live license configuration.
+workflow for that. It builds a paid release that requires the live license configuration; see
+[Launch: licensing on](#launch-licensing-on).
