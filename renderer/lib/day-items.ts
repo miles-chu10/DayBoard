@@ -22,9 +22,11 @@ export function eventDays(event: CalendarEventItem): string[] {
       days.push(day);
     return days.length ? days : [event.start.slice(0, 10)];
   }
-  const start = toISODate(new Date(event.start));
-  // An event ending exactly at midnight doesn't occupy the next day.
-  const end = toISODate(new Date(new Date(event.end).getTime() - 1));
+  const startTime = new Date(event.start).getTime();
+  const start = toISODate(new Date(startTime));
+  // An event ending exactly at midnight doesn't occupy the next day; a zero-length event
+  // (end equals start) still occupies the day it starts on.
+  const end = toISODate(new Date(Math.max(startTime, new Date(event.end).getTime() - 1)));
   const days: string[] = [];
   for (let day = start; day <= end && days.length < 62; day = addDays(day, 1)) days.push(day);
   return days;

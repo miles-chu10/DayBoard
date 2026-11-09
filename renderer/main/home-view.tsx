@@ -21,15 +21,13 @@ import { MeetingCard } from "../components/meeting-card";
 import { useOpenItem } from "../components/open-item";
 import { usePublishViewContext } from "../components/shell";
 import { ViewActions } from "../components/view-actions";
-import { identifyCalendarEvents } from "../lib/calendar-identity";
-import { addDays, dayHeading, toISODate } from "../lib/dates";
-import { groupByDay } from "../lib/day-items";
+import { buildAgenda, type AgendaEntry } from "../lib/agenda";
+import { dayHeading, toISODate } from "../lib/dates";
 import {
   ageLabel,
   firstName,
   greeting,
   homeSummary,
-  homeTodos,
   isStale,
   needsYou,
   suggestedTasks,
@@ -195,7 +193,6 @@ export function HomeView() {
   const openCapture = useOpenCapture();
 
   const days = span === "today" ? 1 : 7;
-  const dates = Array.from({ length: days }, (_, index) => addDays(today, index));
   const calendar = useCalendarRange(today, days);
   const tasks = useTasks();
   const reminders = useReminders();
@@ -225,23 +222,34 @@ export function HomeView() {
     tasks: sourceOn(settings, "tasks"),
     reminders: sourceOn(settings, "reminders"),
   };
-  const todos = homeTodos(
-    mergeLinkedTodos(
-      buildTodos(tasks.data, reminders.data),
-      planning.data?.duplicateLinks,
-      visible,
-    ).filter((todo) => visible[todo.source]),
-    today,
-    span,
-  );
-  const events = identifyCalendarEvents(
-    calendarOn && calendar.data?.state === "ok" ? calendar.data.items : [],
-  );
-  const byDay = groupByDay(events, [], dates);
-  const meetingCount = dates.reduce(
-    (total, date) => total + (byDay.get(date)?.timed.length ?? 0),
+  const todos = mergeLinkedTodos(
+    buildTodos(tasks.data, reminders.data),
+    planning.data?.duplicateLinks,
+    visible,
+  ).filter((todo) => visible[todo.source]);
+  // The same day-by-day model as the Agenda page: events, tasks and reminders interleaved.
+  const agenda = buildAgenda({
+    events: calendarOn && calendar.data?.state === "ok" ? calendar.data.items : [],
+    todos,
+    startDate: today,
+    days,
+    now,
+  });
+  const agendaDays = agenda.days.map((day) => ({
+    date: day.date,
+    entries: [
+      ...day.allDay.map(eventEntry),
+      ...day.timed,
+      ...day.anytime.map(todoEntry),
+    ] as AgendaEntry[],
+  }));
+  const meetingCount = agenda.days.reduce(
+    (total, day) => total + day.timed.filter((entry) => entry.kind === "event").length,
     0,
   );
+  const agendaCount =
+    agenda.overdue.length + agendaDays.reduce((total, day) => total + day.entries.length, 0);
+  const agendaLoading = (calendarOn && calendar.isPending) || tasks.isPending;
   const untriaged = messages.some((message) => !triage.map[message.id]);
 
   const name = firstName(displayName(settings, accounts.data?.google.email));
@@ -323,9 +331,80 @@ export function HomeView() {
           </SegmentedControl>
         </header>
 
-        <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(15rem,20rem)]">
+        <div className="grid gap-6">
           <div className="flex min-w-0 flex-col gap-6">
             <MeetingCard surface="agenda" />
+
+            <Card
+              title="Agenda"
+              count={agendaCount}
+              action={
+                <Button
+                  size="small"
+                  variant="transparent"
+                  onClick={() => void navigate({ to: "/agenda" })}
+                >
+                  Open Agenda
+                </Button>
+              }
+            >
+              <div className="flex flex-col gap-3 px-1">
+                {agenda.overdue.length ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Text variant="small-strong" color="secondary" className="px-1">
+                      Overdue
+                    </Text>
+                    <AgendaList
+                      entries={agenda.overdue.map(todoEntry)}
+                      now={now}
+                      focusKeys={planning.data?.focusKeys ?? []}
+                      onOpen={openTodo}
+                      onPin={(todo) => toggleFocus(planning, todo)}
+                    />
+                  </div>
+                ) : null}
+                {agendaDays.map(({ date, entries }) => {
+                  if (span === "week" && !entries.length) return null;
+                  return (
+                    <div key={date} className="flex flex-col gap-1.5">
+                      {span === "week" || agenda.overdue.length ? (
+                        <Text variant="small-strong" color="secondary" className="px-1">
+                          {span === "week" ? dayHeading(date) : "Today"}
+                        </Text>
+                      ) : null}
+                      {entries.length ? (
+                        <AgendaList
+                          entries={entries}
+                          now={now}
+                          focusKeys={planning.data?.focusKeys ?? []}
+                          onOpen={openTodo}
+                          onOpenEvent={(event) => openEvent(event)}
+                          onPin={(todo) => toggleFocus(planning, todo)}
+                        />
+                      ) : (
+                        <Text color="tertiary" className="px-1 py-2">
+                          {agendaLoading ? "Loading…" : "Nothing scheduled today."}
+                        </Text>
+                      )}
+                    </div>
+                  );
+                })}
+                {span === "week" && !agendaCount && !agendaLoading ? (
+                  <Text color="tertiary" className="px-1 py-2">
+                    Nothing scheduled this week.
+                  </Text>
+                ) : null}
+              </div>
+              <Button
+                size="small"
+                variant="transparent"
+                className="self-start"
+                onClick={openCapture}
+              >
+                <Plus />
+                New item
+              </Button>
+            </Card>
 
             {mailOn ? (
               <Card
@@ -444,86 +523,7 @@ export function HomeView() {
                 />
               </Card>
             ) : null}
-
-            <Card
-              title="Your tasks"
-              count={todos.length}
-              action={
-                <Button
-                  size="small"
-                  variant="transparent"
-                  onClick={() => void navigate({ to: "/agenda" })}
-                >
-                  Open Agenda
-                </Button>
-              }
-            >
-              <div className="px-1">
-                {todos.length ? (
-                  <AgendaList
-                    entries={todos.map(todoEntry)}
-                    now={now}
-                    focusKeys={planning.data?.focusKeys ?? []}
-                    onOpen={openTodo}
-                    onPin={(todo) => toggleFocus(planning, todo)}
-                  />
-                ) : (
-                  <Text color="tertiary" className="px-1 py-2">
-                    {span === "today" ? "Nothing due today." : "Nothing due this week."}
-                  </Text>
-                )}
-              </div>
-              <Button
-                size="small"
-                variant="transparent"
-                className="self-start"
-                onClick={openCapture}
-              >
-                <Plus />
-                New item
-              </Button>
-            </Card>
           </div>
-
-          {calendarOn ? (
-            <Card title="Meetings" count={meetingCount} className="self-start">
-              <div className="flex flex-col gap-3 px-1 pb-1">
-                {dates.map((date) => {
-                  const day = byDay.get(date);
-                  const entries = [...(day?.allDay ?? []), ...(day?.timed ?? [])].map(eventEntry);
-                  if (span === "week" && !entries.length) return null;
-                  return (
-                    <div key={date} className="flex flex-col gap-1.5">
-                      {span === "week" ? (
-                        <Text variant="small-strong" color="secondary" className="px-1">
-                          {dayHeading(date)}
-                        </Text>
-                      ) : null}
-                      {entries.length ? (
-                        <AgendaList
-                          entries={entries}
-                          now={now}
-                          focusKeys={[]}
-                          onOpen={openTodo}
-                          onOpenEvent={(event) => openEvent(event)}
-                          onPin={() => undefined}
-                        />
-                      ) : (
-                        <Text color="tertiary" className="px-1">
-                          {calendar.isPending ? "Loading…" : "No meetings today."}
-                        </Text>
-                      )}
-                    </div>
-                  );
-                })}
-                {span === "week" && !meetingCount && !calendar.isPending ? (
-                  <Text color="tertiary" className="px-1">
-                    No meetings this week.
-                  </Text>
-                ) : null}
-              </div>
-            </Card>
-          ) : null}
         </div>
       </div>
     </ScrollArea>
