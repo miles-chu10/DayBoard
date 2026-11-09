@@ -395,7 +395,7 @@
             </div>
           </div>
           <a class="nav-link" href="pricing.html">Pricing</a>
-          <a class="nav-link" href="download.html">Download</a>
+          <a class="nav-link" href="waitlist.html">Waitlist</a>
         </div>
         <button
           class="theme-toggle"
@@ -434,7 +434,7 @@
           </svg>
           <span class="theme-label">Light</span>
         </button>
-        <a class="button" href="#join">Join the waitlist</a>
+        <a class="button" href="download.html">Download</a>
         <details class="mobile-menu">
           <summary aria-label="Open navigation">
             <span class="menu-icon" aria-hidden="true"
@@ -457,10 +457,10 @@
             </div>
             <span class="menu-caption">DayBoard</span>
             <div class="menu-sections">
-              <a href="/pricing.html">Pricing</a><a href="/download.html">Download</a>
+              <a href="/pricing.html">Pricing</a><a href="/waitlist.html">Waitlist</a>
             </div>
-            <a class="menu-join" href="/waitlist.html"
-              >Join the waitlist <span aria-hidden="true">→</span></a
+            <a class="menu-join" href="/download.html"
+              >Download <span aria-hidden="true">→</span></a
             >
           </div>
         </details>
@@ -484,35 +484,49 @@
             Assistant beside any view. Works with Google Calendar, Google Tasks, Apple Reminders and
             Gmail.
           </p>
-          <form class="signup rise" style="--i: 3" id="join" data-signup method="post" novalidate>
-            <div class="signup-row">
-              <label class="visually-hidden" for="email-hero">Email address</label>
-              <input
-                id="email-hero"
-                disabled
-                name="email"
-                type="email"
-                autocomplete="email"
-                placeholder="you@example.com"
-                required
-                maxlength="254"
-              />
-              <div class="trap" aria-hidden="true">
-                <label for="company-hero">Leave this empty</label
-                ><input id="company-hero" name="company" tabindex="-1" autocomplete="off" />
-              </div>
-              <button class="button" type="submit" disabled>Join the waitlist</button>
-            </div>
-            <p class="signup-note">We invite people in small groups, with no set dates. No spam.</p>
-            <p class="signup-status" role="status" aria-live="polite"></p>
-            <noscript><p class="signup-note">Turn on JavaScript to join the list.</p></noscript>
-          </form>
+          <div class="c-actions rise" style="--i: 3">
+            <a
+              class="button button-download"
+              href="https://github.com/miles-chu10/DayBoard/releases/download/v1.3.0-beta.20/DayBoard-1.3.0-beta.20-arm64.dmg"
+              ><svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M12 4v11" />
+                <path d="m7 11 5 5 5-5" />
+                <path d="M5 20h14" /></svg
+              >Download for Mac</a
+            >
+            <a class="button button-quiet" href="#get-started"
+              ><svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="m5 8 4 4-4 4" />
+                <path d="M12 16h7" /></svg
+              >Install from Terminal</a
+            >
+          </div>
           <p class="c-access rise" style="--i: 4">
-            A limited
-            <a href="download.html">beta community download</a>
-            is available. The app is signed, notarized by Apple and updates itself. Google sign-in
-            may be limited to invited accounts.
-            <a href="beta.html#install">Read the install guide</a>.
+            Free, with a 14-day AI trial. DayBoard 1.3.0 beta 20 for Apple silicon Macs on macOS 14
+            or later, signed and notarized by Apple. Google sign-in may be limited to invited
+            accounts. <a href="beta.html#install">Read the install guide</a>.
           </p>
         </div>
         <section class="wrap product-demo" id="demo" aria-labelledby="demo-title" tabindex="-1">
@@ -543,6 +557,91 @@
             </figure>
           </noscript>
         </section>
+      </section>
+
+      <section
+        class="section get-started"
+        id="get-started"
+        aria-labelledby="get-started-title"
+        tabindex="-1"
+      >
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <span class="eyebrow">Getting started</span>
+            <h2 id="get-started-title">Install DayBoard <em>in a minute.</em></h2>
+            <p>
+              Pick either way. Both install the same signed, notarized app, and it updates itself
+              from then on.
+            </p>
+          </div>
+          <div class="gs-grid" data-reveal>
+            <article class="gs-card" aria-labelledby="gs-download-title">
+              <span class="gs-step">Option 1</span>
+              <h3 id="gs-download-title">Download the app</h3>
+              <p>
+                Open the disk image and drag DayBoard into your Applications folder. If macOS asks
+                whether to open an app downloaded from the internet, click Open.
+              </p>
+              <a
+                class="button button-download"
+                href="https://github.com/miles-chu10/DayBoard/releases/download/v1.3.0-beta.20/DayBoard-1.3.0-beta.20-arm64.dmg"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M12 4v11" />
+                  <path d="m7 11 5 5 5-5" />
+                  <path d="M5 20h14" /></svg
+                >Download for Mac</a
+              >
+              <p class="gs-fine">
+                DayBoard 1.3.0 beta 20 · 138.4 MB ·
+                <a href="download.html">Requirements and release notes</a>
+              </p>
+            </article>
+            <article class="gs-card" aria-labelledby="gs-terminal-title">
+              <span class="gs-step">Option 2</span>
+              <h3 id="gs-terminal-title">Install from Terminal</h3>
+              <p>Paste this into Terminal. It installs DayBoard into Applications.</p>
+              <div class="gs-command">
+                <pre><code id="install-command">curl -fsSL https://getdayboard.com/install.sh | bash</code></pre>
+                <button class="gs-copy" type="button" data-copy="install-command" hidden>
+                  Copy
+                </button>
+              </div>
+              <p class="gs-status" role="status" aria-live="polite"></p>
+              <p class="gs-fine">
+                The script downloads the same disk image from GitHub, checks its SHA-256, Apple's
+                notarization and DayBoard's developer signature, and never asks for your password.
+                <a href="https://github.com/miles-chu10/DayBoard/blob/main/website/install.sh"
+                  >Read the script</a
+                >.
+              </p>
+            </article>
+          </div>
+          <ol class="gs-next" data-reveal>
+            <li>
+              <strong>Open DayBoard.</strong> A short welcome helps you connect Google Calendar,
+              Google Tasks, Gmail and Apple Reminders. Every step can be skipped.
+            </li>
+            <li>
+              <strong>Plan your day.</strong> Home shows what needs you, what's due and your next
+              meeting. The <a href="docs.html">guide</a> covers the controls and shortcuts.
+            </li>
+            <li>
+              <strong>Try the Assistant if you like.</strong> AI is optional and free for 14 days on
+              each Mac. Everything else stays free.
+            </li>
+          </ol>
+        </div>
       </section>
 
       <section class="section" id="how" aria-labelledby="how-title">
@@ -1098,15 +1197,13 @@
               </p>
             </details>
             <details>
-              <summary>How do I get early access?</summary>
+              <summary>How do I get DayBoard?</summary>
               <p>
-                Join the waitlist with your email. If you'll connect Google, use that Google
-                account's address. We invite people in small groups, with no set dates, and joining
-                doesn't guarantee an invite. If you're invited, you'll get a download link and
-                onboarding steps. A limited
-                <a href="download.html">beta community download</a>
-                is also available. The app is notarized and updates itself; Google sign-in may be
-                limited to invited accounts.
+                <a href="#get-started">Download it or install it from Terminal</a>. The app is
+                signed, notarized by Apple and updates itself. Google sign-in may be limited to
+                invited accounts. To ask for an invite, <a href="#join">join the waitlist</a> with
+                the address of the Google account you'll connect. We invite people in small groups,
+                with no set dates, and joining doesn't guarantee an invite.
               </p>
             </details>
             <details>
@@ -1157,8 +1254,51 @@
               ><span class="dot c-reminders"></span><span class="dot c-mail"></span
             ></span>
             <h2 id="cta-title">Get your day <em>on the board.</em></h2>
-            <p>Join the waitlist. We invite people in small groups, with no set dates.</p>
-            <form class="signup" data-signup method="post" novalidate>
+            <p>DayBoard is free to download. AI is optional and free for 14 days.</p>
+            <div class="c-actions">
+              <a
+                class="button button-download"
+                href="https://github.com/miles-chu10/DayBoard/releases/download/v1.3.0-beta.20/DayBoard-1.3.0-beta.20-arm64.dmg"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M12 4v11" />
+                  <path d="m7 11 5 5 5-5" />
+                  <path d="M5 20h14" /></svg
+                >Download for Mac</a
+              >
+              <a class="button button-quiet" href="#get-started"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="m5 8 4 4-4 4" />
+                  <path d="M12 16h7" /></svg
+                >Install from Terminal</a
+              >
+            </div>
+            <p class="cta-waitlist">
+              Connecting Google? Sign-in may be limited to invited accounts. Join the waitlist with
+              your Google account's address. We invite people in small groups, with no set dates.
+            </p>
+            <form class="signup" id="join" data-signup method="post" novalidate>
               <div class="signup-row">
                 <label class="visually-hidden" for="email-cta">Email address</label>
                 <input

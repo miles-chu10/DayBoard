@@ -379,7 +379,7 @@
             </div>
           </div>
           <a class="nav-link" href="pricing.html">Pricing</a>
-          <a class="nav-link" href="download.html" aria-current="page">Download</a>
+          <a class="nav-link" href="waitlist.html">Waitlist</a>
         </div>
         <button
           class="theme-toggle"
@@ -418,7 +418,7 @@
           </svg>
           <span class="theme-label">Light</span>
         </button>
-        <a class="button" href="waitlist.html">Join the waitlist</a>
+        <a class="button" href="download.html" aria-current="page">Download</a>
         <details class="mobile-menu">
           <summary aria-label="Open navigation">
             <span class="menu-icon" aria-hidden="true"
@@ -441,10 +441,10 @@
             </div>
             <span class="menu-caption">DayBoard</span>
             <div class="menu-sections">
-              <a href="/pricing.html">Pricing</a><a href="/download.html">Download</a>
+              <a href="/pricing.html">Pricing</a><a href="/waitlist.html">Waitlist</a>
             </div>
-            <a class="menu-join" href="/waitlist.html"
-              >Join the waitlist <span aria-hidden="true">→</span></a
+            <a class="menu-join" href="/download.html"
+              >Download <span aria-hidden="true">→</span></a
             >
           </div>
         </details>
@@ -495,6 +495,18 @@
               <a href="beta.html#install">install guide</a> covers Google sign-in.
             </li>
           </ol>
+          <p>
+            Prefer Terminal? This one line downloads the same disk image, checks its SHA-256,
+            Apple's notarization and DayBoard's developer signature, then copies DayBoard into
+            Applications. It never asks for your password, and you can
+            <a href="https://github.com/miles-chu10/DayBoard/blob/main/website/install.sh"
+              >read the script</a
+            >
+            first.
+          </p>
+          <pre
+            class="command"
+          ><code>curl -fsSL https://getdayboard.com/install.sh | bash</code></pre>
           <p>
             Already on beta 12 or later? DayBoard installs new betas when you restart, so you don't
             need to download it again.

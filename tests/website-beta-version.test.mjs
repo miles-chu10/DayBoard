@@ -11,6 +11,8 @@ const currentBetaCopy = {
     /Beta (\d+) · Limited access/g,
     /Explore the beta (\d+) guide/g,
     /What's available in beta (\d+)/g,
+    /DayBoard \d+\.\d+\.\d+ beta (\d+) for Apple silicon/g,
+    /DayBoard \d+\.\d+\.\d+ beta (\d+) · [\d.]+ MB/g,
   ],
   "docs.html": [/Get started with DayBoard beta (\d+)/g, /make beta (\d+) work the way you do/g],
 };
@@ -30,4 +32,27 @@ test("the homepage and guide name the beta the download page links", async () =>
       assert.deepEqual(found, [beta], `${page} ${pattern} names beta ${beta}`);
     }
   }
+});
+
+// The homepage's download buttons and the Terminal installer fetch the DMG directly, so they must
+// name the same file the download page links.
+test("the homepage buttons and the installer fetch the DMG the download page links", async () => {
+  const dmgLinks = (text) => [
+    ...new Set(
+      [
+        ...text.matchAll(/releases\/download\/v(\d+\.\d+\.\d+-beta\.\d+)\/DayBoard-\1-arm64\.dmg/g),
+      ].map((m) => m[1]),
+    ),
+  ];
+  const linked = dmgLinks(await read("download.html"));
+  assert.equal(linked.length, 1, "download.html links exactly one DMG");
+
+  assert.deepEqual(dmgLinks(await read("index.html")), linked, "index.html download buttons");
+
+  const installer = await read("install.sh");
+  assert.equal(installer.match(/^VERSION="([^"]+)"$/m)?.[1], linked[0], "install.sh VERSION");
+
+  const size = (await read("download.html")).match(/([\d.]+) MB disk image/)?.[1];
+  assert.ok(size, "download.html states the DMG size");
+  assert.match(await read("index.html"), new RegExp(`· ${size.replace(".", "\\.")} MB ·`));
 });
