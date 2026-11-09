@@ -218,7 +218,7 @@ Strict official-release packaging rejects community mode.
 
 Configured official builds are free except for AI. **DayBoard Pro** ($5, once) unlocks the AI
 assistant, AI actions, transcription and Quick Capture; tasks, reminders, calendar, mail, linked
-duplicates and settings stay free. AI has a **7-day trial** that starts the first time you use it.
+duplicates and settings stay free. AI has a **14-day trial** that starts the first time you use it.
 License activation is in Settings, with a **30-day offline validation grace period**. Demo and
 unconfigured preview builds do not open the personal license store or make licensing requests.
 **AI model usage is not included in the purchase**: AI runs on your own provider account.
