@@ -22,6 +22,10 @@ for the daily check. The trial is tracked on your Mac.
 
 ## Also in this build
 
+- **Send feedback from the app.** Help → Send Feedback… opens a new email to
+  support@getdayboard.com with your DayBoard and macOS versions filled in. If your mail lives in a
+  browser, Help → Copy Feedback Address copies the address instead. Settings → Updates has both in
+  a new Feedback section (#92).
 - In demo mode, opening a message from Home now shows it in the Inbox folder (#80).
 
 ## Updating
