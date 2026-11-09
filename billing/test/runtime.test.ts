@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions, Response as RuntimeResponse } from "miniflare";
 import Stripe from "stripe";
 import { DayBoardLicenseVerifier } from "../../main/services/license/dayboard-verifier.ts";
 import { LicenseService, type LicenseRecord } from "../../main/services/license/license-service.ts";
+import { createUsageCheckIn } from "../../main/services/usage-checkin.ts";
 import { randomToken } from "../src/crypto.ts";
 
 const origin = "https://billing.example.test";
@@ -358,6 +361,78 @@ test("real Worker and D1 issue a comp key the desktop app activates, then revoke
     assert.equal((await desktop.refresh()).state, "invalid");
     await assert.rejects(second.activate(licenseKey, "Second tester Mac"), /has been revoked/);
     assert.equal(outbound, 0);
+  } finally {
+    await mf.dispose();
+  }
+});
+
+test("real Worker and D1 record the desktop app's daily check-in", async (t) => {
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: await workerScript(),
+      compatibilityDate: "2026-09-22",
+      compatibilityFlags: ["nodejs_compat"],
+      cf: false,
+      d1Databases: ["DB"],
+      d1Persist: false,
+      bindings: {
+        SERVICE_ORIGIN: origin,
+        PRODUCT_ID: "prod_RUNTIME",
+        PRICE_ID: "price_RUNTIME",
+        PRICE_CURRENCY: "usd",
+        ENVIRONMENT: "test",
+        ACTIVATION_LIMIT: "3",
+        STRIPE_SECRET_KEY: "rk_test_disposable_runtime",
+        STRIPE_WEBHOOK_SECRET: `whsec_${randomToken()}`,
+        ENCRYPTION_KEY: randomToken(),
+        HASH_SECRET: randomToken(),
+      },
+      outboundService: async () => {
+        throw new Error("a check-in makes no outbound request");
+      },
+    }),
+  );
+  const dir = await mkdtemp(join(tmpdir(), "dayboard-runtime-checkin-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  try {
+    const db = await mf.getD1Database("DB");
+    await migrate(db);
+    let licenseState = "trial";
+    let day = new Date();
+    const checkIn = createUsageCheckIn({
+      apiUrl: origin,
+      appVersion: "1.3.0-beta.20",
+      statePath: join(dir, "usage-checkin.json"),
+      isEnabled: async () => true,
+      licenseState: async () => licenseState,
+      now: () => day,
+      fetch: async (input, init) => {
+        const response = await mf.dispatchFetch(
+          String(input),
+          init as Parameters<typeof mf.dispatchFetch>[1],
+        );
+        return new Response(response.status === 204 ? null : await response.arrayBuffer(), {
+          status: response.status,
+        });
+      },
+    });
+    assert.equal(await checkIn.runOnce(), "sent");
+    // A second app day on the same server day only updates the row.
+    licenseState = "licensed";
+    day = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+    assert.equal(await checkIn.runOnce(), "sent");
+    const rows = await db
+      .prepare("SELECT day, first_day, app_version, license_state FROM usage_checkins")
+      .all<Record<string, string>>();
+    const today = new Date().toISOString().slice(0, 10);
+    assert.deepEqual(rows.results, [
+      { day: today, first_day: today, app_version: "1.3.0-beta.20", license_state: "licensed" },
+    ]);
+    const summary = await db
+      .prepare("SELECT active_today, pro_30_days, installs_seen FROM usage_summary")
+      .first<Record<string, number>>();
+    assert.deepEqual({ ...summary }, { active_today: 1, pro_30_days: 1, installs_seen: 1 });
   } finally {
     await mf.dispose();
   }

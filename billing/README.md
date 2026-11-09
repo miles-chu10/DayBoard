@@ -162,6 +162,22 @@ Revoking sets the comp license's payment tombstone, the same flag a full refund 
 
 What is stored: each comp license is an ordinary `licenses` row (the key's HMAC and AES-GCM ciphertext, never the plaintext), and a `comp_licenses` row with the label and the issue and revocation times. No email address or other tester identity is stored. Because `licenses.order_id` and `licenses.payment_intent_id` are `NOT NULL` foreign keys, and rebuilding `licenses` would risk issued keys, each comp license also gets a placeholder `orders` row and `payments` row with the ID `comp_<licenseId>`. The placeholder order expired at time zero and can't be claimed, its ID doesn't fit the checkout routes, and no Stripe ID starts with `comp_`. Leave comp licenses out of sales counts, for example `SELECT COUNT(*) FROM licenses WHERE id NOT IN (SELECT license_id FROM comp_licenses)`.
 
+## Usage check-ins
+
+Official DayBoard releases with licensing send one anonymous check-in a day to `POST /v1/usage/checkin`, so the owner can count Macs in use, AI trials and Pro installs. The body is exactly `{ installId, appVersion, licenseState }`: a random version 4 UUID the app made for this (not the license installation ID, not derived from hardware), the app version, and one of `trial`, `expired`, `licensed`, `invalid`, `network-error` or `unreadable`. Anything else, including extra fields, gets `400 invalid_checkin` and stores nothing. The day comes from the Worker's clock (UTC), never the request. A success is `204`. Each client address gets 20 check-ins a minute; the rate limit keeps only a keyed hash of the address. Nothing logs the body.
+
+The Worker keeps one `usage_checkins` row per install and day and deletes rows older than 400 days on each check-in. `first_day` carries an install's first check-in forward, so new installs stay countable after old rows go. A wiped app or a second macOS account makes a new ID, so "installs" can overcount people a little. Users turn check-ins off in Settings > Updates; preview, test, QA, demo and App Store builds never send them. The privacy page describes all of this; change it with any change here.
+
+Read the counts in the Cloudflare dashboard (D1, `dayboard`, Console) or with `npx wrangler d1 execute dayboard --remote --command "<query>"`:
+
+| View             | Shows                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `usage_summary`  | Installs active today, in the last 7 and 30 days, new in the last 30 days, Pro in the last 30 days, and all installs seen      |
+| `usage_daily`    | Per UTC day, newest first: active installs, new installs, and how many were in the trial, past it, Pro, or had a license issue |
+| `usage_versions` | Installs per app version in the last 7 days                                                                                    |
+
+Setup, from Miles's Mac (not performed here): back up D1, apply `migrations/0007_usage_checkins.sql` with `npx wrangler d1 migrations apply <database> --remote` (it only adds the table, an index and the three views), then deploy. Until the migration is applied, check-ins get `503`, which the app ignores and retries the next hour. Deploy the Worker and the privacy page before releasing an app version that sends check-ins.
+
 ## Durable states and recovery
 
 A signed webhook is only an input. Before minting, the service retrieves the current Checkout Session, PaymentIntent, and line items and checks test/live mode, paid state, amount, currency, exact product and price, and quantity one. A D1 transaction persists payment ownership, one encrypted key bound to the issuing origin/product/environment, order state, and event deduplication. Retries return the original key. Full refunds and disputes create permanent payment tombstones even if they arrive before the paid webhook. Later paid events cannot restore access. Partial refunds currently retain access; dispute reversal does **not** automatically regrant. Confirm this policy before launch. An unpaid `checkout.session.completed` is durably acknowledged as pending; only subsequent verified asynchronous success can issue a key. Failed asynchronous payment stays unentitled. Manual regrant requires a separately reviewed process and database audit trail.

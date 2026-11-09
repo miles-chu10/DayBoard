@@ -113,7 +113,7 @@
           <h1>Privacy, <em>plainly.</em></h1>
           <p>
             DayBoard keeps your calendar, tasks, reminders and mail between your Mac and the
-            services you connect. This page explains what goes where. Last updated November 8, 2026.
+            services you connect. This page explains what goes where. Last updated November 9, 2026.
           </p>
         </div>
       </header>
@@ -123,8 +123,10 @@
           <h2>The DayBoard app</h2>
           <ul>
             <li>
-              <strong>No tracking.</strong> The app has no analytics, advertising or tracking, and
-              DayBoard has no server that receives your calendar, tasks, reminders or mail.
+              <strong>No ads or analytics services.</strong> The app has no advertising and no
+              third-party analytics, and DayBoard has no server that receives your calendar, tasks,
+              reminders or mail. Its only usage count is the anonymous
+              <a href="#checkin">daily check-in</a>, which you can turn off.
             </li>
             <li>
               <strong>On your Mac:</strong> settings, linked items and Assistant history are stored
@@ -171,9 +173,23 @@
               installation ID one-way from your Mac's hardware UUID, so it stays the same if you
               reinstall DayBoard or delete its data, and every macOS account on that Mac sends the
               same one. The hardware UUID itself is never sent or stored. If DayBoard can't read it,
-              the installation ID is random. The AI trial is tracked only on your Mac: DayBoard
-              contacts the license service only when you activate or deactivate a key, and for that
-              daily check. See <a href="#purchases">Purchases</a>.
+              the installation ID is random. The AI trial's clock is kept only on your Mac. Apart
+              from the daily check-in, DayBoard contacts the license service only when you activate
+              or deactivate a key, and for that daily license check. See
+              <a href="#purchases">Purchases</a>.
+            </li>
+            <li id="checkin">
+              <strong>Daily check-in (on unless you turn it off):</strong> versions after 1.3.0 beta
+              19 tell DayBoard's license service, at most once a day, that DayBoard is in use, so we
+              can count how many people use it. A check-in sends a random ID that DayBoard creates
+              for this purpose (not derived from your Mac's hardware, and not the license
+              installation ID), the DayBoard version, and the license state: in the AI trial, trial
+              ended, Pro, or a license problem. The service stores those with the date and deletes
+              them after about 13 months. It never receives your calendar, tasks, reminders, mail,
+              AI conversations, Google account, name, email address or license key, and it doesn't
+              store your IP address; to limit abuse it briefly keeps a keyed hash of it, not the
+              address itself. Turn it off in Settings &gt; Updates. Deleting DayBoard's data makes a
+              new ID. Only official releases with licensing send check-ins.
             </li>
           </ul>
 
