@@ -179,9 +179,10 @@ the workflow names the live values itself (see above). Also before the first lic
   `SERVICE_ORIGIN=https://api.getdayboard.com`, `PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`,
   `ENVIRONMENT=live` and `ACTIVATION_LIMIT=3`. The app accepts only keys whose issuer, product
   and environment match exactly.
-- Beta testers have their free Pro keys. Installed betas update into the AI trial: AI and Quick
-  Capture start a 7-day trial on first use, everything else stays free, and a key in Settings →
-  License unlocks Pro.
+- Installed betas update into the AI trial: AI, including Quick Capture's AI parsing, starts a
+  14-day trial on first use (`TRIAL_DAYS` in `main/services/license/config.ts`), everything else
+  stays free, and a key in Settings → License unlocks Pro. Beta testers get the same trial; there
+  are no free tester keys.
 - No further free betas can be tagged; a later free build needs `DAYBOARD_LICENSE: "off"` back
   in the workflow and a new version.
 
