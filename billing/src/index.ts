@@ -5,7 +5,9 @@ import { checkout } from "./checkout.ts";
 import { config, type Env } from "./config.ts";
 import { error } from "./http.ts";
 import { licenses } from "./licenses.ts";
+import { usageCheckIn } from "./usage.ts";
 import { webhook } from "./webhook.ts";
+import { USAGE_CHECKIN_PATH } from "../../shared/usage-checkin.ts";
 
 // /v1/beta-signup is the legacy alias of /v1/waitlist, kept for pages cached before the rename.
 const SIGNUP_PATHS = ["/v1/waitlist", "/v1/beta-signup"];
@@ -41,6 +43,7 @@ export function createWorker(
         if (path === "/v1/stripe/webhook")
           return await webhook(request, env, cfg, stripeFactory(env));
         if (path.startsWith("/v1/licenses/")) return await licenses(request, env, cfg);
+        if (path === USAGE_CHECKIN_PATH) return await usageCheckIn(request, env);
         if (path.startsWith("/v1/admin/")) return await admin(request, env, cfg);
         if (
           [

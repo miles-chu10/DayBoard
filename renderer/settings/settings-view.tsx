@@ -19,6 +19,7 @@ import { McpTab } from "./mcp-tab";
 import { SourcesTab } from "./sources-tab";
 import { LicenseTab } from "./license-tab";
 import { UpdatesTab } from "./updates-tab";
+import { UsageCheckInSettings } from "./usage-settings";
 import { FeedbackSettings } from "./feedback-settings";
 import { isAppStoreBuild } from "@shared/app-store-build";
 import { isSettingsTab as isKnownTab, type SettingsTab } from "@shared/settings-navigation";
@@ -124,6 +125,7 @@ export function SettingsView() {
         <TabsContent value="updates" className={TAB_CONTENT_CLASS}>
           <UpdatesTab />
           <FeedbackSettings />
+          <UsageCheckInSettings />
         </TabsContent>
       </ScrollArea>
     </TabsRoot>

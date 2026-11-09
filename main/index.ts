@@ -21,6 +21,7 @@ import { clearAttachmentPicks } from "./services/ai/attachments.js";
 import { clearReminderIdentities } from "./services/apple-reminders.js";
 import { drainNativeThemeWrites, loadNativeTheme } from "./platform/native-theme.js";
 import { registerUpdateHandlers } from "./handlers/updates.js";
+import { registerUsageCheckIn } from "./handlers/usage.js";
 import { pauseAndDrainAppOperations, resumeAppOperations } from "./services/runtime-activity.js";
 
 let updates: ReturnType<typeof registerUpdateHandlers> | undefined;
@@ -108,6 +109,7 @@ if (acquireSingleInstanceLock()) {
         },
         resumeAfterInstallFailure: resumeAppOperations,
       });
+      const usageCheckIn = registerUsageCheckIn();
       setupApplicationMenu({
         checkForUpdates: () => updates!.check(),
         openQuickCapture: () => void showPanel("capture"),
@@ -121,6 +123,7 @@ if (acquireSingleInstanceLock()) {
       startSystemPanels();
       await createMainWindow();
       updates.startAutomatic();
+      usageCheckIn.start();
     })
     .catch((error) => {
       logger.error("main", "Failed to start DayBoard", error);

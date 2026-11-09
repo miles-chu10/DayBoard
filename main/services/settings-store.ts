@@ -115,6 +115,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     followUpDays: 3,
   },
   calendar: { range: "next-7-days", visibility: {} },
+  privacy: { usageCheckIn: true },
   mcpServer: { enabled: false, allowWrites: false },
   ai: {
     enabled: false,
@@ -227,6 +228,7 @@ export function normalizeSettings(value: unknown): AppSettings {
   const mail = record(root.mail);
   const calendar = record(root.calendar);
   const ai = record(root.ai);
+  const privacy = record(root.privacy);
   const mcpServer = record(root.mcpServer);
   const features = record(ai.features);
   const system = record(root.system);
@@ -282,6 +284,9 @@ export function normalizeSettings(value: unknown): AppSettings {
         LEGACY_CALENDAR_DAYS[Number(calendar.daysAhead)] ?? defaults.calendar.range,
       ),
       visibility,
+    },
+    privacy: {
+      usageCheckIn: bool(privacy.usageCheckIn, defaults.privacy.usageCheckIn),
     },
     mcpServer: {
       enabled: bool(mcpServer.enabled, defaults.mcpServer.enabled),
