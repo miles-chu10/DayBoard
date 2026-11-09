@@ -29,8 +29,11 @@ function run(buyUrl) {
   return { button, note };
 }
 
-test("the shipped site keeps the buy button hidden and says checkout isn't open", () => {
-  assert.match(source, /buyUrl: ""/);
+test("the shipped site points its buy buttons at the live checkout page", () => {
+  assert.match(source, /buyUrl: "https:\/\/api\.getdayboard\.com\/buy"/);
+});
+
+test("an empty checkout address keeps the buy button hidden and says checkout isn't open", () => {
   const { button, note } = run("");
   assert.equal(button.hidden, true);
   assert.equal(button.href, undefined);
