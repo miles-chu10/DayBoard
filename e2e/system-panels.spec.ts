@@ -216,13 +216,36 @@ async function openMenuBarAgenda(app: ElectronApplication): Promise<Page> {
   return opened;
 }
 
-test("File → Menu Bar Agenda shows today's panel", async () => {
+test("File → Menu Bar Agenda shows today's panel", async ({
+  playwright: _playwright,
+}, testInfo) => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
     await expect(panel.getByRole("heading", { name: "Today" })).toBeVisible();
     await expect(panel.getByRole("region", { name: "Today's items" })).toBeVisible();
     await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(true);
+
+    // Overdue to-dos fold into one row, like Home, and the panel remembers when it's open.
+    const overdue = panel
+      .getByRole("region", { name: "Overdue items" })
+      .getByRole("button", { name: "3 overdue tasks" });
+    const lateTask = panel.getByText("Send Q4 budget to finance", { exact: true });
+    await expect(overdue).toHaveAttribute("aria-expanded", "false");
+    await expect(lateTask).toBeHidden();
+    await panel.screenshot({ path: testInfo.outputPath("menubar-overdue-collapsed.png") });
+    await overdue.click();
+    await expect(overdue).toHaveAttribute("aria-expanded", "true");
+    await expect(lateTask).toBeVisible();
+    await panel.waitForTimeout(250);
+    await panel.screenshot({ path: testInfo.outputPath("menubar-overdue-open.png") });
+    await panel.reload();
+    await expect(
+      panel.getByRole("region", { name: "Overdue items" }).getByRole("button", {
+        name: "3 overdue tasks",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await expect(panel.getByText("Send Q4 budget to finance", { exact: true })).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();

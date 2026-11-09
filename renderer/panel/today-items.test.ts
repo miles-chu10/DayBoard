@@ -27,7 +27,7 @@ function event(id: string, start: string, end: string) {
 
 function todo(
   key: string,
-  overrides: Partial<{ dueTime: string | null; completed: boolean }> = {},
+  overrides: Partial<{ dueDate: string; dueTime: string | null; completed: boolean }> = {},
 ) {
   return {
     key,
@@ -84,12 +84,34 @@ test("lists today's remaining events then due to-dos", () => {
   assert.equal(result.items[3].time, null);
 });
 
-test("counts overdue to-dos", () => {
+test("counts and lists open overdue to-dos with how late they are", () => {
   const result = todayItems(
-    agenda({ overdue: [todo("o1"), todo("o2"), todo("o3", { completed: true })] }),
+    agenda({
+      overdue: [
+        todo("o1", { dueDate: "2026-10-15" }),
+        todo("o2", { dueDate: "2026-10-19" }),
+        todo("o3", { dueDate: "2026-10-19", completed: true }),
+      ],
+    }),
     now,
   );
   assert.equal(result.overdueCount, 2);
+  assert.deepEqual(
+    result.overdue.map((item) => [item.key, item.kind, item.time]),
+    [
+      ["o1", "todo", "5 days ago"],
+      ["o2", "todo", "Yesterday"],
+    ],
+  );
+});
+
+test("caps the overdue list at eight but counts every overdue to-do", () => {
+  const overdue = Array.from({ length: 12 }, (_, index) =>
+    todo(`o${index}`, { dueDate: "2026-10-18" }),
+  );
+  const result = todayItems(agenda({ overdue }), now);
+  assert.equal(result.overdueCount, 12);
+  assert.equal(result.overdue.length, 8);
 });
 
 test("caps the list at eight", () => {
