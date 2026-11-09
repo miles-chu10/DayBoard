@@ -43,9 +43,12 @@ Open items, with what each waits on, are under "Remaining work".
 ### Release and update path
 
 - Since beta.12 every published beta is Developer ID signed (team `LGJS5APK9X`), notarized and
-  stapled by the **Signed macOS release** workflow, which runs when a `v` tag is pushed. It builds a
-  free release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=off`), so every feature, AI included,
-  is free in published betas. Official builds check for and download updates in the background and
+  stapled by the **Signed macOS release** workflow, which runs when a `v` tag is pushed. Through
+  beta.18 it built a free release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=off`), so every
+  feature, AI included, was free. From beta.19 it builds with licensing on against the live license
+  service (`https://api.getdayboard.com`, product `prod_VZ5SiyzDZ4ASHs`, both set in the workflow):
+  AI is behind DayBoard Pro with a 7-day trial from first AI use, and everything else stays free.
+  Official builds check for and download updates in the background and
   install on restart or quit. The manual **Signed macOS beta** workflow is an updates-off signing
   dry run. Local `npm run package:preview` builds are still ad-hoc signed. See `docs/RELEASE.md`.
 - Tags are pushed only from Miles's Mac, and each push needs his approval.
@@ -179,10 +182,10 @@ Open items, with what each waits on, are under "Remaining work".
   remain gated.
 - On main, PR #67 (`a48d205`) made DayBoard Pro a $5 AI-only unlock with Stripe Managed Payments,
   and `main/services/license/config.ts` sets `TRIAL_DAYS = 7`. #67 shipped in beta.17 and #75 (comp
-  licenses, Quick Capture, deactivation and installation-ID fixes) in beta.18, both inactive:
-  published betas build with `DAYBOARD_LICENSE: "off"` (`.github/workflows/macos-release.yml:59`),
-  so every feature, AI included, is free. Payment code merged to main reaches users unchanged only
-  while that stays off; turning it on is a release-workflow change.
+  licenses, Quick Capture, deactivation and installation-ID fixes) in beta.18, both inactive
+  because betas through beta.18 built with `DAYBOARD_LICENSE: "off"`. Beta.19 turns licensing on
+  in `.github/workflows/macos-release.yml`, so every `v*` tag after it, betas included, is a paid
+  build; a later free build needs `"off"` back through a PR and a new version.
 - A separate project thread, "Get DayBoard ready to take payments", owns the payment flow.
 
 ### Glaze

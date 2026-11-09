@@ -771,14 +771,10 @@ test("tag releases build with licensing on and the live license service; the bet
   const workflow = (name) =>
     readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
   const release = await workflow("macos-release.yml");
-  assert.match(
-    release,
-    /^\s+DAYBOARD_LICENSE_API_URL: \$\{\{ vars\.DAYBOARD_LICENSE_API_URL \}\}$/m,
-  );
-  assert.match(
-    release,
-    /^\s+DAYBOARD_STRIPE_PRODUCT_ID: \$\{\{ vars\.DAYBOARD_STRIPE_PRODUCT_ID \}\}$/m,
-  );
+  // The format check can't tell the live product from the test one, so the values are pinned.
+  assert.match(release, /^\s+DAYBOARD_LICENSE_API_URL: https:\/\/api\.getdayboard\.com$/m);
+  assert.match(release, /^\s+DAYBOARD_STRIPE_PRODUCT_ID: prod_VZ5SiyzDZ4ASHs$/m);
+  assert.doesNotMatch(release, /vars\.DAYBOARD_(LICENSE|STRIPE)/);
   assert.match(release, /^\s+DAYBOARD_LICENSE_ENVIRONMENT: live$/m);
   assert.match(release, /^\s+DAYBOARD_RELEASE: "1"$/m);
   assert.match(release, /^\s+DAYBOARD_LICENSE: "on"$/m);

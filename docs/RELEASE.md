@@ -157,10 +157,11 @@ tags. That environment needs:
 | Secret   | `MACOS_CERTIFICATE_PASSWORD`   | The `.p12` export password                                 |
 | Secret   | `MACOS_NOTARY_KEY_P8`          | Contents of the App Store Connect `.p8` key                |
 | Secret   | `DAYBOARD_GOOGLE_OAUTH_JSON`   | `{"clientId": …, "clientSecret": …}` of the Desktop client |
-| Variable | `DAYBOARD_LICENSE_API_URL`     | `https://api.getdayboard.com` (tag releases only)          |
-| Variable | `DAYBOARD_STRIPE_PRODUCT_ID`   | `prod_VZ5SiyzDZ4ASHs`, the live product (tag releases)     |
 
-The release workflow fixes `DAYBOARD_LICENSE_ENVIRONMENT=live`; the beta dry run ignores all three.
+The release workflow sets the public license configuration itself:
+`DAYBOARD_LICENSE_API_URL=https://api.getdayboard.com`, `DAYBOARD_STRIPE_PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`
+(the live product) and `DAYBOARD_LICENSE_ENVIRONMENT=live`. They are not repository variables, so a
+wrong variable can't ship; `tests/macos-release.test.mjs` pins them. The beta dry run ignores all three.
 The first Developer ID build replaces ad-hoc-signed installs, so verify on an owned installation
 that Google sign-in and the Keychain-held encryption key carry over when the app is replaced in
 Applications.
@@ -172,7 +173,7 @@ build step sets `DAYBOARD_LICENSE: "on"`, and `electron.vite.config.ts` refuses 
 `DAYBOARD_RELEASE=1` build unless the API URL is an HTTPS origin, the product is a `prod_…` ID
 and the environment is `live`, so a missing or test configuration fails the run before signing
 and nothing is published. The format check cannot tell the live product from the test one, so
-confirm both variables above before tagging. Also before the first licensed tag:
+the workflow names the live values itself (see above). Also before the first licensed tag:
 
 - The production `dayboard-billing` Worker answers `/buy` and `/v1/licenses/*` (not 503) with
   `SERVICE_ORIGIN=https://api.getdayboard.com`, `PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`,
@@ -228,7 +229,7 @@ New installation IDs are an HMAC-SHA256 of the Mac's `IOPlatformUUID` (read with
 
 The app states the activation cap from `LICENSE_ACTIVATION_LIMIT` in `shared/license.ts` (3), in the activation-limit message and in Settings → License; the license service enforces its own `ACTIVATION_LIMIT` (`billing/`). The service doesn't send its limit to the app, so the two must match: change both together.
 
-The separate `billing/` service creates hosted Checkout Sessions, verifies signed payment webhooks and delivers the license on its authenticated receipt page. Stripe's payment receipt is separate from this key delivery. Product/price, quantity, payment state and test/live mode are verified on the server. Refund/dispute revocation survives out-of-order payment events. Standard Stripe Checkout does not imply merchant-of-record coverage; confirm the seller's tax setup and registrations before enabling automatic tax or accepting live payments. Price, activation limit, support recovery and refund policy require a deliberate launch decision.
+The separate `billing/` service creates hosted Checkout Sessions, verifies signed payment webhooks and delivers the license on its authenticated receipt page. Stripe's payment receipt is separate from this key delivery. Product/price, quantity, payment state and test/live mode are verified on the server. Refund/dispute revocation survives out-of-order payment events. Standard Stripe Checkout does not imply merchant-of-record coverage; confirm the seller's tax setup and registrations before enabling automatic tax or accepting live payments. Miles decided the price, the activation limit (3 Macs), the support address (support@getdayboard.com) and the 14-day refund policy on 2026-11-04 (`docs/EXECPLAN.md`).
 
 ## Verification gates
 
