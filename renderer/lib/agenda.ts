@@ -267,7 +267,11 @@ export function getAvailableSlots(
   const busy = events
     .filter((event) => !event.allDay)
     .map((event) => clipTimedEvent(event, dayStart, dayEnd))
-    .filter((interval): interval is { start: Date; end: Date } => interval !== null)
+    // A zero-length event marks a moment, not busy time, so it never blocks a slot.
+    .filter(
+      (interval): interval is { start: Date; end: Date } =>
+        interval !== null && interval.end > interval.start,
+    )
     .sort((a, b) => a.start.getTime() - b.start.getTime())
     .reduce<Array<{ start: Date; end: Date }>>((merged, interval) => {
       const previous = merged[merged.length - 1];
