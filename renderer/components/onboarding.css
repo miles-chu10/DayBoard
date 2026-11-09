@@ -2,7 +2,7 @@
  * Motion for the first-run welcome, adapted from transitions.dev (free tier): page side-by-side
  * between steps, texts reveal on the first step, skeleton reveal as the example day fills in,
  * and the success check. Timings use its motion tokens. The global reduce-motion rules in
- * styles.css cut every duration here to nothing.
+ * styles.css cut every duration here to nothing, and the rules at the end drop the delays.
  */
 .onboarding {
   --onboarding-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -115,10 +115,17 @@
   }
 }
 
+/* With reduced motion, everything shows at once: no staggered delays either. */
 @media (prefers-reduced-motion: reduce) {
+  .onboarding * {
+    animation-delay: 0s !important;
+  }
   .onboarding-check path {
     stroke-dashoffset: 0;
   }
+}
+:root.reduce-motion .onboarding * {
+  animation-delay: 0s !important;
 }
 :root.reduce-motion .onboarding-check path {
   stroke-dashoffset: 0;
