@@ -1,0 +1,125 @@
+/*
+ * Motion for the first-run welcome, adapted from transitions.dev (free tier): page side-by-side
+ * between steps, texts reveal on the first step, skeleton reveal as the example day fills in,
+ * and the success check. Timings use its motion tokens. The global reduce-motion rules in
+ * styles.css cut every duration here to nothing.
+ */
+.onboarding {
+  --onboarding-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --onboarding-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --onboarding-page: 250ms;
+  --onboarding-reveal: 400ms;
+  --onboarding-text: 500ms;
+  --onboarding-stagger: 40ms;
+  --onboarding-distance: 8px;
+  --onboarding-text-distance: 12px;
+  --onboarding-blur: 3px;
+}
+
+/* Page side-by-side: a step comes in from the side it sits on, forward from the right. */
+.onboarding-step {
+  animation: onboarding-step-in var(--onboarding-page) var(--onboarding-ease) both;
+}
+.onboarding-step[data-direction="forward"] {
+  --onboarding-from: var(--onboarding-distance);
+}
+.onboarding-step[data-direction="back"] {
+  --onboarding-from: calc(var(--onboarding-distance) * -1);
+}
+.onboarding-step[data-direction="none"] {
+  animation: none;
+}
+@keyframes onboarding-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--onboarding-from, 0));
+    filter: blur(var(--onboarding-blur));
+  }
+}
+
+/* Texts reveal: the welcome's lines rise in one after another, once, when it opens. */
+.onboarding-texts > * {
+  animation: onboarding-text-in var(--onboarding-text) var(--onboarding-ease) both;
+}
+.onboarding-texts > :nth-child(2) {
+  animation-delay: var(--onboarding-stagger);
+}
+.onboarding-texts > :nth-child(3) {
+  animation-delay: calc(var(--onboarding-stagger) * 2);
+}
+.onboarding-texts > :nth-child(4) {
+  animation-delay: calc(var(--onboarding-stagger) * 3);
+}
+@keyframes onboarding-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--onboarding-text-distance));
+    filter: blur(var(--onboarding-blur));
+  }
+}
+
+/* Skeleton reveal: a row of the example day cross-fades in from its placeholder. */
+.onboarding-row {
+  animation: onboarding-row-in var(--onboarding-reveal) var(--onboarding-ease) both;
+  animation-delay: calc(var(--onboarding-stagger) * var(--onboarding-order, 0));
+}
+@keyframes onboarding-row-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Success check: fade, rotate upright, settle and draw the tick. */
+.onboarding-check {
+  display: inline-block;
+  transform-origin: center;
+  animation:
+    onboarding-check-fade 500ms var(--onboarding-ease) both,
+    onboarding-check-rotate 500ms var(--onboarding-ease) both,
+    onboarding-check-blur 500ms var(--onboarding-ease) both,
+    onboarding-check-bob 500ms var(--onboarding-ease-bob) both;
+}
+.onboarding-check svg {
+  display: block;
+  overflow: visible;
+}
+.onboarding-check path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: onboarding-check-draw 500ms var(--onboarding-ease) 80ms forwards;
+}
+@keyframes onboarding-check-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes onboarding-check-rotate {
+  from {
+    transform: rotate(80deg);
+  }
+}
+@keyframes onboarding-check-blur {
+  from {
+    filter: blur(8px);
+  }
+}
+@keyframes onboarding-check-bob {
+  from {
+    translate: 0 12px;
+  }
+}
+@keyframes onboarding-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-check path {
+    stroke-dashoffset: 0;
+  }
+}
+:root.reduce-motion .onboarding-check path {
+  stroke-dashoffset: 0;
+}

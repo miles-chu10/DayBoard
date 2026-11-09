@@ -44,11 +44,31 @@ async function standInFreshMac(app: ElectronApplication) {
       status: { state: "trial", daysLeft: 14 },
       checkoutUrl: "",
     }));
-    ipcMain.removeHandler("accounts:getStatus");
-    ipcMain.handle("accounts:getStatus", () => ({
-      google: { hasCredentials: true, connected: false, email: null, clientIdHint: null },
-      reminders: "not-determined",
-    }));
+    // Signing in and allowing access succeed at once, as they would after the browser and macOS
+    // prompts.
+    let google = false;
+    let reminders = "not-determined";
+    const accounts = () => ({
+      google: {
+        hasCredentials: true,
+        connected: google,
+        email: google ? "you@example.com" : null,
+        clientIdHint: null,
+      },
+      reminders,
+    });
+    for (const channel of ["accounts:getStatus", "google:connect", "reminders:requestAccess"]) {
+      ipcMain.removeHandler(channel);
+    }
+    ipcMain.handle("accounts:getStatus", accounts);
+    ipcMain.handle("google:connect", () => {
+      google = true;
+      return accounts();
+    });
+    ipcMain.handle("reminders:requestAccess", () => {
+      reminders = "full-access";
+      return accounts();
+    });
     ipcMain.removeHandler("ai:providerStatus");
     ipcMain.handle("ai:providerStatus", (_event, payload: { provider: string }) =>
       payload.provider === "claude"
@@ -75,8 +95,11 @@ for (const theme of ["light", "dark"] as const) {
       await useTheme(first.app, page, theme);
 
       const dialog = page.getByRole("dialog");
+      const preview = dialog.getByRole("complementary", { name: "Example day" });
       await expect(dialog.getByRole("heading", { name: "Welcome to DayBoard" })).toBeVisible();
       await expect(dialog).toContainText("There’s no DayBoard account to create.");
+      await expect(preview).toContainText("Design review");
+      await expect(preview).toContainText("Pick up dry cleaning");
       // Nothing is focused with a ring on launch; Tab still moves into the dialog.
       await expect(dialog).toBeFocused();
       await shot("1-welcome");
@@ -87,7 +110,24 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog.getByText("Apple Reminders", { exact: true })).toBeVisible();
       await expect(dialog.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
       await expect(dialog.getByRole("button", { name: "Allow Access" })).toBeVisible();
+      // The example day beside the steps waits for each account.
+      await expect(preview.getByText("Connect Google")).toHaveCount(3);
+      await expect(preview.getByText("Allow Reminders")).toBeVisible();
+      await expect(preview).not.toContainText("Design review");
       await shot("2-connect");
+
+      await dialog.getByRole("button", { name: "Sign in with Google" }).click();
+      await expect(dialog.getByText("you@example.com")).toBeVisible();
+      await expect(preview).toContainText("Design review");
+      await expect(preview.getByText("Connect Google")).toHaveCount(0);
+      await dialog.getByRole("button", { name: "Allow Access" }).click();
+      await expect(dialog.getByText("Allowed", { exact: true })).toBeVisible();
+      await expect(preview).toContainText("Pick up dry cleaning");
+      await shot("2-connected");
+      // Let the "Signed in" notice go before the next screenshots.
+      await expect(page.getByText("Signed in as you@example.com")).toHaveCount(0, {
+        timeout: 15_000,
+      });
 
       await dialog.getByRole("button", { name: "Continue" }).click();
       await expect(dialog.getByRole("heading", { name: "Set up AI (optional)" })).toBeVisible();
@@ -104,12 +144,13 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog).toContainText("This tool isn’t installed on this Mac.");
       await providers.getByRole("radio", { name: /Claude/ }).click();
       await expect(dialog.getByRole("button", { name: "Turn on AI" })).toBeEnabled();
+      await expect(preview).toContainText("Want a draft reply?");
       await shot("3-ai");
       await dialog.getByRole("button", { name: "Not now" }).click();
 
       await expect(dialog.getByRole("heading", { name: "You’re all set" })).toBeVisible();
       await expect(dialog).toContainText("Search and jump anywhere");
-      await expect(dialog).toContainText("Help → Send Feedback");
+      await expect(dialog).toContainText("It’s also in the Help menu.");
       await expect(
         dialog.getByRole("switch", { name: "Open DayBoard when you log in" }),
       ).toBeVisible();
