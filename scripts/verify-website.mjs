@@ -410,16 +410,20 @@ async function checkPages() {
   }
   if (args.www && loopbackSite) warn("www redirect", "skipped for a loopback site");
   else if (args.www) {
-    const from = `https://www.${site.host}/verify-path?x=1`;
-    const expected = `${SITE}/verify-path?x=1`;
-    const res = await send(from, { redirect: "manual" });
-    const location = res.headers.get("location");
-    const ok = [301, 308].includes(res.status) && safeUrl(location, from)?.href === expected;
-    check(
-      "www redirect",
-      ok,
-      `${res.error ?? `${res.status} ${location ? `to ${location}` : "without a Location"}`}${ok ? "" : `; expected 301 or 308 to ${expected}`}`,
-    );
+    // A missing path reaches the site Worker, but an existing page is a static asset that only the
+    // zone's www redirect rule covers, so check both.
+    for (const path of ["/verify-path?x=1", "/?x=1"]) {
+      const from = `https://www.${site.host}${path}`;
+      const expected = `${SITE}${path}`;
+      const res = await send(from, { redirect: "manual" });
+      const location = res.headers.get("location");
+      const ok = [301, 308].includes(res.status) && safeUrl(location, from)?.href === expected;
+      check(
+        `www redirect ${path}`,
+        ok,
+        `${res.error ?? `${res.status} ${location ? `to ${location}` : "without a Location"}`}${ok ? "" : `; expected 301 or 308 to ${expected}`}`,
+      );
+    }
   }
 
   const script = await send(`${SITE}/assets/site.js`);

@@ -7,7 +7,11 @@
     "directory": "../website",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": true,
+    // Only video runs the Worker first (Safari needs byte ranges). Pages, CSS, scripts and images
+    // are served as static assets, which are free and don't count toward the Workers request limit.
+    // The http-to-https and www-to-apex redirects for those come from the zone's Always Use HTTPS
+    // setting and a www redirect rule (docs/launch/website-deploy.md, "Redirects").
+    "run_worker_first": ["/*.mp4"],
   },
   "routes": [
     { "pattern": "getdayboard.com", "custom_domain": true },

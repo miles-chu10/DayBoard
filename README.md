@@ -59,9 +59,11 @@ The current packaged app requires **an Apple Silicon Mac running macOS 14 or lat
    [SHA256SUMS.txt](https://github.com/miles-chu10/DayBoard/releases/download/v1.3.0-beta.18/SHA256SUMS.txt)
    lists the download checksums. If you have beta 11 or earlier, install the current beta over it
    once; your DayBoard data stays in place.
-2. **Connect your sources** in **Settings → Sources**. Sign in with Google for Tasks, Gmail, and
-   Calendar; connect Apple Reminders when you are ready to grant its macOS permission.
-3. **Choose your AI provider**, if you want AI features. Each AI feature can be turned off.
+2. **Connect your sources.** On first launch, a short welcome walks you through signing in with
+   Google for Tasks, Gmail, and Calendar and allowing Apple Reminders. Skip anything and do it later
+   in **Settings → Sources**; **Help → Welcome to DayBoard…** shows the welcome again.
+3. **Choose your AI provider**, if you want AI features, in the welcome or **Settings → AI**. Each
+   AI feature can be turned off.
 
 Google sign-in uses the app's desktop OAuth configuration. People using a configured build do not
 need to create a Google Cloud project. Source builds need their own client configuration; see
