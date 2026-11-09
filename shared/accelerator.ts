@@ -134,12 +134,14 @@ const SYMBOLS: Record<string, string> = {
   Right: "→",
 };
 
-export function formatAccelerator(accelerator: string): string {
+/** One key cap per part, in macOS symbols: "Control+Alt+Space" → ["⌃", "⌥", "Space"]. */
+export function acceleratorKeys(accelerator: string): string[] {
   const normalized = normalizeAccelerator(accelerator) ?? accelerator;
-  return normalized
-    .split("+")
-    .map((part) => SYMBOLS[part] ?? part)
-    .join("");
+  return normalized.split("+").map((part) => SYMBOLS[part] ?? part);
+}
+
+export function formatAccelerator(accelerator: string): string {
+  return acceleratorKeys(accelerator).join("");
 }
 
 /** macOS defaults for the system shortcuts most likely to collide with a capture hotkey. */

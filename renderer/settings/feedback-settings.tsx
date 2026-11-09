@@ -1,19 +1,8 @@
 import { FEEDBACK_EMAIL } from "@shared/feedback";
-import { Button, Field, FieldSet, toast } from "../ui";
-import { errorMessage, invoke } from "../lib/ipc";
+import { Button, Field, FieldSet } from "../ui";
+import { copyFeedbackAddress, sendFeedback } from "../lib/feedback";
 
 export function FeedbackSettings() {
-  const sendFeedback = () =>
-    invoke("app:sendFeedback").catch((error: unknown) =>
-      toast.error("Couldn’t open your mail app", {
-        description: `${errorMessage(error)} Email ${FEEDBACK_EMAIL} instead.`,
-      }),
-    );
-  const copyAddress = () =>
-    invoke("app:copyFeedbackAddress").then(
-      () => toast.success(`Copied ${FEEDBACK_EMAIL}`),
-      (error: unknown) => toast.error(`Couldn’t copy the address: ${errorMessage(error)}`),
-    );
   return (
     <FieldSet
       title="Feedback"
@@ -24,7 +13,7 @@ export function FeedbackSettings() {
           <Button size="small" onClick={() => void sendFeedback()}>
             Send feedback…
           </Button>
-          <Button size="small" variant="transparent" onClick={() => void copyAddress()}>
+          <Button size="small" variant="transparent" onClick={() => void copyFeedbackAddress()}>
             Copy address
           </Button>
         </div>
