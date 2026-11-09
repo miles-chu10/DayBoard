@@ -67,4 +67,6 @@ export interface CheckoutStatus {
 }
 export interface CheckoutClaim {
   licenseKey: string;
+  /** Present when the service is also emailing the key to the checkout address, or already did. */
+  email?: "pending" | "sent";
 }

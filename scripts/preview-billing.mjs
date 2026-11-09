@@ -11,7 +11,7 @@ import {
 
 const orderId = "F".repeat(32);
 const fixtureKey = `DAYB_${"F".repeat(43)}`;
-const context = { site: DEFAULT_SITE_ORIGIN, activationLimit: 3 };
+const context = { site: DEFAULT_SITE_ORIGIN, activationLimit: 3, emailsKey: true };
 let polls = 0;
 const banner =
   '<aside style="padding:12px;text-align:center;background:#30394a;color:white;font:14px system-ui">Local UI fixture · no payments or real licenses</aside>';
@@ -60,7 +60,7 @@ const server = createServer(async (request, response) => {
       url.pathname === "/v1/checkout/claim" &&
       body?.orderId === orderId
     ) {
-      response.end(JSON.stringify({ licenseKey: fixtureKey }));
+      response.end(JSON.stringify({ licenseKey: fixtureKey, email: "sent" }));
     } else response.writeHead(404).end("{}");
   }
 });

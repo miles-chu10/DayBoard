@@ -71,6 +71,9 @@ test("real Worker, D1 and Stripe SDK complete delivery, desktop activation and r
   const sessions = new Map<string, Record<string, unknown>>();
   let calls = 0;
   let refunded = false;
+  // The license email: the provider fails the first request and accepts later ones.
+  const buyer = "runtime.buyer@example.test";
+  const mails: { userAgent: string | null; idempotencyKey: string | null; body: string }[] = [];
   const mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
@@ -91,10 +94,26 @@ test("real Worker, D1 and Stripe SDK complete delivery, desktop activation and r
         STRIPE_WEBHOOK_SECRET: secret,
         ENCRYPTION_KEY: randomToken(),
         HASH_SECRET: randomToken(),
+        RESEND_API_KEY: "re_disposable_runtime",
+        MAIL_FROM: "DayBoard <license@mail.example.test>",
       },
       // Every outbound request is intercepted. No provider, account or Internet call can occur.
       outboundService: async (request) => {
         const url = new URL(request.url);
+        if (url.origin === "https://api.resend.com") {
+          assert.equal(`${request.method} ${url.pathname}`, "POST /emails");
+          assert.equal(request.headers.get("Authorization"), "Bearer re_disposable_runtime");
+          mails.push({
+            userAgent: request.headers.get("User-Agent"),
+            idempotencyKey: request.headers.get("Idempotency-Key"),
+            body: await request.text(),
+          });
+          return mails.length === 1
+            ? new RuntimeResponse(JSON.stringify({ name: "internal_server_error" }), {
+                status: 500,
+              })
+            : new RuntimeResponse(JSON.stringify({ id: "email_runtime" }));
+        }
         assert.equal(url.origin, "https://api.stripe.com");
         calls++;
         let data: unknown;
@@ -133,6 +152,7 @@ test("real Worker, D1 and Stripe SDK complete delivery, desktop activation and r
               payment_intent: `pi_runtime${index}`,
               currency: "usd",
               amount_total: 1000,
+              customer_details: { email: buyer },
               url: `https://checkout.stripe.com/c/pay/cs_test_runtime${index}`,
             };
             sessions.set(session.id, session);
@@ -249,6 +269,36 @@ test("real Worker, D1 and Stripe SDK complete delivery, desktop activation and r
       ).json(),
       { state: "ready" },
     );
+    // The email is sent after the webhook's reply. The two deliveries of one event made one
+    // attempt, which the provider failed, so the key waits for the schedule.
+    const emailRow = () =>
+      db
+        .prepare("SELECT state,attempts FROM license_emails WHERE order_id=?")
+        .bind(orders[0].orderId)
+        .first<{ state: string; attempts: number }>();
+    for (let waited = 0; mails.length === 0 && waited < 5000; waited += 25)
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(mails.length, 1);
+    for (let waited = 0; (await emailRow())?.attempts !== 1 && waited < 5000; waited += 25)
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.deepEqual(await emailRow(), { state: "pending", attempts: 1 });
+    const worker = await mf.getWorker();
+    await worker.scheduled({ cron: "*/15 * * * *" });
+    assert.equal(mails.length, 1, "the failed attempt holds the order until its retry is due");
+    await db.prepare("UPDATE license_emails SET next_at=0").run();
+    await worker.scheduled({ cron: "*/15 * * * *" });
+    await worker.scheduled({ cron: "*/15 * * * *" });
+    assert.equal(mails.length, 2);
+    assert.deepEqual(await emailRow(), { state: "sent", attempts: 2 });
+    assert.equal(mails[0].body, mails[1].body);
+    assert.equal(mails[0].idempotencyKey, mails[1].idempotencyKey);
+    assert.match(mails[1].idempotencyKey!, new RegExp(`^dayboard-license/${orders[0].orderId}/`));
+    // Resend rejects requests without a User-Agent, and workerd adds none.
+    assert.equal(mails[1].userAgent, "dayboard-billing/1");
+    assert.equal(
+      (await db.prepare("SELECT COUNT(*) n FROM license_emails").first<{ n: number }>())?.n,
+      1,
+    );
     assert.deepEqual(
       await (
         await request(`/v1/checkout/status?order=${orders[1].orderId}`, "GET", cookies)
@@ -263,8 +313,12 @@ test("real Worker, D1 and Stripe SDK complete delivery, desktop activation and r
       orderId: orders[0].orderId,
     });
     assert.equal(claim.status, 200);
-    const { licenseKey } = (await claim.json()) as { licenseKey: string };
+    const { licenseKey, email } = (await claim.json()) as { licenseKey: string; email?: string };
     assert.match(licenseKey, /^DAYB_[A-Za-z0-9_-]{43}$/);
+    assert.equal(email, "sent");
+    const mail = JSON.parse(mails[1].body) as { to: string[]; text: string; html: string };
+    assert.deepEqual(mail.to, [buyer]);
+    assert.ok(mail.text.includes(licenseKey) && mail.html.includes(licenseKey));
     const desktop = desktopFor(mf, "prod_RUNTIME");
     assert.equal((await desktop.activate(licenseKey, "Disposable runtime Mac")).state, "licensed");
     assert.equal((await desktop.activate(licenseKey, "Disposable runtime Mac")).state, "licensed");

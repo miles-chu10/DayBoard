@@ -226,7 +226,8 @@ unconfigured preview builds do not open the personal license store or make licen
 **AI model usage is not included in the purchase**: AI runs on your own provider account.
 
 Payments use Stripe-hosted Checkout and the separate service in [`billing/`](billing/). Customers
-retrieve a DayBoard key from the authenticated receipt page and activate it in Settings. Stripe and
+get a DayBoard key on the authenticated receipt page, and by email where the service's license key
+email is configured, and activate it in Settings. Stripe and
 webhook secrets remain in the backend; the app embeds only public service/product configuration.
 
 `npm run dist` requires complete Google and live license-service configuration and does not publish.

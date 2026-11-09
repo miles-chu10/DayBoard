@@ -2,6 +2,8 @@ import type Stripe from "stripe";
 import { ORDER_ACCESS_DAYS, siteOrigin, type Config, type Env } from "./config.ts";
 import { decrypt, hash, randomToken } from "./crypto.ts";
 import { error, json, limit, readJson, sameOrigin, securityHeaders } from "./http.ts";
+import { licenseEmailStatus } from "./license-email.ts";
+import { mailer } from "./mail.ts";
 import {
   DEFAULT_SITE_ORIGIN,
   busyPage,
@@ -76,7 +78,11 @@ function orderIdFromBody(value: unknown): string | null {
     : null;
 }
 function pageContext(env: Env, cfg: Config): PageContext {
-  return { site: siteOrigin(env) ?? DEFAULT_SITE_ORIGIN, activationLimit: cfg.activationLimit };
+  return {
+    site: siteOrigin(env) ?? DEFAULT_SITE_ORIGIN,
+    activationLimit: cfg.activationLimit,
+    emailsKey: mailer(env) !== null,
+  };
 }
 function receiptUrl(cfg: Config, orderId: string): string {
   return `${cfg.origin}/receipt?order=${orderId}`;
@@ -194,7 +200,11 @@ export async function checkout(
       .bind(order.id, cfg.origin, cfg.productId, cfg.environment)
       .first<{ key_ciphertext: string; key_iv: string; revoked: number }>();
     if (!row || row.revoked) return error(409, "revoked");
-    return json({ licenseKey: await decrypt(row.key_ciphertext, row.key_iv, env.ENCRYPTION_KEY) });
+    const email = await licenseEmailStatus(env, order.id);
+    return json({
+      licenseKey: await decrypt(row.key_ciphertext, row.key_iv, env.ENCRYPTION_KEY),
+      ...(email ? { email } : {}),
+    });
   }
   return error(404, "not_found");
 }

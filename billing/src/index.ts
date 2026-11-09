@@ -4,7 +4,9 @@ import { waitlistSignup, type WaitUntil } from "./beta.ts";
 import { checkout } from "./checkout.ts";
 import { config, type Env } from "./config.ts";
 import { error } from "./http.ts";
+import { retryLicenseEmails } from "./license-email.ts";
 import { licenses } from "./licenses.ts";
+import type { Send } from "./mail.ts";
 import { usageCheckIn } from "./usage.ts";
 import { webhook } from "./webhook.ts";
 import { USAGE_CHECKIN_PATH } from "../../shared/usage-checkin.ts";
@@ -18,6 +20,8 @@ export function createWorker(
     new Stripe(env.STRIPE_SECRET_KEY, {
       httpClient: Stripe.createFetchHttpClient(),
     }),
+  // Wrapped, because Workers reject a bare `fetch` called as another object's method.
+  send: Send = (url, init) => fetch(url, init),
 ) {
   return {
     async fetch(request: Request, env: Env, ctx?: WaitUntil): Promise<Response> {
@@ -41,7 +45,7 @@ export function createWorker(
       const path = url.pathname;
       try {
         if (path === "/v1/stripe/webhook")
-          return await webhook(request, env, cfg, stripeFactory(env));
+          return await webhook(request, env, cfg, stripeFactory(env), send, ctx);
         if (path.startsWith("/v1/licenses/")) return await licenses(request, env, cfg);
         if (path === USAGE_CHECKIN_PATH) return await usageCheckIn(request, env);
         if (path.startsWith("/v1/admin/")) return await admin(request, env, cfg);
@@ -61,6 +65,16 @@ export function createWorker(
       } catch {
         return error(503, "service_unavailable");
       }
+    },
+    /** The Cron Trigger: retries license key emails that haven't been sent yet. */
+    async scheduled(_controller: unknown, env: Env): Promise<void> {
+      let cfg;
+      try {
+        cfg = config(env);
+      } catch {
+        return;
+      }
+      await retryLicenseEmails(env, cfg, stripeFactory(env), send);
     },
   };
 }
