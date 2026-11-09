@@ -52,6 +52,18 @@ test("Home greets, ranks what needs you, suggests tasks from mail and shows the 
     await expect(agenda.getByText("Finalize launch announcement", { exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Meetings" })).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Your tasks" })).toHaveCount(0);
+
+    // Overdue items fold into one row, like the Agenda page, and Home remembers when it's open.
+    const overdue = agenda.getByRole("button", { name: "3 overdue tasks" });
+    const lateTask = agenda.getByText("Send Q4 budget to finance", { exact: true });
+    await expect(overdue).toHaveAttribute("aria-expanded", "false");
+    await expect(lateTask).toBeHidden();
+    await page.getByRole("heading", { level: 2, name: /^Good / }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: testInfo.outputPath("home-overdue-collapsed.png") });
+    await overdue.click();
+    await expect(overdue).toHaveAttribute("aria-expanded", "true");
+    await expect(lateTask).toBeVisible();
     await page.waitForTimeout(250);
     await page.screenshot({ path: testInfo.outputPath("home-today.png") });
 
@@ -73,6 +85,10 @@ test("Home greets, ranks what needs you, suggests tasks from mail and shows the 
     // Home remembers the range and the dismissed suggestion.
     await sidebarItem(page, "Home").click();
     await expect(page.getByRole("radio", { name: "This week" })).toBeChecked();
+    await expect(agenda.getByRole("button", { name: "3 overdue tasks" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await expect(suggested.getByText("Review launch copy", { exact: true })).toBeVisible();
     await expect(suggested.getByText("Submit the Q4 budget", { exact: true })).toHaveCount(0);
     expect(demo.errors).toEqual([]);

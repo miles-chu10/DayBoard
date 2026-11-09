@@ -21,7 +21,7 @@ import {
   SegmentedControlItem,
   Text,
 } from "@renderer/ui";
-import { ChevronLeft, ChevronRight, CircleAlert, Search, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Sparkles } from "lucide-react";
 import type { CalendarEventItem, MailItem, SourceId } from "@main/shared-types";
 
 import { AgendaDetailDialog } from "../components/agenda-detail-dialog";
@@ -33,6 +33,7 @@ import { BriefingCard } from "../components/briefing-card";
 import { MeetingCard } from "../components/meeting-card";
 import { MailDetail } from "../components/mail-detail";
 import { MailRow } from "../components/mail-row";
+import { OverdueSummary } from "../components/overdue-summary";
 import { ReplyDialog } from "../components/reply-dialog";
 import { RowsSkeleton, SectionCard, ListCard, InlineHint } from "../components/section-card";
 import { SourceIcon } from "../components/source-dot";
@@ -124,24 +125,6 @@ function Disclosure({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="pt-2">{children}</div>
-      </CollapsibleContent>
-    </CollapsibleRoot>
-  );
-}
-
-/** Google Calendar-style summary row: all overdue items collapse into one line above the day. */
-function OverdueSummary({ count, children }: { count: number; children: ReactNode }) {
-  return (
-    <CollapsibleRoot>
-      <CollapsibleTrigger className="w-full rounded-md px-2 min-h-[var(--density-row)] hover:bg-list-hover">
-        <CollapsibleChevron />
-        <CircleAlert className="size-4 shrink-0 text-support-red" aria-hidden="true" />
-        <Text variant="strong">
-          {count} overdue {count === 1 ? "task" : "tasks"}
-        </Text>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="pt-1">{children}</div>
       </CollapsibleContent>
     </CollapsibleRoot>
   );
