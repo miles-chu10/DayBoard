@@ -40,12 +40,12 @@ export const LICENSE_STATUS_COPY: Record<
   trial: {
     label: "AI trial",
     description:
-      "Everything in DayBoard is free except AI. AI is free for 7 days from the first time you use it; DayBoard Pro unlocks it for $5, once, including future updates.",
+      "Everything in DayBoard is free except AI. Your AI trial starts the first time you use AI; DayBoard Pro then unlocks it with a one-time purchase that includes future updates.",
   },
   expired: {
     label: "AI trial ended",
     description:
-      "Everything else in DayBoard stays free. Get DayBoard Pro for $5, once, to keep using AI.",
+      "Everything else in DayBoard stays free. Get DayBoard Pro, a one-time purchase, to keep using AI.",
   },
   invalid: {
     label: "Key needs attention",

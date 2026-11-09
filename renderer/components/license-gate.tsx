@@ -35,7 +35,7 @@ function upsellCopy(status: LicenseStatus): {
       return {
         title: "AI trial ended",
         description:
-          "Everything else in DayBoard stays free. Get DayBoard Pro for $5, once, to keep using AI.",
+          "Everything else in DayBoard stays free. Get DayBoard Pro, a one-time purchase, to keep using AI.",
       };
     case "invalid":
       // The reason varies (revoked, released by another account on this Mac, not verified yet).
@@ -113,7 +113,7 @@ export function LicenseUpsellActions({
     <>
       {checkoutUrl ? (
         <Button variant="accent" size={size} onClick={() => void openExternal(checkoutUrl)}>
-          Get DayBoard Pro · $5
+          Get DayBoard Pro
         </Button>
       ) : null}
       <Button size={size} onClick={() => void openSettings("license")}>
