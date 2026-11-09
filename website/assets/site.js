@@ -3,7 +3,7 @@
 // waitlist forms stay closed until both are set.
 const SITE_CONFIG = Object.freeze({
   waitlistUrl: "https://api.getdayboard.com/v1/waitlist",
-  contactEmail: "hello@getdayboard.com",
+  contactEmail: "support@getdayboard.com",
   // The billing service's checkout page, e.g. "https://api.getdayboard.com/buy". Leave it empty
   // until live checkout is ready: buy buttons stay hidden and pages say checkout isn't open yet.
   buyUrl: "",
