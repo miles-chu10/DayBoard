@@ -188,3 +188,23 @@ const revealed = new IntersectionObserver(
   { rootMargin: "0px 0px -12% 0px" },
 );
 for (const element of document.querySelectorAll("[data-reveal], .merge")) revealed.observe(element);
+
+// Copy buttons ship hidden and appear only where the page can copy for the visitor.
+for (const button of document.querySelectorAll("button[data-copy]")) {
+  const source = document.getElementById(button.dataset.copy);
+  const status = button.closest(".gs-card")?.querySelector('[role="status"]');
+  if (!source || !navigator.clipboard?.writeText) continue;
+  button.hidden = false;
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(source.textContent.trim());
+      button.textContent = "Copied";
+      if (status) status.textContent = "Copied. Paste it into Terminal and press Return.";
+    } catch {
+      if (status) status.textContent = "Couldn't copy. Select the command and copy it yourself.";
+    }
+    setTimeout(() => {
+      button.textContent = "Copy";
+    }, 2000);
+  });
+}

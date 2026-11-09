@@ -9,3 +9,8 @@
 
 /assets/fonts/*
   Cache-Control: public, max-age=2592000
+
+# The installer is fetched by curl and read in browsers; serve it as plain text and never stale.
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
