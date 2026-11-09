@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { AlertDialog, Button, Callout, Field, FieldSet, Input, Status } from "../ui";
 import {
+  LICENSE_DEACTIVATE_COPY,
   LICENSE_FORGET_COPY,
   LICENSE_RELEASE_PENDING_COPY,
   LICENSE_RESET_COPY,
@@ -62,6 +63,7 @@ export function LicenseTab() {
   const forget = useForgetPendingRelease();
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [confirmingForget, setConfirmingForget] = useState(false);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
 
   if (isError)
     return (
@@ -140,8 +142,8 @@ export function LicenseTab() {
       status.state === "demo" ||
       status.state === "unconfigured" ? null : status.state === "licensed" ? (
         <Field>
-          <Button onClick={() => deactivate.mutate()} disabled={deactivate.isPending}>
-            {deactivate.isPending ? "Removing…" : "Deactivate this device"}
+          <Button onClick={() => setConfirmingDeactivate(true)} disabled={deactivate.isPending}>
+            {deactivate.isPending ? "Removing…" : LICENSE_DEACTIVATE_COPY.action}
           </Button>
         </Field>
       ) : (
@@ -184,6 +186,15 @@ export function LicenseTab() {
         </>
       )}
 
+      <AlertDialog
+        open={confirmingDeactivate}
+        onOpenChange={setConfirmingDeactivate}
+        title={LICENSE_DEACTIVATE_COPY.title}
+        description={LICENSE_DEACTIVATE_COPY.description}
+        confirmLabel={LICENSE_DEACTIVATE_COPY.confirm}
+        confirmVariant="destructive"
+        onConfirm={() => deactivate.mutate()}
+      />
       <AlertDialog
         open={confirmingReset}
         onOpenChange={setConfirmingReset}

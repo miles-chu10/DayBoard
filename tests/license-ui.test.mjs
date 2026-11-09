@@ -391,11 +391,13 @@ test("deactivation toasts say whether the activation slot was freed", async () =
       ],
     ],
   ]) {
-    for (const [state, label] of [
-      ["licensed", "Deactivate this device"],
-      ["invalid", "Remove saved key"],
-    ]) {
+    for (const state of ["licensed", "invalid"]) {
       render(LicenseTab, status(state));
+      // A working key is removed from the confirmation dialog; a rejected one right away.
+      const act =
+        state === "licensed"
+          ? dialog("Deactivate DayBoard Pro on this Mac?").onConfirm
+          : () => click("Remove saved key");
       await withIpc(
         {
           status: { state: "trial", daysLeft: 5 },
@@ -403,11 +405,36 @@ test("deactivation toasts say whether the activation slot was freed", async () =
           releasePending: release === "pending",
           release,
         },
-        () => click(label),
+        act,
       );
       assert.deepEqual(fixture.invocations, [["license:deactivate"]], `${state} ${release}`);
       assert.deepEqual(fixture.toasts, [toast], `${state} ${release}`);
     }
+  }
+});
+
+test("Deactivate this device asks first and removes nothing until confirmed", async () => {
+  const html = render(LicenseTab, status("licensed"));
+  assert.match(html, />Deactivate this device</);
+  // The dialog starts closed, and opening it makes no license call.
+  assert.doesNotMatch(html, /Deactivate DayBoard Pro on this Mac\?/);
+  const confirm = dialog("Deactivate DayBoard Pro on this Mac?");
+  await withIpc({ status: { state: "trial", daysLeft: 5 }, checkoutUrl: "" }, () =>
+    click("Deactivate this device"),
+  );
+  assert.deepEqual(fixture.invocations, []);
+  assert.deepEqual(fixture.toasts, []);
+
+  await withIpc(
+    { status: { state: "trial", daysLeft: 5 }, checkoutUrl: "", release: "released" },
+    () => confirm.onConfirm(),
+  );
+  assert.deepEqual(fixture.invocations, [["license:deactivate"]]);
+
+  // Only a working key offers it.
+  for (const state of ["trial", "expired", "invalid", "network-error", "unreadable"]) {
+    render(LicenseTab, status(state));
+    assert.ok(!fixture.buttons.some((item) => item.label === "Deactivate this device"), state);
   }
 });
 

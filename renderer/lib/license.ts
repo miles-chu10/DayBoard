@@ -92,6 +92,15 @@ export const LICENSE_FORGET_COPY = {
   toast: `Deleted the license key from this Mac. Its activation slot may still be in use; email ${LICENSE_SUPPORT_EMAIL} to free it.`,
 };
 
+/** Confirmation before "Deactivate this device" removes a working key from this Mac. */
+export const LICENSE_DEACTIVATE_COPY = {
+  action: "Deactivate this device",
+  title: "Deactivate DayBoard Pro on this Mac?",
+  description:
+    "DayBoard removes your license key from this Mac and frees its activation slot for another Mac. AI stops working here once any remaining trial time runs out. Everything else keeps working. To use DayBoard Pro on this Mac again, you'll need to enter your license key, so make sure you have it saved first.",
+  confirm: "Deactivate",
+};
+
 /** Toasts after "Deactivate this device" or "Remove saved key", by release outcome. */
 export const LICENSE_REMOVED_COPY = {
   released: "Removed the license from this Mac. Its activation slot is free.",
