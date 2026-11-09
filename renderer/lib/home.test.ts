@@ -2,16 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { MailItem } from "@main/shared-types";
 
-import {
-  ageLabel,
-  firstName,
-  greeting,
-  homeSummary,
-  homeTodos,
-  needsYou,
-  suggestedTasks,
-} from "./home";
-import type { Todo } from "./todos";
+import { ageLabel, firstName, greeting, homeSummary, needsYou, suggestedTasks } from "./home";
 import type { TriageMap } from "./triage-types";
 
 const NOW = Date.parse("2026-11-04T18:00:00Z");
@@ -27,20 +18,6 @@ function mail(id: string, hoursAgo: number, unread = false): MailItem {
     snippet: "",
     date: new Date(NOW - hoursAgo * HOUR).toISOString(),
     unread,
-  };
-}
-
-function todo(key: string, dueDate: string | null, completed = false): Todo {
-  return {
-    key,
-    source: "tasks",
-    title: key,
-    notes: null,
-    dueDate,
-    dueTime: null,
-    listTitle: "My Tasks",
-    completed,
-    completedAt: null,
   };
 }
 
@@ -118,25 +95,6 @@ test("suggested tasks skip handled and taskless mail", () => {
   assert.deepEqual(
     tasks.map((task) => [task.key, task.title]),
     [["suggest:a", "Submit the budget"]],
-  );
-});
-
-test("Home's tasks are overdue and today's, or the next 7 days'", () => {
-  const todos = [
-    todo("late", "2026-11-01"),
-    todo("today", "2026-11-04"),
-    todo("sunday", "2026-11-08"),
-    todo("next", "2026-11-11"),
-    todo("undated", null),
-    todo("done", "2026-11-04", true),
-  ];
-  assert.deepEqual(
-    homeTodos(todos, "2026-11-04", "today").map((item) => item.key),
-    ["late", "today"],
-  );
-  assert.deepEqual(
-    homeTodos(todos, "2026-11-04", "week").map((item) => item.key),
-    ["late", "today", "sunday"],
   );
 });
 

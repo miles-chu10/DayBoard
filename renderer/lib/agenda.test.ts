@@ -5,6 +5,7 @@ import type { CalendarEventItem, SourceResult, TaskItem } from "@main/shared-typ
 
 import { buildAgenda, findRelatedTodos, getAvailableSlots } from "./agenda";
 import { agendaSpanDays, validateAgendaSearch } from "./agenda-search";
+import { groupByDay } from "./day-items";
 import { buildTodos, type Todo } from "./todos";
 import {
   calendarEventKey,
@@ -284,5 +285,43 @@ test("buildTodos scopes Google task keys by list and provider id", () => {
   assert.deepEqual(
     buildTodos(tasks, undefined).map((item) => item.key),
     ["task:list-a:shared-id", "task:list-b:shared-id"],
+  );
+});
+
+test("buildAgenda keeps zero-length timed events, such as a Google event that starts and ends at 10:00", () => {
+  const pointInTime = event({
+    id: "point",
+    title: "Remove old account",
+    start: "2026-09-22T10:00:00",
+    end: "2026-09-22T10:00:00",
+  });
+  const midnight = event({
+    id: "midnight",
+    title: "Midnight check",
+    start: "2026-09-23T00:00:00",
+    end: "2026-09-23T00:00:00",
+  });
+  const reversed = event({
+    id: "reversed",
+    title: "Bad range",
+    start: "2026-09-22T11:00:00",
+    end: "2026-09-22T10:00:00",
+  });
+  const agenda = buildAgenda({
+    events: [pointInTime, midnight, reversed],
+    todos: [],
+    startDate: "2026-09-22",
+    days: 2,
+    now,
+  });
+  const titles = (index: number) =>
+    agenda.days[index].timed.map((entry) => (entry.kind === "event" ? entry.event.title : ""));
+  assert.deepEqual(titles(0), ["Remove old account"]);
+  assert.deepEqual(titles(1), ["Midnight check"]);
+  assert.deepEqual(
+    groupByDay([pointInTime, midnight], [], ["2026-09-22", "2026-09-23"])
+      .get("2026-09-23")
+      ?.timed.map((item) => item.title),
+    ["Midnight check"],
   );
 });
