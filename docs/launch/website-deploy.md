@@ -211,7 +211,7 @@ Commit these edits so the repository matches the live site.
 
 ## 4. Deploy the site
 
-The site is a Worker with static assets (Cloudflare now steers new static sites to Workers instead of Pages). `website-worker/wrangler.jsonc` serves `website/`, applies `_headers`, answers unknown paths with `404.html` and status 404, and routes `<domain>` and `www.<domain>` as custom domains. `website-worker/worker.js` redirects `http://` and `www.` requests to `<site-origin>` with 301, keeping the path and query. Set the two custom-domain patterns in `website-worker/wrangler.jsonc` to `<domain>` and `www.<domain>`, then:
+The site is a Worker with static assets (Cloudflare now steers new static sites to Workers instead of Pages). `website-worker/wrangler.jsonc` serves `website/`, applies `_headers`, answers unknown paths with `404.html` and status 404, and routes `<domain>` and `www.<domain>` as custom domains. Only `.mp4` requests, and paths with no matching file, run `website-worker/worker.js`: it answers byte ranges for video (Safari plays only video it can fetch in parts) and redirects `http://` and `www.` requests to `<site-origin>` with 301, keeping the path and query. Every other file is served as a static asset, which is free and doesn't count toward the Workers request limit, so the zone's redirects below cover those. Set the two custom-domain patterns in `website-worker/wrangler.jsonc` to `<domain>` and `www.<domain>`, then:
 
 ```sh
 # website-worker/, each time you publish
@@ -219,6 +219,22 @@ npx --prefix ../billing wrangler deploy
 ```
 
 With the zone on the same account, Cloudflare creates the DNS records and certificates for both hostnames. The deploy publishes every file in `website/` except `.DS_Store`, and only when you run the command.
+
+### Redirects
+
+Static assets never reach the Worker, so two free zone settings make the redirects. Set them in the Cloudflare dashboard for the `<domain>` zone before the first deploy that limits `run_worker_first` to video; with the earlier Worker still live they change nothing visible.
+
+1. **SSL/TLS → Edge Certificates → Always Use HTTPS:** on. Every `http://` request in the zone, including `api.<domain>`, gets a 301 to `https://`.
+2. **Rules → Redirect Rules → Create rule → template "Redirect from WWW to root":** keep its request URL `https://www.*`, target `https://${1}`, status 301 and "Preserve query string", then deploy the rule. An `http://www.` request takes two hops: to `https://www.`, then to the apex.
+
+Until that deploy, the old Worker answers the same redirects, so check them right after it. Each must answer 301 with the `Location` shown; if either doesn't, roll the site back (see [Operate](#operate)) and fix the setting:
+
+```sh
+curl -sI 'http://<domain>/pricing?x=1'           # Location: https://<domain>/pricing?x=1
+curl -sI 'https://www.<domain>/pricing?x=1'      # Location: https://<domain>/pricing?x=1
+```
+
+`scripts/verify-website.mjs --www` checks the same for a missing path and the home page.
 
 ## 5. Verify the live site
 
@@ -252,7 +268,7 @@ Expect the script's synthetic address and your Safari address, both `waitlist` /
 
 - **Roll back the Worker:** once the site posts to `/v1/waitlist`, roll the site back first, because Worker versions from before the waitlist serve only `/v1/beta-signup`. From `billing/`, `npx wrangler deployments list`, then `npx wrangler rollback <version-id>`. Without an ID it picks the version of the previous deployment. `secret put` and `secret delete` each create a deployment too, so right after one of them a plain `rollback` undoes that secret change; Wrangler warns when the secrets differ. A rollback doesn't touch D1. After any rollback, rerun the section 2 check. If it answers `503 signup_unconfigured`, the version you rolled back to predates `HASH_SECRET`: roll back again to a version deployed after the secret was set. Piping the secret in again won't work while an older version is live, because `secret put` refuses to run then.
 - **Roll back the site:** from `website-worker/`, `npx --prefix ../billing wrangler deployments list`, then `npx --prefix ../billing wrangler rollback <version-id>`.
-- **Costs:** Static asset requests are free; the site Worker runs first on each request to handle redirects, which counts toward Workers Free. Workers Free covers 100,000 requests a day per account, and D1 has a free tier. The domain is the only fixed cost.
+- **Costs:** Static asset requests are free and unlimited. The site Worker runs only for video and missing paths, which count toward Workers Free: 100,000 requests a day per account, shared with the API Worker. Past that, Worker requests get 429 until the daily reset. D1 has a free tier. The domain is the only fixed cost.
 
 ## After go-live: Google verification
 
