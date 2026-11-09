@@ -45,5 +45,25 @@ Questions: support@getdayboard.com.
 
 ## Release verification
 
-Not yet released. This section is filled in from the signed release run and the published
-assets.
+The [signed release run](https://github.com/miles-chu10/DayBoard/actions/runs/42631750424)
+published this prerelease on 2026-11-09 at 14:24 UTC from `2937103`, the commit the
+[signed beta dry run](https://github.com/miles-chu10/DayBoard/actions/runs/42628828194) built
+first. The release contains the DMG, ZIP, both blockmaps, `latest-mac.yml`,
+`release-manifest.json` and `SHA256SUMS.txt`.
+
+Checked on a Mac from the published downloads: every `SHA256SUMS.txt` line matches the files, and
+`latest-mac.yml` gives this version with the ZIP's and DMG's actual SHA-512 and size. The DMG
+passes `xcrun stapler validate`, and `spctl` accepts it as Notarized Developer ID. The apps in the
+ZIP and the DMG are 1.3.0-beta.20, pass `codesign --verify --deep --strict` and
+`stapler validate`, and are accepted as Notarized Developer ID (team `LGJS5APK9X`).
+
+Update from beta.19: on 2026-11-09 at 14:29 UTC, an installed beta.19 downloaded this release
+through the in-app updater (the ZIP's SHA-512 matched `latest-mac.yml`) and installed it on quit.
+The relaunched app is 1.3.0-beta.20, passes `codesign --verify --deep --strict` and shows 14 days
+left in the AI trial. Home shows the Agenda, including a zero-length Google Calendar event under
+Today, Help → Welcome to DayBoard… opens the welcome, and Settings → Updates shows the usage
+check-in. About a minute after launch, the production `usage_summary` view counted one active
+install on 1.3.0-beta.20.
+
+DMG: `DayBoard-1.3.0-beta.20-arm64.dmg` (138,350,403 bytes). Its published SHA-256 is
+`952f2f475b8a3855cb9247174636e640938bc4247e813f84f6a86fa6edac4775`.
