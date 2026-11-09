@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createPackage } from "@electron/asar";
+import { packAsar } from "./helpers/asar.mjs";
 import { build } from "esbuild";
 import { verifyQaApp, verifyQaBuild } from "../scripts/verify-qa-package.mjs";
 
@@ -90,17 +90,17 @@ test("actual QA build omits credentials and verifies exact packaged main code", 
   const app = path.join(f.directory, "DayBoard QA.app");
   const resources = path.join(app, "Contents/Resources");
   await mkdir(resources, { recursive: true });
-  await createPackage(source, path.join(resources, "app.asar"));
+  await packAsar(source, path.join(resources, "app.asar"));
   verifyQaApp(app);
   await writeFile(
     path.join(source, "package.json"),
     JSON.stringify({ ...metadata, productName: "DayBoard" }),
   );
-  await createPackage(source, path.join(resources, "app.asar"));
+  await packAsar(source, path.join(resources, "app.asar"));
   assert.throws(() => verifyQaApp(app), /Unexpected QA application entry or identity/);
   await writeFile(path.join(source, "package.json"), JSON.stringify(metadata));
   await writeFile(path.join(source, "out/main/index.js"), "ordinary-production-replacement");
-  await createPackage(source, path.join(resources, "app.asar"));
+  await packAsar(source, path.join(resources, "app.asar"));
   assert.throws(() => verifyQaApp(app), /QA isolation verification failed/);
 });
 

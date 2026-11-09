@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createPackage } from "@electron/asar";
+import { packAsar } from "./helpers/asar.mjs";
 import { verifyBetaApp, verifyBetaBuild } from "../scripts/verify-beta-package.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -120,11 +120,11 @@ test("preview packaging independently rebuilds with beta flags and verifies its 
   const source = path.join(directory, "asar-input");
   await cp(path.join(directory, "out"), path.join(source, "out"), { recursive: true });
   await writeFile(path.join(source, "package.json"), JSON.stringify({ main: pkg.main }));
-  await createPackage(source, path.join(resources, "app.asar"));
+  await packAsar(source, path.join(resources, "app.asar"));
   assert.match(verifyBetaApp(app), /^[a-f0-9]{64}$/);
 
   await writeFile(path.join(source, "out/main/index.js"), "unconfigured replacement");
-  await createPackage(source, path.join(resources, "app.asar"));
+  await packAsar(source, path.join(resources, "app.asar"));
   assert.throws(() => verifyBetaApp(app), /Beta configuration verification failed/);
 });
 
