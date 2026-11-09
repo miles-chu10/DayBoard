@@ -19,6 +19,7 @@ import { useOpenCapture } from "../components/capture-dialog";
 import { HistoryNav } from "../components/history-nav";
 import { MeetingCard } from "../components/meeting-card";
 import { useOpenItem } from "../components/open-item";
+import { OverdueSummary } from "../components/overdue-summary";
 import { usePublishViewContext } from "../components/shell";
 import { ViewActions } from "../components/view-actions";
 import { buildAgenda, type AgendaEntry } from "../lib/agenda";
@@ -54,9 +55,11 @@ import { useAgendaClock } from "../lib/use-agenda-clock";
 
 const SPAN_KEY = "home:span:v1";
 const HANDLED_KEY = "home:suggestions:v1";
+const OVERDUE_OPEN_KEY = "home:overdueOpen:v1";
 const PREVIEW = 5;
 
 const isSpan = (value: unknown): value is HomeSpan => value === "today" || value === "week";
+const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
 const isKeys = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
@@ -187,6 +190,14 @@ export function HomeView() {
     writeStored(SPAN_KEY, next);
   };
   const [handled, setHandled] = useState<string[]>(() => readStored(HANDLED_KEY, isKeys) ?? []);
+  // Overdue starts collapsed, like the Agenda page; Home remembers if you expand it.
+  const [overdueOpen, setOverdueOpenState] = useState(
+    () => readStored(OVERDUE_OPEN_KEY, isBoolean) ?? false,
+  );
+  const setOverdueOpen = (next: boolean) => {
+    setOverdueOpenState(next);
+    writeStored(OVERDUE_OPEN_KEY, next);
+  };
   const [showAllWaiting, setShowAllWaiting] = useState(false);
   const [showAllSuggested, setShowAllSuggested] = useState(false);
   const { openMail, openEvent, openTodo } = useOpenItem();
@@ -350,10 +361,11 @@ export function HomeView() {
             >
               <div className="flex flex-col gap-3 px-1">
                 {agenda.overdue.length ? (
-                  <div className="flex flex-col gap-1.5">
-                    <Text variant="small-strong" color="secondary" className="px-1">
-                      Overdue
-                    </Text>
+                  <OverdueSummary
+                    count={agenda.overdue.length}
+                    open={overdueOpen}
+                    onOpenChange={setOverdueOpen}
+                  >
                     <AgendaList
                       entries={agenda.overdue.map(todoEntry)}
                       now={now}
@@ -361,7 +373,7 @@ export function HomeView() {
                       onOpen={openTodo}
                       onPin={(todo) => toggleFocus(planning, todo)}
                     />
-                  </div>
+                  </OverdueSummary>
                 ) : null}
                 {agendaDays.map(({ date, entries }) => {
                   if (span === "week" && !entries.length) return null;
