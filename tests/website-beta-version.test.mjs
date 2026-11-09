@@ -4,6 +4,20 @@ import test from "node:test";
 
 const read = (name) => readFile(new URL(`../website/${name}`, import.meta.url), "utf8");
 
+// Verified against the downloaded release DMG, its GitHub digest and SHA256SUMS.txt.
+const publishedDmg = {
+  version: "1.3.0-beta.21",
+  bytes: "138,344,080",
+  sha256: "0d219fb8f72fdd29c532ecc9e73db18779e20deccc8a576098625b2d729c1ba4",
+};
+
+test("the site and installer pin the verified published release", async () => {
+  const installer = await read("install.sh");
+  assert.equal(installer.match(/^VERSION="([^"]+)"$/m)?.[1], publishedDmg.version);
+  assert.equal(installer.match(/^DMG_SHA256="([^"]+)"$/m)?.[1], publishedDmg.sha256);
+  assert.ok((await read("README.md")).includes(`The DMG is ${publishedDmg.bytes} bytes`));
+});
+
 // Each pattern marks copy that names the current beta, not a historical one such as a screenshot
 // caption. All of them must name the beta whose DMG download.html links.
 const currentBetaCopy = {
