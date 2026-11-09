@@ -325,3 +325,15 @@ test("buildAgenda keeps zero-length timed events, such as a Google event that st
     ["Midnight check"],
   );
 });
+
+test("getAvailableSlots ignores zero-length events, which take up no time", () => {
+  const slots = getAvailableSlots(
+    [event({ id: "point", start: "2026-09-23T10:00:00", end: "2026-09-23T10:00:00" })],
+    "2026-09-23",
+    30,
+    now,
+  );
+  const starts = slots.map((slot) => slot.start.toTimeString().slice(0, 5));
+  assert.ok(starts.includes("09:45"), "9:45–10:15 stays free around a 10:00 point event");
+  assert.ok(starts.includes("10:00"));
+});
