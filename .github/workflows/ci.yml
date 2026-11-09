@@ -45,8 +45,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      # Electron, its SHASUMS256.txt and electron-builder's tools come from GitHub releases.
-      # Keeping them between runs means a GitHub download outage can't fail this job.
+      # Electron and electron-builder's tools come from GitHub releases. The cache skips those
+      # downloads, but @electron/get still fetches Electron's SHASUMS256.txt on every build
+      # unless electron-builder.yml pins the checksums.
       - uses: actions/cache@v4
         with:
           path: |
@@ -71,9 +72,9 @@ jobs:
           }
           NODE
       # Synthetic client only; no credential access, uploads, releases or live sign-in.
-      # A 5xx from a GitHub release download inside @electron/get crashes the build before
-      # electron-builder's own download retry runs, so retry the test for that error only.
-      # Any other failure fails the job on the first attempt.
+      # GitHub release downloads can answer 5xx for longer than electron-builder's own
+      # 3 retries last, so retry the test for that error only. Any other failure fails
+      # the job on the first attempt.
       - name: Run npm run test:packaging
         shell: bash
         run: |
