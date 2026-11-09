@@ -552,11 +552,6 @@ workflows and anything outward-facing need Miles's explicit OK for that action, 
        `/download` redirects through `DOWNLOAD_URL` in `website-worker/worker.js` (it is the static
        `website/download.html`); still gates beta.12 on website disclosure; its dry-run artifact
        list misses `beta-test-results` (PR #72).
-     - `docs/AUTOMATED_RELEASES.md`: says signing can't be proven until credentials exist (beta.12,
-       beta.13 and beta.15 ran it end to end); implies release builds enforce licensing and need
-       the account and checkout checks first, but the workflow keeps the `live` license
-       environment (`macos-release.yml:27`) and sets `DAYBOARD_LICENSE=off` (`:59`), so published
-       betas are free; names the repository `miles-chu10/dayboard` (now `miles-chu10/DayBoard`).
      - `docs/CODEX-HANDOFF.md`: the beta 14 status, "Published: v1.3.0-beta.13" and pending item 1
        are superseded by beta.15 and beta.16; #59 is deployed; #61 is merged as `8645628`; the
        "Glaze 1.2.5 is live", uncommitted `sources/` dependency fixes, pending item 2 and line 346
