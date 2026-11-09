@@ -12,7 +12,19 @@ Open items, with what each waits on, are under "Remaining work".
 
 ### Releases
 
-- **Latest published beta: `1.3.0-beta.18`** (prerelease `v1.3.0-beta.18`). Signed macOS release
+- **Latest published beta: `1.3.0-beta.19`** (prerelease `v1.3.0-beta.19`), the first release
+  built with licensing on. Signed macOS release run 42573752532 published it on 2026-11-09 at
+  06:47 UTC from `350d99b` (#90), after signed beta dry run 42571797367 passed on the same commit.
+  Notes and verification: `docs/release-notes-1.3.0-beta.19.md`. `/release-check` on the Mac: all
+  seven assets present; every `SHA256SUMS.txt` line matches; `latest-mac.yml` gives the version
+  and the ZIP's and DMG's actual SHA-512 and size; the DMG and the apps in the ZIP and DMG pass
+  `codesign`, `stapler validate` and `spctl` (Notarized Developer ID, team `LGJS5APK9X`). Before the
+  tag, a licensing-on build of main (`94d3c3d`) against the live service showed the 14-day trial,
+  a License tab with no price, Get DayBoard Pro opening `https://api.getdayboard.com/buy` and
+  Help → Send Feedback working. On 2026-11-09 at 07:09 UTC an installed beta.18 updated itself to
+  beta.19 through the in-app updater (hashes, signature and notarization matched; existing app
+  data files kept).
+- `1.3.0-beta.18` (prerelease `v1.3.0-beta.18`): signed macOS release
   run 41977368075 published it on 2026-11-05 at 06:14 UTC from `8c3665c`. Notes:
   `docs/release-notes-1.3.0-beta.18.md`. It is the first release whose DMG is notarized and
   stapled. `/release-check` on the Mac: all seven assets present; every `SHA256SUMS.txt` line
