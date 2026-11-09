@@ -177,7 +177,7 @@ export function LicenseTab() {
           {canBuy ? (
             <Field>
               <Button variant="accent" onClick={() => openExternal(checkoutUrl)}>
-                Get DayBoard Pro · $5
+                Get DayBoard Pro
               </Button>
             </Field>
           ) : null}
