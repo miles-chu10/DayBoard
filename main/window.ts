@@ -153,6 +153,8 @@ export type MainRoute =
 export interface MainNavigation {
   to: MainRoute;
   prompt?: string;
+  /** Also opens the first-run welcome over the view (Help → Welcome to DayBoard…). */
+  welcome?: true;
 }
 
 export function isMainRoute(value: unknown): value is MainRoute {
@@ -289,6 +291,16 @@ export function setupApplicationMenu(options: {
     {
       role: "help",
       submenu: [
+        {
+          label: "Welcome to DayBoard…",
+          id: "welcome",
+          click: () => {
+            void focusMainWindow({ to: "/", welcome: true }).catch((error) =>
+              logger.warn("welcome", "Could not open the welcome", error),
+            );
+          },
+        },
+        { type: "separator" },
         {
           label: "Send Feedback…",
           id: "send-feedback",
