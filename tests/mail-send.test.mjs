@@ -184,7 +184,7 @@ const stubs = {
       export const app = { getPath: () => "/nonexistent" };`,
       "../services/file-store.js": `export const readFileIfExists = async () => globalThis.__mailFile ?? null;
       export const writeFileAtomic = async (_path, text) => { globalThis.__mailFile = Buffer.from(text); };`,
-      "./productivity.js": `export const requireAgendaScope = async () => "google:test";
+      "./productivity.js": `export const requireAgendaScope = async () => globalThis.__mailFixture.scope ?? "google:test";
       export const getAccountsStatus = async () => ({ google: { email: "me@example.com" } });
       export const onAccountsChanged = () => () => {};`,
       "../services/demo-data.js": `export const assertNotDemo = (channel) => {
@@ -285,6 +285,32 @@ test("with an undo window the email is held and Undo cancels it", async () => {
     await mail.drainMailOutbox();
     assert.equal(sentRaw.length, before);
   } finally {
+    globalThis.__mailFixture.undoSeconds = 0;
+  }
+});
+
+test("a held email is not sent from a different account than the one that wrote it", async () => {
+  globalThis.__mailFixture.undoSeconds = 5;
+  try {
+    const before = sentRaw.length;
+    const ticket = await invoke("mail:send", {
+      kind: "new",
+      to: "a@x.com",
+      subject: "Hi",
+      body: "Written while signed in to the first account",
+    });
+    assert.equal(ticket.held, true);
+    // The Google account is switched inside the undo window.
+    globalThis.__mailFixture.scope = "google:other";
+    await mail.drainMailOutbox();
+    assert.equal(sentRaw.length, before);
+    const result = broadcasts.findLast(
+      ([channel, params]) => channel === "mail:sendResult" && params.id === ticket.id,
+    );
+    assert.equal(result[1].ok, false);
+    assert.match(result[1].error, /account changed/i);
+  } finally {
+    delete globalThis.__mailFixture.scope;
     globalThis.__mailFixture.undoSeconds = 0;
   }
 });
