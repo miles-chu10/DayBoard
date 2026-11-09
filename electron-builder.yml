@@ -51,6 +51,18 @@ mas:
     - "!node_modules/electron-updater{,/**/*}"
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
+# Electron's SHA-256 checksums, copied from node_modules/electron/checksums.json. With them,
+# @electron/get still verifies the Electron zip but no longer downloads SHASUMS256.txt from GitHub
+# on every build (it skips its cache for that file), which failed packaging with 504s on
+# 2026-11-09. unsafelyDisableChecksums: false keeps verification on and selects the option form
+# that passes checksums through to @electron/get; adding mirrorOptions here would drop them.
+# tests/electron-download.test.mjs checks both and fails when the pins fall out of step with the
+# installed Electron.
+electronDownload:
+  unsafelyDisableChecksums: false
+  checksums:
+    electron-v44.10.0-darwin-arm64.zip: 8e9f6041d3aa62229332b033d0390fd213a9b10cd078163f3f5fe988ee91baf7
+    electron-v44.10.0-mas-arm64.zip: b05139de1e28bb05a449eeb0da1ec6a0c382a503a3af54dec9f5cff2bc1be164
 # Release feed for electron-updater. Config only: `npm run dist` passes --publish never.
 publish:
   provider: github

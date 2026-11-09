@@ -43,9 +43,12 @@ Open items, with what each waits on, are under "Remaining work".
 ### Release and update path
 
 - Since beta.12 every published beta is Developer ID signed (team `LGJS5APK9X`), notarized and
-  stapled by the **Signed macOS release** workflow, which runs when a `v` tag is pushed. It builds a
-  free release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=off`), so every feature, AI included,
-  is free in published betas. Official builds check for and download updates in the background and
+  stapled by the **Signed macOS release** workflow, which runs when a `v` tag is pushed. Through
+  beta.18 it built a free release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=off`), so every
+  feature, AI included, was free. From beta.19 it builds with licensing on against the live license
+  service (`https://api.getdayboard.com`, product `prod_VZ5SiyzDZ4ASHs`, both set in the workflow):
+  AI is behind DayBoard Pro with a 14-day trial from first AI use, and everything else stays free.
+  Official builds check for and download updates in the background and
   install on restart or quit. The manual **Signed macOS beta** workflow is an updates-off signing
   dry run. Local `npm run package:preview` builds are still ad-hoc signed. See `docs/RELEASE.md`.
 - Tags are pushed only from Miles's Mac, and each push needs his approval.
@@ -175,14 +178,16 @@ Open items, with what each waits on, are under "Remaining work".
 
 - On 2026-11-04 Miles set the model (`docs/EXECPLAN.md` line 13): DayBoard Pro is $5 once and
   unlocks AI only, with a 7-day AI trial from the first AI use, a 30-day offline grace, Stripe
-  Managed Payments, 3 devices and 14-day refunds. Stripe account setup, deploy and public launch
-  remain gated.
+  Managed Payments, 3 devices and 14-day refunds. On 2026-11-09 he lengthened the trial to 14
+  days for everyone, beta testers included, in place of free tester keys (#91). Stripe account
+  setup, deploy and public launch remain gated.
 - On main, PR #67 (`a48d205`) made DayBoard Pro a $5 AI-only unlock with Stripe Managed Payments,
-  and `main/services/license/config.ts` sets `TRIAL_DAYS = 7`. #67 shipped in beta.17 and #75 (comp
-  licenses, Quick Capture, deactivation and installation-ID fixes) in beta.18, both inactive:
-  published betas build with `DAYBOARD_LICENSE: "off"` (`.github/workflows/macos-release.yml:59`),
-  so every feature, AI included, is free. Payment code merged to main reaches users unchanged only
-  while that stays off; turning it on is a release-workflow change.
+  and `main/services/license/config.ts` set `TRIAL_DAYS = 7`; #91 makes it 14. #67 shipped in
+  beta.17 and #75 (comp licenses, Quick Capture, deactivation and installation-ID fixes) in
+  beta.18, both inactive because betas through beta.18 built with `DAYBOARD_LICENSE: "off"`.
+  Beta.19 turns licensing on in `.github/workflows/macos-release.yml`, so every `v*` tag after it,
+  betas included, is a paid build; a later free build needs `"off"` back through a PR and a new
+  version.
 - A separate project thread, "Get DayBoard ready to take payments", owns the payment flow.
 
 ### Glaze
@@ -244,7 +249,7 @@ Open items, with what each waits on, are under "Remaining work".
 
 - Standalone Electron integration is implemented: platform services, sandboxed preload, native window lifecycle, React UI, Swift Reminders helper, Google Desktop OAuth, AI provider selection, local MCP, preferences and history.
 - The existing Claude platform/UI/AI/licensing packets have been incorporated and reviewed. Root fixes include account-change races, native date/list validation, explicit AI-provider selection, demo isolation, accessible editor labels, persisted theme and licensing enforcement.
-- Stripe now replaces Lemon Squeezy by explicit user choice. The separate `billing/` Worker handles hosted Checkout, per-order authenticated key delivery, idempotent signed-webhook fulfillment, refund/dispute revocation and device limits. The app binds keys to issuer/product/environment, preserves old encrypted records and compensates only newly created activation slots. Since PR #67 the trial is a 7-day AI-only trial that starts on the first AI use; the 30-day offline grace still applies, and 14 days is the refund window. Missing commercial configuration produces preview mode; strict release builds require live configuration.
+- Stripe now replaces Lemon Squeezy by explicit user choice. The separate `billing/` Worker handles hosted Checkout, per-order authenticated key delivery, idempotent signed-webhook fulfillment, refund/dispute revocation and device limits. The app binds keys to issuer/product/environment, preserves old encrypted records and compensates only newly created activation slots. Since PR #67 the trial is AI-only and starts on the first AI use, and #91 lengthens it from 7 to 14 days; the 30-day offline grace still applies, and 14 days is the refund window. Missing commercial configuration produces preview mode; strict release builds require live configuration.
 - The website lives in `website/`, with a real fictional-data screenshot. Its live state is under
   "Website" above.
 - The reviewed Agenda/sidebar UI preserves the existing design tokens and adds clear date hierarchy, grouped navigation, wrapping filters and density spacing. Test/demo startup validates backend and browser storage before services and exits Electron immediately on isolation failure. No billing, waitlist or provider behavior changed.
@@ -528,9 +533,10 @@ workflows and anything outward-facing need Miles's explicit OK for that action, 
    - Confirm the production waitlist: D1 migrations 0001 to 0005, the suppressions table and the
      health of the waitlist endpoint. Waits on Miles running read-only `wrangler` commands
      (`wrangler d1 migrations list --remote`, `wrangler deployments list`).
-   - Beta-tester invitation email: on hold. Its trigger was "after beta 14 is published", and beta
-     14 was never published. Waits on Miles to restate the trigger, say where the one-by-one
-     invitation workflow lives, and approve each send; each send needs fresh suppression checks.
+   - Beta-tester email: on 2026-11-09 Miles restated the trigger as "after beta.19 is published".
+     The payments project thread drafts the emails in Gmail for the waitlist, minus the people he
+     excluded; nothing is sent until he says "send", and each send needs fresh suppression checks.
+     Testers get the 14-day AI trial, not a free key.
    - Claude Design project check: rerun the read-only `/design-sync` inspection. Waits on Miles
      running `/design-login` once in an interactive Claude Code session.
    - Source migration review (see the note on separate histories below). Waits on Miles to

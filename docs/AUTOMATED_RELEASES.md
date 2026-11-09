@@ -19,15 +19,13 @@ Secrets:
 
 Variables:
 
-| Name                         | Value                                   |
-| ---------------------------- | --------------------------------------- |
-| `APPLE_TEAM_ID`              | Expected 10-character Developer ID team |
-| `APPLE_API_KEY_ID`           | Notarization API key ID                 |
-| `APPLE_API_ISSUER`           | Notarization team API issuer UUID       |
-| `DAYBOARD_LICENSE_API_URL`   | Deployed HTTPS license-service origin   |
-| `DAYBOARD_STRIPE_PRODUCT_ID` | Approved live Stripe product ID         |
+| Name               | Value                                   |
+| ------------------ | --------------------------------------- |
+| `APPLE_TEAM_ID`    | Expected 10-character Developer ID team |
+| `APPLE_API_KEY_ID` | Notarization API key ID                 |
+| `APPLE_API_ISSUER` | Notarization team API issuer UUID       |
 
-The workflow fixes the license environment to `live` but builds published betas with `DAYBOARD_LICENSE=off`, so every feature stays free. Checkout and Google waitlist restrictions are unchanged. Enabling paid licensing requires a separately approved workflow change and the account, checkout and support checks in `RELEASE.md`; signing and release approvals still apply to every beta. This automation does not create Stripe products, deploy the billing backend or website, merge the app PR or upload existing unsigned previews.
+Tag releases build with licensing on (`DAYBOARD_LICENSE=on`). The workflow itself sets the live license service `https://api.getdayboard.com`, the live product `prod_VZ5SiyzDZ4ASHs` and the `live` environment; they are not repository variables. AI is behind DayBoard Pro with a 14-day trial and everything else stays free; see "Launch: licensing on" in `RELEASE.md`. Checkout and Google waitlist restrictions are unchanged. Signing and release approvals still apply to every beta. This automation does not create Stripe products, deploy the billing backend or website, merge the app PR or upload existing unsigned previews.
 
 ## Release process
 

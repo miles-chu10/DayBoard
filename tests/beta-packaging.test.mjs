@@ -145,11 +145,7 @@ for (const [name, contents, overrides, error] of [
   });
 }
 
-test("a free release enables updates without licensing or license service configuration", async (t) => {
-  const { directory, run } = await fixture(t);
-  await writeFile(
-    path.join(directory, "entry.ts"),
-    `
+const releaseEntry = `
     import { GOOGLE_APP_CLIENT_ID } from ${JSON.stringify(path.join(root, "main/services/google-oauth-app-client.ts"))};
     import { configuredLicenseProduct, isLicenseGatingDisabled } from ${JSON.stringify(path.join(root, "main/services/license/config.ts"))};
     export const configuration = {
@@ -158,15 +154,17 @@ test("a free release enables updates without licensing or license service config
       licenseProduct: configuredLicenseProduct(),
       updatesEnabled: process.env.DAYBOARD_RELEASE === "1",
     };
-  `,
-  );
-  const built = run("build", {
-    DAYBOARD_RELEASE: "1",
-    DAYBOARD_LICENSE: "off",
-    DAYBOARD_LICENSE_API_URL: "https://license-sentinel.example",
-    DAYBOARD_STRIPE_PRODUCT_ID: "prod_sentinel",
-    DAYBOARD_LICENSE_ENVIRONMENT: "live",
-  });
+  `;
+const liveLicense = {
+  DAYBOARD_LICENSE_API_URL: "https://license-sentinel.example",
+  DAYBOARD_STRIPE_PRODUCT_ID: "prod_sentinel",
+  DAYBOARD_LICENSE_ENVIRONMENT: "live",
+};
+
+test("a free release enables updates without licensing or license service configuration", async (t) => {
+  const { directory, run } = await fixture(t);
+  await writeFile(path.join(directory, "entry.ts"), releaseEntry);
+  const built = run("build", { DAYBOARD_RELEASE: "1", DAYBOARD_LICENSE: "off", ...liveLicense });
   assert.equal(built.status, 0, built.stderr);
   const output = path.join(directory, "out/main/index.js");
   assert.doesNotMatch(await readFile(output, "utf8"), /sentinel/);
@@ -182,12 +180,43 @@ test("a free release enables updates without licensing or license service config
   });
 });
 
+// The signed tag workflow's build: licensing on, updates on and the live license service.
+test("a paid release embeds the live license configuration with updates on", async (t) => {
+  const { directory, run } = await fixture(t);
+  await writeFile(path.join(directory, "entry.ts"), releaseEntry);
+  const built = run("build", { DAYBOARD_RELEASE: "1", DAYBOARD_LICENSE: "on", ...liveLicense });
+  assert.equal(built.status, 0, built.stderr);
+  const output = path.join(directory, "out/main/index.js");
+  const { configuration } = await import(pathToFileURL(output).href);
+  assert.deepEqual(configuration, {
+    googleConfigured: true,
+    licensingDisabled: false,
+    licenseProduct: {
+      apiUrl: "https://license-sentinel.example",
+      issuer: "https://license-sentinel.example",
+      productId: "prod_sentinel",
+      environment: "live",
+    },
+    updatesEnabled: true,
+  });
+  await assert.rejects(readFile(path.join(directory, "out/main/beta-build.json")), {
+    code: "ENOENT",
+  });
+});
+
 test("a release with licensing on still requires the live license configuration", async (t) => {
   const { directory, run } = await fixture(t);
-  const result = run("build", { DAYBOARD_RELEASE: "1" });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Release packaging requires/);
-  await assert.rejects(readFile(path.join(directory, "out/main/index.js")), { code: "ENOENT" });
+  for (const overrides of [
+    {},
+    { ...liveLicense, DAYBOARD_LICENSE_API_URL: "" },
+    { ...liveLicense, DAYBOARD_STRIPE_PRODUCT_ID: "" },
+    { ...liveLicense, DAYBOARD_LICENSE_ENVIRONMENT: "test" },
+  ]) {
+    const result = run("build", { DAYBOARD_RELEASE: "1", ...overrides });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Release packaging requires/);
+    await assert.rejects(readFile(path.join(directory, "out/main/index.js")), { code: "ENOENT" });
+  }
 });
 
 test("packaging rejects absent, unsafe or stale build proof without disclosing its contents", () => {

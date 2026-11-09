@@ -22,8 +22,9 @@ jobs:
       sha: ${{ steps.plan.outputs.sha }}
     env:
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-      DAYBOARD_LICENSE_API_URL: ${{ vars.DAYBOARD_LICENSE_API_URL }}
-      DAYBOARD_STRIPE_PRODUCT_ID: ${{ vars.DAYBOARD_STRIPE_PRODUCT_ID }}
+      # Public live license service and product, fixed here so a wrong repository variable can't ship.
+      DAYBOARD_LICENSE_API_URL: https://api.getdayboard.com
+      DAYBOARD_STRIPE_PRODUCT_ID: prod_VZ5SiyzDZ4ASHs
       DAYBOARD_LICENSE_ENVIRONMENT: live
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -55,8 +56,8 @@ jobs:
       - name: Build, sign and notarize
         env:
           DAYBOARD_RELEASE: "1"
-          # Free release with in-app updates until DayBoard has a price; remove to require live licensing.
-          DAYBOARD_LICENSE: "off"
+          # Paid release: fails unless the license configuration above is complete and live.
+          DAYBOARD_LICENSE: "on"
           CSC_IDENTITY_AUTO_DISCOVERY: "true"
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}

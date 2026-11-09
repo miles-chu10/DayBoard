@@ -106,8 +106,10 @@ notarized, self-updating betas. Two workflows share the signing setup:
 
 - **Signed macOS release** (`.github/workflows/macos-release.yml`) runs when a `v`-prefixed
   SemVer tag such as `v1.3.0-beta.12` is pushed for a commit on `main` whose `package.json`
-  version matches. The current workflow builds a free release (`DAYBOARD_RELEASE=1`
-  with `DAYBOARD_LICENSE=off`): Google required, in-app updates on, licensing off. It signs,
+  version matches. It builds a paid release (`DAYBOARD_RELEASE=1` with `DAYBOARD_LICENSE=on`
+  and the live license service, see [Launch: licensing on](#launch-licensing-on)): Google
+  required, in-app updates on, AI behind DayBoard Pro. Betas tagged before the launch were free
+  releases built with `DAYBOARD_LICENSE=off`. It signs,
   notarizes, staples, verifies and smoke-tests like the dry run below, then publishes the DMG,
   ZIP, blockmaps, `latest-mac.yml` and `SHA256SUMS.txt` as a GitHub prerelease (never marked
   latest for a prerelease version). This is how betas are distributed.
@@ -156,9 +158,36 @@ tags. That environment needs:
 | Secret   | `MACOS_NOTARY_KEY_P8`          | Contents of the App Store Connect `.p8` key                |
 | Secret   | `DAYBOARD_GOOGLE_OAUTH_JSON`   | `{"clientId": …, "clientSecret": …}` of the Desktop client |
 
-The free release ignores `DAYBOARD_LICENSE_API_URL` and `DAYBOARD_STRIPE_PRODUCT_ID`. The first
-Developer ID build replaces ad-hoc-signed installs, so verify on an owned installation that Google
-sign-in and the Keychain-held encryption key carry over when the app is replaced in Applications.
+The release workflow sets the public license configuration itself:
+`DAYBOARD_LICENSE_API_URL=https://api.getdayboard.com`, `DAYBOARD_STRIPE_PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`
+(the live product) and `DAYBOARD_LICENSE_ENVIRONMENT=live`. They are not repository variables, so a
+wrong variable can't ship; `tests/macos-release.test.mjs` pins them. The beta dry run ignores all three.
+The first Developer ID build replaces ad-hoc-signed installs, so verify on an owned installation
+that Google sign-in and the Keychain-held encryption key carry over when the app is replaced in
+Applications.
+
+## Launch: licensing on
+
+From the launch release, every `v*` tag (stable or prerelease) builds with licensing on. The
+build step sets `DAYBOARD_LICENSE: "on"`, and `electron.vite.config.ts` refuses a
+`DAYBOARD_RELEASE=1` build unless the API URL is an HTTPS origin, the product is a `prod_…` ID
+and the environment is `live`, so a missing or test configuration fails the run before signing
+and nothing is published. The format check cannot tell the live product from the test one, so
+the workflow names the live values itself (see above). Also before the first licensed tag:
+
+- The production `dayboard-billing` Worker answers `/buy` and `/v1/licenses/*` (not 503) with
+  `SERVICE_ORIGIN=https://api.getdayboard.com`, `PRODUCT_ID=prod_VZ5SiyzDZ4ASHs`,
+  `ENVIRONMENT=live` and `ACTIVATION_LIMIT=3`. The app accepts only keys whose issuer, product
+  and environment match exactly.
+- Installed betas update into the AI trial: AI, including Quick Capture's AI parsing, starts a
+  14-day trial on first use (`TRIAL_DAYS` in `main/services/license/config.ts`), everything else
+  stays free, and a key in Settings → License unlocks Pro. Beta testers get the same trial; there
+  are no free tester keys.
+- No further free betas can be tagged; a later free build needs `DAYBOARD_LICENSE: "off"` back
+  in the workflow and a new version.
+
+`build:beta` (the manual dry run and local beta packages), App Store builds and community builds
+keep licensing off.
 
 ## Local installation and QA copies
 
@@ -201,7 +230,7 @@ New installation IDs are an HMAC-SHA256 of the Mac's `IOPlatformUUID` (read with
 
 The app states the activation cap from `LICENSE_ACTIVATION_LIMIT` in `shared/license.ts` (3), in the activation-limit message and in Settings → License; the license service enforces its own `ACTIVATION_LIMIT` (`billing/`). The service doesn't send its limit to the app, so the two must match: change both together.
 
-The separate `billing/` service creates hosted Checkout Sessions, verifies signed payment webhooks and delivers the license on its authenticated receipt page. Stripe's payment receipt is separate from this key delivery. Product/price, quantity, payment state and test/live mode are verified on the server. Refund/dispute revocation survives out-of-order payment events. Standard Stripe Checkout does not imply merchant-of-record coverage; confirm the seller's tax setup and registrations before enabling automatic tax or accepting live payments. Price, activation limit, support recovery and refund policy require a deliberate launch decision.
+The separate `billing/` service creates hosted Checkout Sessions, verifies signed payment webhooks and delivers the license on its authenticated receipt page. Stripe's payment receipt is separate from this key delivery. Product/price, quantity, payment state and test/live mode are verified on the server. Refund/dispute revocation survives out-of-order payment events. Standard Stripe Checkout does not imply merchant-of-record coverage; confirm the seller's tax setup and registrations before enabling automatic tax or accepting live payments. Miles decided the price, the activation limit (3 Macs), the support address (support@getdayboard.com) and the 14-day refund policy on 2026-11-04 (`docs/EXECPLAN.md`).
 
 ## Verification gates
 
@@ -234,6 +263,5 @@ Keep GPL source/build instructions available with the official binary. Distribut
 
 The signed workflow runs on `v*` tag pushes and includes publication after verification.
 Do not push a tag merely to obtain a signing test or review artifact; use the manual beta
-workflow for that. The current release workflow keeps licensing off. Enabling paid licensing
-requires a separately approved workflow change and the corresponding release checks; removing
-`DAYBOARD_LICENSE: "off"` makes the workflow require live license configuration.
+workflow for that. It builds a paid release that requires the live license configuration; see
+[Launch: licensing on](#launch-licensing-on).

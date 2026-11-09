@@ -766,3 +766,20 @@ test("moved tags cannot publish either before or after uploads", async (t) => {
   await assert.rejects(publish(during, directory));
   assert.equal(during.state.releases[0].draft, true);
 });
+
+test("tag releases build with licensing on and the live license service; the beta dry run does not", async () => {
+  const workflow = (name) =>
+    readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+  const release = await workflow("macos-release.yml");
+  // The format check can't tell the live product from the test one, so the values are pinned.
+  assert.match(release, /^\s+DAYBOARD_LICENSE_API_URL: https:\/\/api\.getdayboard\.com$/m);
+  assert.match(release, /^\s+DAYBOARD_STRIPE_PRODUCT_ID: prod_VZ5SiyzDZ4ASHs$/m);
+  assert.doesNotMatch(release, /vars\.DAYBOARD_(LICENSE|STRIPE)/);
+  assert.match(release, /^\s+DAYBOARD_LICENSE_ENVIRONMENT: live$/m);
+  assert.match(release, /^\s+DAYBOARD_RELEASE: "1"$/m);
+  assert.match(release, /^\s+DAYBOARD_LICENSE: "on"$/m);
+  assert.doesNotMatch(release, /DAYBOARD_LICENSE: "off"/);
+  const beta = await workflow("macos-beta.yml");
+  assert.match(beta, /^\s+npm run build:beta$/m);
+  assert.doesNotMatch(beta, /DAYBOARD_LICENSE|DAYBOARD_STRIPE_PRODUCT_ID|DAYBOARD_RELEASE/);
+});
