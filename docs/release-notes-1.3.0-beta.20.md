@@ -1,8 +1,9 @@
-# DayBoard 1.3.0-beta.20 — A welcome for new installs and a daily check-in
+# DayBoard 1.3.0-beta.20 — Agenda on Home, a welcome for new installs and a daily check-in
 
-This beta adds a short first-run welcome for new installs and an anonymous daily check-in, so we
-know how many people use DayBoard. Licensing works as in beta.19: everything that isn't AI is
-free, AI runs a 14-day trial on each Mac, and DayBoard Pro unlocks it for good.
+This beta puts your agenda on Home, adds a short first-run welcome for new installs and an
+anonymous daily check-in, so we know how many people use DayBoard. Licensing works as in beta.19:
+everything that isn't AI is free, AI runs a 14-day trial on each Mac, and DayBoard Pro unlocks it
+for good.
 
 ## New
 
@@ -18,6 +19,15 @@ free, AI runs a 14-day trial on each Mac, and DayBoard Pro unlocks it for good.
   chats, Google account or license key, and the service doesn't store your IP address. To turn
   it off, open Settings → Updates and switch off **Send a daily anonymous check-in**. The
   [privacy policy](https://getdayboard.com/privacy.html#checkin) has the details (#97).
+- **Your agenda on Home.** Home now has one Agenda card in place of the separate tasks and
+  meetings cards: overdue items, then events, tasks and reminders by day, for Today or This week
+  (#101).
+
+## Fixed
+
+- **Google Calendar events that start and end at the same time show up everywhere.** Events like
+  a 10:00–10:00 reminder appeared in Calendar and Up next but not in Agenda, Home or the menu bar.
+  They now appear on the day they start (#101).
 
 ## Updating
 
