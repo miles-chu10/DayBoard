@@ -1,4 +1,6 @@
 /* global URL, Headers, Response */
+// Runs first only for .mp4 paths (and for paths with no matching asset, before the 404 page); see
+// run_worker_first in wrangler.jsonc. Every other request is served straight from the assets.
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
