@@ -104,8 +104,11 @@ main() {
 
   MOUNT="$WORK/mount"
   mkdir "$MOUNT"
-  hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" >/dev/null ||
-    fail "the disk image would not open."
+  # hdiutil's own messages are shown only if the image fails to open (newer macOS prints a
+  # deprecation notice on every attach).
+  local attach_log
+  attach_log="$(hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" 2>&1 >/dev/null)" ||
+    fail "the disk image would not open. ${attach_log}"
   [ -d "$MOUNT/$APP_NAME" ] || fail "the disk image does not contain $APP_NAME."
 
   # Copy next to the destination first, check that copy, then swap it into place.

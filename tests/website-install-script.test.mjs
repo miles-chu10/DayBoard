@@ -35,6 +35,8 @@ printf '%s' "$FAKE_DOWNLOAD" > "$out"`,
 esac`,
   spctl: `echo "accepted" >&2; echo "source=\${FAKE_SOURCE}" >&2`,
   hdiutil: `if [ "$1" = "attach" ]; then
+  echo "hdiutil: WARNING: 'hdiutil attach' is deprecated." >&2
+  [ "\${FAKE_UNREADABLE_IMAGE:-0}" = "1" ] && echo "hdiutil: attach failed - image not recognized" >&2 && exit 1
   while [ $# -gt 0 ]; do [ "$1" = "-mountpoint" ] && mount="$2"; shift; done
   mkdir -p "$mount/DayBoard.app/Contents" && echo "new" > "$mount/DayBoard.app/Contents/marker"
 fi`,
@@ -97,6 +99,7 @@ test("installs a verified download and cleans up after itself", (t) => {
   assert.deepEqual(run.leftovers, []);
   assert.deepEqual(run.temp, []);
   assert.match(run.stdout, /DayBoard \S+ is installed/);
+  assert.equal(run.stderr, "", "a working install shows none of hdiutil's own notices");
 });
 
 test("replaces an older copy when DayBoard is closed", (t) => {
@@ -119,6 +122,11 @@ const refusals = [
   ["another developer's signature", { env: { FAKE_TEAM: "ABCDE12345" } }, /Developer ID team/],
   ["an app that isn't notarized", { env: { FAKE_SOURCE: "Developer ID" } }, /not notarized/],
   ["a broken app signature", { env: { FAKE_BROKEN_SIGNATURE: "1" } }, /signature is not valid/],
+  [
+    "a disk image that won't open",
+    { env: { FAKE_UNREADABLE_IMAGE: "1" } },
+    /would not open\. [\s\S]*image not recognized/,
+  ],
   ["an Intel Mac", { env: { FAKE_ARM64: "0" } }, /Apple silicon/],
   ["macOS 13", { env: { FAKE_MACOS: "13.6.1" } }, /macOS 14/],
   ["another operating system", { env: { FAKE_OS: "Linux" } }, /Mac app/],
