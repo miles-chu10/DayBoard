@@ -744,6 +744,7 @@ test("buy page states the offer, terms and support before checkout", async () =>
   const beforeCheckout = html.slice(0, html.indexOf('id="buy"'));
   for (const copy of [
     /\$5 once \(launch price\)/,
+    /The launch price ends December 31, 2026 at 11:59 PM PST\. After that, DayBoard Pro is \$9\./,
     /Unlocks DayBoard's AI features\./,
     /Use on up to 3 Macs/,
     /14-day refunds\./,
