@@ -94,7 +94,6 @@ export const LICENSE_FORGET_COPY = {
 
 /** Confirmation before "Deactivate this device" removes a working key from this Mac. */
 export const LICENSE_DEACTIVATE_COPY = {
-  action: "Deactivate this device",
   title: "Deactivate DayBoard Pro on this Mac?",
   description:
     "DayBoard removes your license key from this Mac and frees its activation slot for another Mac. AI stops working here once any remaining trial time runs out. Everything else keeps working. To use DayBoard Pro on this Mac again, you'll need to enter your license key, so make sure you have it saved first.",

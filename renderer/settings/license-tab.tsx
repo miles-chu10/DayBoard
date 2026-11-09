@@ -143,7 +143,7 @@ export function LicenseTab() {
       status.state === "unconfigured" ? null : status.state === "licensed" ? (
         <Field>
           <Button onClick={() => setConfirmingDeactivate(true)} disabled={deactivate.isPending}>
-            {deactivate.isPending ? "Removing…" : LICENSE_DEACTIVATE_COPY.action}
+            {deactivate.isPending ? "Removing…" : "Deactivate this device"}
           </Button>
         </Field>
       ) : (
