@@ -17,8 +17,8 @@ run a 14-day trial, and DayBoard Pro unlocks them for good.
   to 3 Macs. To move it, choose "Deactivate this device" on the old Mac first. DayBoard checks the
   key once a day and keeps working offline for 30 days after the last good check.
 
-DayBoard talks to the license service at `https://api.getdayboard.com` only to activate a key and
-for the daily check. The trial is tracked on your Mac.
+DayBoard talks to the license service at `https://api.getdayboard.com` only to activate or
+deactivate a key and for the daily check. The trial is tracked on your Mac.
 
 ## Also in this build
 
