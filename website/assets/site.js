@@ -4,9 +4,9 @@
 const SITE_CONFIG = Object.freeze({
   waitlistUrl: "https://api.getdayboard.com/v1/waitlist",
   contactEmail: "support@getdayboard.com",
-  // The billing service's checkout page, e.g. "https://api.getdayboard.com/buy". Leave it empty
-  // until live checkout is ready: buy buttons stay hidden and pages say checkout isn't open yet.
-  buyUrl: "",
+  // The live billing service's checkout page. Set it to "" to close checkout: buy buttons then
+  // stay hidden and pages show their [data-buy-pending] notes instead.
+  buyUrl: "https://api.getdayboard.com/buy",
 });
 
 const buyUrl = (() => {
