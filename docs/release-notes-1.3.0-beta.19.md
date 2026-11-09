@@ -57,8 +57,13 @@ passes `xcrun stapler validate`, and `spctl` accepts it as Notarized Developer I
 ZIP and the DMG are 1.3.0-beta.19 with the same code signature, pass
 `codesign --verify --deep --strict` and `stapler validate`, and are accepted as Notarized
 Developer ID (team `LGJS5APK9X`). The shipped `app.asar` names the live license service and the
-live product, and no test product or test license service. An update from beta.18 has not yet
-been observed.
+live product, and no test product or test license service.
+
+Update from beta.18: on 2026-11-09 at 07:09 UTC, an installed beta.18 updated itself through the
+in-app updater. The downloaded ZIP matched the published SHA-256 and SHA-512, the installer
+finished with status 0, and the relaunched app is 1.3.0-beta.19 with the release's code signature,
+accepted as Notarized Developer ID. The existing settings, Google token store and other app data
+files were kept, not recreated.
 
 DMG: `DayBoard-1.3.0-beta.19-arm64.dmg` (138,285,359 bytes). Its published SHA-256 is
 `2a47c4796b0f618bce1e2215aa8e0918cd02c7ed5c669fa07aa48a00336be343`.
