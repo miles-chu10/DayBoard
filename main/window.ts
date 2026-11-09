@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import { ipcMain, logger } from "./platform/index.js";
 import type { SettingsTab } from "../shared/settings-navigation.js";
 import { registerTrustedWindow } from "./platform/ipc.js";
+import { copyFeedbackAddress, openFeedbackEmail } from "./services/feedback.js";
+import { FEEDBACK_EMAIL } from "../shared/feedback.js";
 import {
   isAllowedWindowNavigation,
   isExternalWebUrl,
@@ -288,6 +290,18 @@ export function setupApplicationMenu(options: {
       role: "help",
       submenu: [
         {
+          label: "Send Feedback…",
+          id: "send-feedback",
+          click: () => void openFeedbackEmail().catch(showFeedbackAddress),
+        },
+        // Mail.app takes mailto: even with no account set up, so webmail users need the address.
+        {
+          label: "Copy Feedback Address",
+          id: "copy-feedback-address",
+          click: copyFeedbackAddress,
+        },
+        { type: "separator" },
+        {
           label: "Open Source Licenses…",
           click: () => {
             const file = app.isPackaged
@@ -313,6 +327,23 @@ export function setupApplicationMenu(options: {
     },
   ]);
   Menu.setApplicationMenu(menu);
+}
+
+/** If macOS can't open the mailto: link at all, give the address so it can go in webmail. */
+function showFeedbackAddress(error: unknown): void {
+  logger.warn("feedback", "Could not open a new email", error);
+  void dialog
+    .showMessageBox({
+      type: "info",
+      message: "Send feedback by email",
+      detail: `DayBoard couldn't open your mail app. Email ${FEEDBACK_EMAIL} with what happened and your DayBoard and macOS versions.`,
+      buttons: ["Copy Address", "OK"],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then(({ response }) => {
+      if (response === 0) copyFeedbackAddress();
+    });
 }
 
 /**
