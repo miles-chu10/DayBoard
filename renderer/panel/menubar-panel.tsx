@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Callout, Input, Text } from "@renderer/ui";
 
 import { MeetingCard } from "../components/meeting-card";
+import { OverdueSummary } from "../components/overdue-summary";
 import { SourceDot } from "../components/source-dot";
 import { buildAgenda } from "../lib/agenda";
 import { identifyCalendarEvents } from "../lib/calendar-identity";
@@ -13,6 +14,7 @@ import { dueFollowUps, useMailSchedule } from "../lib/mail-schedule";
 import { useAgendaState, useCalendarRange, useMail, useReminders, useTasks } from "../lib/queries";
 import { featureOn, sourceOn, useSettings } from "../lib/settings";
 import { buildTodos, mergeLinkedTodos } from "../lib/todos";
+import { readStored, writeStored } from "../lib/storage";
 import { readTriageMap } from "../lib/triage";
 import { useAgendaClock } from "../lib/use-agenda-clock";
 import { panelAiCapture, type CaptureRecordView } from "./capture-panel-state";
@@ -24,7 +26,34 @@ import {
   usePanelEscape,
   usePanelShown,
 } from "./panel-ipc";
-import { todayItems } from "./today-items";
+import { todayItems, type TodayItem } from "./today-items";
+
+const OVERDUE_OPEN_KEY = "menubar:overdueOpen:v1";
+const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
+
+function ItemRow({ item, wideTime = false }: { item: TodayItem; wideTime?: boolean }) {
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+      onClick={() => void openMain(item.kind === "event" ? "/calendar" : "/agenda")}
+    >
+      <SourceDot source={item.source} />
+      <Text
+        as="span"
+        variant="small"
+        color="secondary"
+        className={`${wideTime ? "w-20" : "w-16"} shrink-0 tabular-nums`}
+        truncate
+      >
+        {item.time ?? "Anytime"}
+      </Text>
+      <Text as="span" variant="regular" truncate title={item.title}>
+        {item.title}
+      </Text>
+    </button>
+  );
+}
 
 function openMain(route: string, prompt?: string) {
   return invoke("panel:openMain", prompt ? { route, prompt } : { route });
@@ -121,6 +150,14 @@ export function MenuBarPanel() {
     latestText.current = text;
   }, [text]);
   const [error, setError] = useState<string | null>(null);
+  // Overdue starts collapsed so today stays in view; the panel remembers if you expand it.
+  const [overdueOpen, setOverdueOpenState] = useState(
+    () => readStored(OVERDUE_OPEN_KEY, isBoolean) ?? false,
+  );
+  const setOverdueOpen = (next: boolean) => {
+    setOverdueOpenState(next);
+    writeStored(OVERDUE_OPEN_KEY, next);
+  };
 
   useEffect(
     () =>
@@ -150,7 +187,7 @@ export function MenuBarPanel() {
     on,
   );
   const events = identifyCalendarEvents(calendar.data?.state === "ok" ? calendar.data.items : []);
-  const { overdueCount, items } = todayItems(
+  const { overdueCount, overdue, items } = todayItems(
     buildAgenda({ events, todos, startDate: today, days: 1, now, sources: on }),
     now,
   );
@@ -201,29 +238,31 @@ export function MenuBarPanel() {
 
       {sourceOn(settings, "mail") ? <WaitingOnYou now={now} /> : null}
 
+      {overdueCount ? (
+        <section aria-label="Overdue items" className="flex flex-col">
+          <OverdueSummary count={overdueCount} open={overdueOpen} onOpenChange={setOverdueOpen}>
+            <div className="flex flex-col">
+              {overdue.map((item) => (
+                <ItemRow key={item.key} item={item} wideTime />
+              ))}
+              {overdueCount > overdue.length ? (
+                <Button
+                  size="small"
+                  variant="transparent"
+                  className="self-start"
+                  onClick={() => void openMain("/agenda")}
+                >
+                  {overdueCount - overdue.length} more in DayBoard
+                </Button>
+              ) : null}
+            </div>
+          </OverdueSummary>
+        </section>
+      ) : null}
+
       <section aria-label="Today's items" className="flex flex-col">
         {items.length ? (
-          items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-              onClick={() => void openMain(item.kind === "event" ? "/calendar" : "/agenda")}
-            >
-              <SourceDot source={item.source} />
-              <Text
-                as="span"
-                variant="small"
-                color="secondary"
-                className="w-16 shrink-0 tabular-nums"
-              >
-                {item.time ?? "Anytime"}
-              </Text>
-              <Text as="span" variant="regular" truncate title={item.title}>
-                {item.title}
-              </Text>
-            </button>
-          ))
+          items.map((item) => <ItemRow key={item.key} item={item} />)
         ) : (
           <Text as="p" variant="small" color="secondary">
             Nothing else today.

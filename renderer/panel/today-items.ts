@@ -1,11 +1,12 @@
 import type { Agenda } from "../lib/agenda";
-import { formatTimeOfDay } from "../lib/dates";
+import { formatTimeOfDay, relativeDue } from "../lib/dates";
 
 export interface TodayItem {
   key: string;
   kind: "event" | "todo";
   title: string;
-  /** Start or due time, formatted for display; null for an anytime to-do. */
+  /** Start or due time, formatted for display ("Yesterday" for an overdue to-do); null for an
+   * anytime to-do. */
   time: string | null;
   source: "calendar" | "tasks" | "reminders";
 }
@@ -17,11 +18,14 @@ function clockTime(hhmm: string): string {
   return formatTimeOfDay(new Date(2000, 0, 1, hours, minutes).toISOString());
 }
 
-/** What's left today, for the menu-bar panel: timed items not yet over, then anytime to-dos. */
+/**
+ * What's left today, for the menu-bar panel: timed items not yet over, then anytime to-dos. Open
+ * overdue to-dos come separately, oldest first, for the panel's collapsible overdue row.
+ */
 export function todayItems(
   agenda: Agenda,
   now: Date,
-): { overdueCount: number; items: TodayItem[] } {
+): { overdueCount: number; overdue: TodayItem[]; items: TodayItem[] } {
   const today = agenda.days[0];
   const items: TodayItem[] = [];
   for (const entry of today?.timed ?? []) {
@@ -48,8 +52,16 @@ export function todayItems(
     if (todo.completed) continue;
     items.push({ key: todo.key, kind: "todo", title: todo.title, time: null, source: todo.source });
   }
+  const overdue = agenda.overdue.filter((todo) => !todo.completed);
   return {
-    overdueCount: agenda.overdue.filter((todo) => !todo.completed).length,
+    overdueCount: overdue.length,
+    overdue: overdue.slice(0, MAX_ITEMS).map((todo) => ({
+      key: todo.key,
+      kind: "todo",
+      title: todo.title,
+      time: todo.dueDate ? relativeDue(todo.dueDate, todo.dueTime, now).label : null,
+      source: todo.source,
+    })),
     items: items.slice(0, MAX_ITEMS),
   };
 }
