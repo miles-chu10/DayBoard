@@ -8,7 +8,7 @@ function sidebarItem(page: Page, title: string) {
     .first();
 }
 
-test("Home greets, ranks what needs you, suggests tasks from mail and lists meetings", async ({
+test("Home greets, ranks what needs you, suggests tasks from mail and shows the Agenda", async ({
   playwright: _playwright,
 }, testInfo) => {
   const demo = await launchDemo();
@@ -24,8 +24,7 @@ test("Home greets, ranks what needs you, suggests tasks from mail and lists meet
 
     const needsYou = page.getByRole("region", { name: "Needs you" });
     const suggested = page.getByRole("region", { name: "Suggested" });
-    const meetings = page.getByRole("region", { name: "Meetings" });
-    const tasks = page.getByRole("region", { name: "Your tasks" });
+    const agenda = page.getByRole("region", { name: "Agenda" });
 
     // New mail is triaged on its own: what needs a reply stays, FYI mail drops out.
     const sam = needsYou.getByRole("button", {
@@ -48,8 +47,11 @@ test("Home greets, ranks what needs you, suggests tasks from mail and lists meet
     await expect(suggested.getByText("Submit the Q4 budget", { exact: true })).toHaveCount(0);
 
     // Past meetings render without a button, so match the row by text at any time of day.
-    await expect(meetings).toContainText("Team standup");
-    await expect(tasks.getByText("Finalize launch announcement", { exact: true })).toBeVisible();
+    // One Agenda card holds today's events and tasks together.
+    await expect(agenda).toContainText("Team standup");
+    await expect(agenda.getByText("Finalize launch announcement", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Meetings" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Your tasks" })).toHaveCount(0);
     await page.waitForTimeout(250);
     await page.screenshot({ path: testInfo.outputPath("home-today.png") });
 

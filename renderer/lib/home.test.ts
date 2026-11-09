@@ -2,14 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { MailItem } from "@main/shared-types";
 
-import {
-  ageLabel,
-  firstName,
-  greeting,
-  homeSummary,
-  needsYou,
-  suggestedTasks,
-} from "./home";
+import { ageLabel, firstName, greeting, homeSummary, needsYou, suggestedTasks } from "./home";
 import type { TriageMap } from "./triage-types";
 
 const NOW = Date.parse("2026-11-04T18:00:00Z");
