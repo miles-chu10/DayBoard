@@ -15,7 +15,8 @@ import { ShellProvider } from "../components/shell";
 import { useHistoryShortcuts } from "../components/history-nav";
 import { useAppearanceSync } from "../lib/appearance";
 import { useAgendaState, useBackendSync } from "../lib/queries";
-import { useSettings } from "../lib/settings";
+import { useSettingsEditor } from "../lib/settings";
+import { OnboardingDialog } from "../components/onboarding-dialog";
 import { invoke } from "../lib/ipc";
 import { TabStrip, TabsProvider } from "../components/tab-strip";
 
@@ -46,17 +47,28 @@ export function RootView() {
   useAppearanceSync();
   useHistoryShortcuts();
 
-  const settings = useSettings().data;
+  const { settings, edit } = useSettingsEditor();
   const navigate = useNavigate();
   const launched = React.useRef(false);
+  // A new install shows the welcome until it's finished or skipped; Help reopens it.
+  const [welcomeRequested, setWelcomeRequested] = React.useState(false);
+  const welcomeOpen = welcomeRequested || settings?.general.onboarded === false;
+  const finishWelcome = () => {
+    setWelcomeRequested(false);
+    if (settings?.general.onboarded === false)
+      edit((draft) => {
+        draft.general.onboarded = true;
+      });
+  };
 
   // Panels and notifications open a view here: pulled once if this window opened for it, then
   // pushed while the window lives. Either one replaces the launch view.
   React.useEffect(() => {
     const go = (value: unknown) => {
-      const target = value as { to?: unknown; prompt?: unknown } | null;
+      const target = value as { to?: unknown; prompt?: unknown; welcome?: unknown } | null;
       if (!target || typeof target.to !== "string" || !(target.to in ROUTE_BY_PATH)) return;
       launched.current = true;
+      if (target.welcome === true) setWelcomeRequested(true);
       const to = ROUTE_BY_PATH[target.to];
       if (to === "/assistant" && typeof target.prompt === "string")
         void navigate({ to, search: { prompt: target.prompt } });
@@ -84,6 +96,7 @@ export function RootView() {
                 <TabsProvider>
                   <Shell />
                 </TabsProvider>
+                {welcomeOpen ? <OnboardingDialog onDone={finishWelcome} /> : null}
               </ShellProvider>
             </MeetingPrepProvider>
           </SubscriptionsProvider>

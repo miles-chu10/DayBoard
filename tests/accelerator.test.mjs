@@ -46,6 +46,12 @@ test("maps key events by code", () => {
 test("formats with macOS symbols", () => {
   assert.equal(accelerator.formatAccelerator("Control+Alt+Space"), "⌃⌥Space");
   assert.equal(accelerator.formatAccelerator("Control+Alt+Shift+Command+K"), "⌃⌥⇧⌘K");
+  assert.deepEqual(accelerator.acceleratorKeys("Control+Alt+Shift+Space"), [
+    "⌃",
+    "⌥",
+    "⇧",
+    "Space",
+  ]);
 });
 
 test("reports a default macOS conflict when the plist has no entry", () => {

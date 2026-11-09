@@ -83,6 +83,8 @@ export interface AppSettings {
     detailView: DetailView;
     /** The sidebar's views: their order, which are hidden (Home never is), and count pills. */
     sidebar: { order: SidebarView[]; hidden: SidebarView[]; counts: boolean };
+    /** The first-run welcome was finished or skipped; settings saved before it existed count as done. */
+    onboarded: boolean;
   };
   sources: Record<SourceId, { enabled: boolean; color: SourceColor }>;
   mail: {

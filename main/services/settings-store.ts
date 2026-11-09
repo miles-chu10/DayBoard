@@ -101,6 +101,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     density: "default",
     detailView: "dialog",
     sidebar: { order: [...SIDEBAR_VIEWS], hidden: [], counts: true },
+    onboarded: false,
   },
   sources: {
     tasks: { enabled: true, color: "blue" },
@@ -252,6 +253,8 @@ export function normalizeSettings(value: unknown): AppSettings {
       density: oneOf(general.density, DENSITIES, defaults.general.density),
       detailView: oneOf(general.detailView, DETAIL_VIEWS, defaults.general.detailView),
       sidebar: normalizeSidebar(general.sidebar),
+      // Only a new install, with no settings file, starts with the welcome still to show.
+      onboarded: bool(general.onboarded, true),
     },
     sources: Object.fromEntries(
       SOURCE_IDS.map((id) => {
@@ -401,6 +404,8 @@ function safeDemoSettings(value: unknown): AppSettings {
   const settings = normalizeSettings(value);
   return {
     ...settings,
+    // Demo windows open on the dashboard; Help → Welcome to DayBoard… still shows the welcome.
+    general: { ...settings.general, onboarded: true },
     sources: {
       tasks: { ...settings.sources.tasks, enabled: true },
       reminders: { ...settings.sources.reminders, enabled: true },
