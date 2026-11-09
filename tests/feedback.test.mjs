@@ -33,6 +33,10 @@ test("Help menu and Settings both offer feedback", async () => {
     readFile(new URL("../renderer/settings/settings-view.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(menu, /role: "help",\s*submenu: \[\s*\{\s*label: "Send Feedback…"/);
+  assert.match(
+    menu,
+    /label: "Copy Feedback Address",\s*id: "copy-feedback-address",\s*click: copyFeedbackAddress/,
+  );
   assert.match(handlers, /ipcMain\.handle\("app:sendFeedback"/);
   assert.match(handlers, /ipcMain\.handle\("app:copyFeedbackAddress"/);
   assert.match(settings, /<UpdatesTab \/>\s*<FeedbackSettings \/>/);

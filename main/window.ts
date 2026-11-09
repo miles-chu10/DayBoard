@@ -294,6 +294,12 @@ export function setupApplicationMenu(options: {
           id: "send-feedback",
           click: () => void openFeedbackEmail().catch(showFeedbackAddress),
         },
+        // Mail.app takes mailto: even with no account set up, so webmail users need the address.
+        {
+          label: "Copy Feedback Address",
+          id: "copy-feedback-address",
+          click: copyFeedbackAddress,
+        },
         { type: "separator" },
         {
           label: "Open Source Licenses…",
@@ -323,7 +329,7 @@ export function setupApplicationMenu(options: {
   Menu.setApplicationMenu(menu);
 }
 
-/** When no mail app takes the mailto: link, give the address so it can go in webmail instead. */
+/** If macOS can't open the mailto: link at all, give the address so it can go in webmail. */
 function showFeedbackAddress(error: unknown): void {
   logger.warn("feedback", "Could not open a new email", error);
   void dialog
