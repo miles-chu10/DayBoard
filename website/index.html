@@ -53,11 +53,349 @@
           ><img src="assets/icon-96.png" alt="" width="34" height="34" />DayBoard</a
         >
         <div class="nav-links">
-          <a href="#how">How it works</a><a href="#features">Features</a
-          ><a class="nav-tertiary" href="#privacy">Privacy</a
-          ><a class="nav-tertiary" href="#roadmap">Road Map</a><a href="#faq">FAQ</a
-          ><a href="pricing.html">Pricing</a><a href="download.html">Download</a
-          ><a class="nav-secondary" href="https://github.com/miles-chu10/dayboard">GitHub</a>
+          <div class="nav-menu" data-nav-menu>
+            <button
+              class="nav-trigger"
+              type="button"
+              aria-expanded="false"
+              aria-controls="nav-product"
+            >
+              Product<svg
+                class="nav-chevron"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="nav-panel nav-panel-wide" id="nav-product">
+              <div class="nav-col">
+                <p class="nav-col-title">Plan your day</p>
+                <a class="nav-item" href="#how"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Home and Agenda</span
+                    ><span class="nav-desc"
+                      >What needs you, what's due and your next meeting.</span
+                    ></span
+                  ></a
+                >
+                <a class="nav-item" href="#calendar"
+                  ><span class="nav-icon c-calendar"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M4 5h16v16H4V5Zm0 5h16M8 3v4m8-4v4" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Calendar</span
+                    ><span class="nav-desc"
+                      >Month, week and schedule views that show what's due.</span
+                    ></span
+                  ></a
+                >
+                <a class="nav-item" href="#tasks"
+                  ><span class="nav-icon c-tasks"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="m4 7 2 2 4-4m3 3h7M4 15h6v5H4v-5Zm9 2h7" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Tasks and Reminders</span
+                    ><span class="nav-desc"
+                      >Google Tasks and Apple Reminders in one list.</span
+                    ></span
+                  ></a
+                >
+              </div>
+              <div class="nav-col">
+                <p class="nav-col-title">Stay on top</p>
+                <a class="nav-item" href="#mail"
+                  ><span class="nav-icon c-mail"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M3 6h18v12H3V6Zm0 1 9 6 9-6" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Inbox</span
+                    ><span class="nav-desc"
+                      >Read, reply and snooze mail next to your plans.</span
+                    ></span
+                  ></a
+                >
+                <a class="nav-item" href="#assistant"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M11 3l1.7 4.3L17 9l-4.3 1.7L11 15l-1.7-4.3L5 9l4.3-1.7L11 3Zm7 11 .8 1.7 1.7.8-1.7.8L18 19l-.8-1.7-1.7-.8 1.7-.8L18 14Z"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Assistant</span
+                    ><span class="nav-desc"
+                      >Optional AI beside any view, off until you pick a provider.</span
+                    ></span
+                  ></a
+                >
+                <a class="nav-item" href="#workspace"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M14 3H6v18h12V7l-4-4Zm0 0v4h4M9 13h6m-6 4h4" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Notes and shortcuts</span
+                    ><span class="nav-desc"
+                      >Markdown notes, the ⌘K menu and a menu bar glance.</span
+                    ></span
+                  ></a
+                >
+              </div>
+              <div class="nav-col">
+                <p class="nav-col-title">See it</p>
+                <a class="nav-item" href="#demo"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M4 4h16v12H4V4Zm4 16h8m-4-4v4M10 8l4 2-4 2V8Z" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Try the demo</span
+                    ><span class="nav-desc"
+                      >A hands-on sample day, right in your browser.</span
+                    ></span
+                  ></a
+                >
+                <a class="nav-item" href="#privacy"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6l-7-3Z" />
+                      <path d="M9.5 12 11 13.5l3.5-3.5" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Privacy</span
+                    ><span class="nav-desc">Your day stays between you and your Mac.</span></span
+                  ></a
+                >
+                <a class="nav-item" href="#roadmap"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M5 21V4m0 0h11l-2 4 2 4H5" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Road Map</span
+                    ><span class="nav-desc">What has shipped and what comes next.</span></span
+                  ></a
+                >
+              </div>
+            </div>
+          </div>
+          <div class="nav-menu" data-nav-menu>
+            <button
+              class="nav-trigger"
+              type="button"
+              aria-expanded="false"
+              aria-controls="nav-resources"
+            >
+              Resources<svg
+                class="nav-chevron"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="nav-panel" id="nav-resources">
+              <div class="nav-col">
+                <p class="nav-col-title">Learn and get help</p>
+                <a class="nav-item" href="docs.html"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Zm0 16a2 2 0 0 1 2-2h13v2"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Guide</span
+                    ><span class="nav-desc">How each view and setting works.</span></span
+                  ></a
+                >
+                <a class="nav-item" href="beta.html#install"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M12 3v12m-4-4 4 4 4-4M5 17v3h14v-3" /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Install help</span
+                    ><span class="nav-desc">Install the beta and keep it updated.</span></span
+                  ></a
+                >
+                <a class="nav-item" href="support.html"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l.9-4.4A8 8 0 1 1 20 12Z" />
+                      <path
+                        d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5M12 16h.01"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">Support</span
+                    ><span class="nav-desc">Report a problem or ask a question.</span></span
+                  ></a
+                >
+                <a class="nav-item" href="#faq"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+                      <path
+                        d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5M12 16.5h.01"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">FAQ</span
+                    ><span class="nav-desc">Pricing, privacy and requirements.</span></span
+                  ></a
+                >
+                <a class="nav-item" href="https://github.com/miles-chu10/dayboard"
+                  ><span class="nav-icon"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M9 19c-4 1.3-4-2-6-2.5m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.8 2.3 5.8 2.6 5.8 2.6a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.4 9c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"
+                      /></svg></span
+                  ><span class="nav-text"
+                    ><span class="nav-title">GitHub</span
+                    ><span class="nav-desc">Source code, releases and changes.</span></span
+                  ></a
+                >
+              </div>
+            </div>
+          </div>
+          <a class="nav-link" href="pricing.html">Pricing</a>
+          <a class="nav-link" href="download.html">Download</a>
         </div>
         <button
           class="theme-toggle"
@@ -104,14 +442,22 @@
             ></span>
           </summary>
           <div class="menu-panel">
-            <span class="menu-caption">Explore DayBoard</span>
+            <span class="menu-caption">Product</span>
             <div class="menu-sections">
-              <a href="/#demo">Try the demo</a><a href="/#how">How it works</a>
-              <a href="/#features">Features</a><a href="/#privacy">Privacy</a>
-              <a href="/#roadmap">Road Map</a><a href="/#faq">FAQ</a>
+              <a href="/#demo">Try the demo</a><a href="/#how">Home and Agenda</a
+              ><a href="/#calendar">Calendar</a><a href="/#tasks">Tasks and Reminders</a
+              ><a href="/#mail">Inbox</a><a href="/#assistant">Assistant</a
+              ><a href="/#privacy">Privacy</a><a href="/#roadmap">Road Map</a>
+            </div>
+            <span class="menu-caption">Resources</span>
+            <div class="menu-sections">
+              <a href="/docs.html">Guide</a><a href="/beta.html#install">Install help</a
+              ><a href="/support.html">Support</a><a href="/#faq">FAQ</a
+              ><a href="https://github.com/miles-chu10/dayboard">GitHub</a>
+            </div>
+            <span class="menu-caption">DayBoard</span>
+            <div class="menu-sections">
               <a href="/pricing.html">Pricing</a><a href="/download.html">Download</a>
-              <a href="/docs.html">Guide</a><a href="/support.html">Support</a>
-              <a href="https://github.com/miles-chu10/dayboard">GitHub</a>
             </div>
             <a class="menu-join" href="/waitlist.html"
               >Join the waitlist <span aria-hidden="true">→</span></a
@@ -134,58 +480,11 @@
             Your whole day, <em>on one board.</em>
           </h1>
           <p class="c-lead rise" style="--i: 2">
-            Start with what needs you, what's due and your next meeting. DayBoard brings Google
-            Calendar, Google Tasks, Apple Reminders and Gmail together, with Notes and an optional
-            Assistant beside any view.
+            Your meetings, tasks, reminders and mail in one Mac app, with Notes and an optional
+            Assistant beside any view. Works with Google Calendar, Google Tasks, Apple Reminders and
+            Gmail.
           </p>
-        </div>
-        <section class="wrap product-demo" id="demo" aria-labelledby="demo-title" tabindex="-1">
-          <div class="demo-intro">
-            <div>
-              <span class="eyebrow">Try DayBoard</span>
-              <h2 id="demo-title">Try a day in DayBoard.</h2>
-            </div>
-            <p>A hands-on sample of the Mac app. Fictional data; changes stay in this tab.</p>
-          </div>
-          <div class="demo-app" data-demo hidden></div>
-          <noscript
-            ><p class="fine">
-              Enable JavaScript for the interactive demo. You can still explore this screenshot.
-            </p></noscript
-          >
-          <details class="demo-original" data-demo-static open>
-            <summary>See the actual Mac app</summary>
-            <figure>
-              <div class="board">
-                <div class="window">
-                  <div class="theme-picture">
-                    <img
-                      class="theme-light"
-                      src="assets/screens/light-home.png"
-                      alt="DayBoard Home with Needs you, suggested tasks, your tasks and meetings (fictional demo data)"
-                      width="2560"
-                      height="1640"
-                      loading="lazy"
-                    />
-                    <img
-                      class="theme-dark"
-                      src="assets/screens/dark-home.png"
-                      alt="DayBoard Home with Needs you, suggested tasks, your tasks and meetings (fictional demo data)"
-                      width="2560"
-                      height="1640"
-                    />
-                  </div>
-                </div>
-              </div>
-              <figcaption class="fine">
-                Home in DayBoard 1.3.0 beta 17. All names, messages and plans shown are fictional
-                demo data.
-              </figcaption>
-            </figure>
-          </details>
-        </section>
-        <div class="wrap demo-signup">
-          <form class="signup" id="join" data-signup method="post" novalidate>
+          <form class="signup rise" style="--i: 3" id="join" data-signup method="post" novalidate>
             <div class="signup-row">
               <label class="visually-hidden" for="email-hero">Email address</label>
               <input
@@ -208,7 +507,7 @@
             <p class="signup-status" role="status" aria-live="polite"></p>
             <noscript><p class="signup-note">Turn on JavaScript to join the list.</p></noscript>
           </form>
-          <p class="c-access">
+          <p class="c-access rise" style="--i: 4">
             A limited
             <a href="download.html">beta community download</a>
             is available. The app is signed, notarized by Apple and updates itself. Google sign-in
@@ -216,6 +515,34 @@
             <a href="beta.html#install">Read the install guide</a>.
           </p>
         </div>
+        <section class="wrap product-demo" id="demo" aria-labelledby="demo-title" tabindex="-1">
+          <h2 id="demo-title" class="visually-hidden">Try DayBoard in your browser</h2>
+          <div class="demo" data-demo hidden></div>
+          <noscript>
+            <figure class="demo-noscript">
+              <div class="theme-picture">
+                <img
+                  class="theme-light"
+                  src="assets/screens/light-home.png"
+                  alt="DayBoard Home with Needs you, suggested tasks, your tasks and meetings (fictional demo data)"
+                  width="2560"
+                  height="1640"
+                />
+                <img
+                  class="theme-dark"
+                  src="assets/screens/dark-home.png"
+                  alt="DayBoard Home with Needs you, suggested tasks, your tasks and meetings (fictional demo data)"
+                  width="2560"
+                  height="1640"
+                />
+              </div>
+              <figcaption class="fine">
+                Home in DayBoard 1.3.0 beta 17. Turn on JavaScript to try the interactive sample.
+                All names, messages and plans shown are fictional demo data.
+              </figcaption>
+            </figure>
+          </noscript>
+        </section>
       </section>
 
       <section class="section" id="how" aria-labelledby="how-title">
@@ -283,7 +610,7 @@
 
       <div class="band" id="features">
         <div class="wrap">
-          <section class="feature" aria-labelledby="calendar-title" data-reveal>
+          <section class="feature" id="calendar" aria-labelledby="calendar-title" data-reveal>
             <div class="feature-copy c-calendar">
               <span class="eyebrow"><span class="dot"></span>Calendar</span>
               <h2 id="calendar-title">A calendar that also shows <em>what's due.</em></h2>
@@ -360,7 +687,7 @@
             </div>
           </section>
 
-          <section class="feature flip" aria-labelledby="todos-title" data-reveal>
+          <section class="feature flip" id="tasks" aria-labelledby="todos-title" data-reveal>
             <div class="feature-copy c-tasks">
               <span class="eyebrow"
                 ><span class="dots"
@@ -447,7 +774,7 @@
             </div>
           </section>
 
-          <section class="feature" aria-labelledby="mail-title" data-reveal>
+          <section class="feature" id="mail" aria-labelledby="mail-title" data-reveal>
             <div class="feature-copy c-mail">
               <span class="eyebrow"><span class="dot"></span>Inbox</span>
               <h2 id="mail-title">Mail that sits <em>next to your plans.</em></h2>
@@ -485,7 +812,12 @@
             </div>
           </section>
 
-          <section class="feature flip" aria-labelledby="assistant-title" data-reveal>
+          <section
+            class="feature flip"
+            id="assistant"
+            aria-labelledby="assistant-title"
+            data-reveal
+          >
             <div class="feature-copy">
               <span class="eyebrow">Assistant · optional</span>
               <h2 id="assistant-title">An assistant <em>beside your day.</em></h2>
@@ -528,7 +860,7 @@
             Screenshots show DayBoard beta 17 with fictional demo data and sample AI responses.
           </p>
 
-          <section class="section" aria-labelledby="workspace-title" data-reveal>
+          <section class="section" id="workspace" aria-labelledby="workspace-title" data-reveal>
             <div class="section-head">
               <span class="eyebrow">Make room for your work</span>
               <h2 id="workspace-title">Keep your place. <em>Move at your pace.</em></h2>

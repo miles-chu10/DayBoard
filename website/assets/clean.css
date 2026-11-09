@@ -507,3 +507,167 @@ h2 em {
     display: none;
   }
 }
+
+/* ── Header menus ──────────────────────────────────────
+   Product and Resources open a panel of links, each with an icon, a title and one line of
+   description. assets/navigation.js opens them on hover, click and keyboard; without scripts the
+   panels open on hover and keyboard focus. Below 1024px the mobile menu takes over. */
+.nav > .nav-links {
+  align-items: center;
+  gap: 4px;
+  margin-left: 20px;
+  margin-right: auto;
+  flex-wrap: nowrap;
+}
+.nav-menu {
+  position: relative;
+}
+.nav-trigger,
+.nav-links > .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-soft);
+  font: 500 0.95rem/1 var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nav-trigger:hover,
+.nav-links > .nav-link:hover,
+.nav-menu.is-open > .nav-trigger,
+.nav-trigger.is-current,
+.nav-links > .nav-link[aria-current="page"] {
+  color: var(--ink);
+}
+.nav-trigger:hover,
+.nav-links > .nav-link:hover,
+.nav-menu.is-open > .nav-trigger {
+  background: var(--paper-sunk);
+}
+.nav-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s;
+}
+.nav-menu.is-open .nav-chevron {
+  transform: rotate(180deg);
+}
+.nav-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -8px;
+  z-index: 20;
+  display: none;
+  width: 340px;
+  padding: 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 14px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-window);
+}
+/* Bridges the gap under the trigger so the pointer can travel into the panel. */
+.nav-panel::before {
+  content: "";
+  position: absolute;
+  inset: -12px 0 100%;
+}
+.nav-panel-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(860px, calc(100vw - 48px));
+}
+.nav-menu.is-open > .nav-panel,
+html:not(.js) .nav-menu:is(:hover, :focus-within) > .nav-panel {
+  display: grid;
+  animation: nav-panel-in 0.14s ease-out;
+}
+@keyframes nav-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.nav-col {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 4px;
+}
+.nav-panel-wide .nav-col + .nav-col {
+  border-left: 1px solid var(--rule);
+  padding-left: 8px;
+}
+.nav-col-title {
+  margin: 0;
+  padding: 6px 10px 8px;
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.nav-links .nav-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: normal;
+}
+.nav-item:hover,
+.nav-item:focus-visible,
+.nav-item[aria-current="page"] {
+  background: var(--paper-sunk);
+}
+.nav-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--c-ink, var(--ink-soft));
+}
+.nav-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.nav-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.nav-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.nav-desc {
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+@media (max-width: 1160px) and (min-width: 1024px) {
+  .nav > .nav-links {
+    margin-left: 8px;
+  }
+  .nav-trigger,
+  .nav-links > .nav-link {
+    padding: 0 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu.is-open > .nav-panel {
+    animation: none;
+  }
+  .nav-chevron {
+    transition: none;
+  }
+}

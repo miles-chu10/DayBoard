@@ -46,6 +46,10 @@ Follow `docs/launch/website-deploy.md`. It deploys the signup endpoint, sets `SI
 - Review `privacy.html` (a draft, not legal advice); Google's verification needs it linked from the consent screen.
 - Check that the copy still matches the shipped app, especially the requirements and install steps on `beta.html`.
 
+## Header menus
+
+Every page shares one header: a Product menu (three columns of feature links), a Resources menu (guide, install help, support, FAQ, GitHub), and plain Pricing and Download links. Below 1024px the header shows the `details.mobile-menu` list instead, grouped the same way. `assets/navigation.js` opens a menu on click, on hover with a mouse, and closes it on Escape (focus returns to the button), an outside click or when focus leaves; without JavaScript the panels open on hover and focus. The markup is repeated in each page, so change all of them together; `tests/website-nav.test.mjs` checks they match.
+
 ## Cloudflare files
 
 - `_headers` sets security headers, including a Content-Security-Policy whose `script-src` allows each page's inline head script by its sha256 hash. After editing a page's inline `<script>`, recompute the hashes from the repository root and update `_headers`:
@@ -60,7 +64,7 @@ Follow `docs/launch/website-deploy.md`. It deploys the signup endpoint, sets `SI
 ## Assets
 
 - `assets/screens/` contains copies of `docs/screenshots/`, captured by `npm run screenshots` from the isolated fictional demo. The beta 17 refresh captures a 1280×820 content window at 2× scale, producing 2560×1640 images. Copy matching light and dark images after recapturing, and keep the HTML image dimensions and social preview metadata in sync.
-- The homepage hero uses `light-home.png` and `dark-home.png`; its social preview uses the light Home image. The Assistant feature uses `light-ask.png` and `dark-ask.png` to show the docked panel beside Home. The calendar, task, reminder and mail gallery images come from the same capture. Visible captions and alt text identify fictional demo data and sample AI responses.
+- The homepage hero is the interactive sample in `assets/demo.js`, `assets/demo-state.js` and `assets/demo.css`. It mirrors the app's demo mode (`main/services/demo-data.ts`) and current Home layout, uses the app's own color tokens for light and dark, and keeps every change in memory for that tab. Visitors without JavaScript see `light-home.png` and `dark-home.png` instead (a `<noscript>` figure). The social preview uses the light Home image. When the app's Home, sidebar or demo data changes, update the sample to match. The Assistant feature uses `light-ask.png` and `dark-ask.png` to show the docked panel beside Home. The calendar, task, reminder and mail gallery images come from the same capture. Visible captions and alt text identify fictional demo data and sample AI responses.
 - The beta and waitlist pages use the current `assets/screens/light-agenda.png` for their social previews. The older Agenda previews and launch video are retained as historical assets but are no longer the homepage hero. The older `assets/og-image.png` says "Free public beta" and must not be referenced by waitlist pages.
 - `assets/icon-32.png` and `assets/icon-96.png` are the small-size logo, and `assets/icon-180.png` (Apple touch icon) is the full-bleed square logo. Sources and regeneration steps are in `brand/README.md`.
 - `assets/fonts/` holds self-hosted Fraunces and Hanken Grotesk under the SIL Open Font License; their license texts sit beside them. No page loads third-party resources.
