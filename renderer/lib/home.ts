@@ -1,7 +1,5 @@
 import type { MailItem } from "@main/shared-types";
 
-import { addDays } from "./dates";
-import { compareByDue, type Todo } from "./todos";
 import type { TriageMap } from "./triage-types";
 
 export type HomeSpan = "today" | "week";
@@ -110,14 +108,6 @@ export function suggestedTasks(input: {
     const key = `suggest:${message.id}`;
     return title && !handled.has(key) ? [{ key, title, mail: message }] : [];
   });
-}
-
-/** Open tasks and reminders for Home: overdue and due today, or due within the next 7 days. */
-export function homeTodos(todos: Todo[], today: string, span: HomeSpan): Todo[] {
-  const last = span === "today" ? today : addDays(today, 6);
-  return todos
-    .filter((todo) => !todo.completed && todo.dueDate !== null && todo.dueDate <= last)
-    .sort(compareByDue);
 }
 
 export function greeting(hour: number): string {

@@ -88,7 +88,9 @@ function sourceEnabled(
 function eventBounds(event: CalendarEventItem): { start: Date; end: Date } | null {
   const start = event.allDay ? startOfDay(event.start.slice(0, 10)) : new Date(event.start);
   const end = event.allDay ? startOfDay(event.end.slice(0, 10)) : new Date(event.end);
-  return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start
+  // Google allows timed events whose end equals their start (a "reminder"-style point in
+  // time). They are real events, so keep them; only reversed or unreadable ranges are dropped.
+  return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start
     ? null
     : { start, end };
 }
@@ -96,7 +98,11 @@ function eventBounds(event: CalendarEventItem): { start: Date; end: Date } | nul
 function overlapsDay(event: CalendarEventItem, date: string): boolean {
   const bounds = eventBounds(event);
   if (!bounds) return false;
-  return bounds.start < endOfDay(date) && bounds.end > startOfDay(date);
+  const dayStart = startOfDay(date);
+  const dayEnd = endOfDay(date);
+  if (bounds.end.getTime() === bounds.start.getTime())
+    return bounds.start >= dayStart && bounds.start < dayEnd;
+  return bounds.start < dayEnd && bounds.end > dayStart;
 }
 
 function compareEvents(a: CalendarEventItem, b: CalendarEventItem): number {
