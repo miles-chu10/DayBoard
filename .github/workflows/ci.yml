@@ -45,6 +45,14 @@ jobs:
         with:
           node-version: "24"
           cache: npm
+      # Electron, its SHASUMS256.txt and electron-builder's tools come from GitHub releases.
+      # Keeping them between runs means a GitHub download outage can't fail this job.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
       - run: npm ci --include=dev
       - name: Seed existing artifacts for the isolation regression
         run: |
@@ -63,7 +71,20 @@ jobs:
           }
           NODE
       # Synthetic client only; no credential access, uploads, releases or live sign-in.
-      - run: npm run test:packaging
+      # A 5xx from a GitHub release download inside @electron/get crashes the build before
+      # electron-builder's own download retry runs, so retry the test for that error only.
+      # Any other failure fails the job on the first attempt.
+      - name: Run npm run test:packaging
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/packaging.log"
+          for attempt in 1 2 3; do
+            if npm run test:packaging 2>&1 | tee "$log"; then exit 0; fi
+            grep -qE 'HTTPError: Response code 5[0-9]{2}' "$log" || exit 1
+            echo "::warning::A GitHub download answered 5xx on attempt $attempt of 3."
+            sleep 30
+          done
+          exit 1
   billing:
     name: Offline Stripe license service tests (Node 24)
     runs-on: ubuntu-latest
