@@ -217,7 +217,7 @@ export function ItemEditButton({
 }
 
 function ItemEditor({
-  item: opened,
+  item,
   onClose,
   onSaved,
 }: {
@@ -225,9 +225,6 @@ function ItemEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  // Edit the item as it was when the editor opened. A background refresh passes a new copy of
-  // the same item, and following it reloaded the form over what had been typed.
-  const [item] = useState(opened);
   const queryClient = useQueryClient();
   const fieldId = useId();
   const kind = kindFor(item);
@@ -251,13 +248,17 @@ function ItemEditor({
   const saveDisabled =
     demo || !scope || !title || !eventTimesValid || loadingEvent || Boolean(eventLoadError);
 
+  // Details load once per event, not per copy of it: a background refresh passes a new copy of
+  // the same event, and reloading for it replaced what had been typed. Saves still use the
+  // current copy, so a reminder's refreshed reference is the one submitted.
+  const eventCalendarId = isCalendarEvent(item) ? item.calendarId : null;
+  const eventId = isCalendarEvent(item) ? item.id : null;
   useEffect(() => {
-    if (kind !== "event" || demo || !scope) return;
-    const event = item as CalendarEventItem;
+    if (!eventCalendarId || !eventId || demo || !scope) return;
     let cancelled = false;
     void invoke<CalendarEventItem>("calendar:getForEditing", {
-      calendarId: event.calendarId,
-      eventId: event.id,
+      calendarId: eventCalendarId,
+      eventId,
       expectedScope: scope,
     })
       .then((fullEvent) => {
@@ -272,7 +273,7 @@ function ItemEditor({
     return () => {
       cancelled = true;
     };
-  }, [demo, item, kind, scope]);
+  }, [demo, eventCalendarId, eventId, scope]);
 
   function setField<Key extends keyof typeof fields>(key: Key, value: (typeof fields)[Key]) {
     setFields((current) => ({ ...current, [key]: value }));
