@@ -12,6 +12,11 @@ export function openFeedbackEmail(): Promise<void> {
   );
 }
 
+/** The app macOS will open for a new email, or "" when none is set. */
+export function feedbackMailApp(): string {
+  return app.getApplicationNameForProtocol("mailto:");
+}
+
 /** For testers whose mail is in a browser rather than a mail app. */
 export function copyFeedbackAddress(): void {
   clipboard.writeText(FEEDBACK_EMAIL);

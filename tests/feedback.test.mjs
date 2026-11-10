@@ -4,11 +4,15 @@ import test from "node:test";
 
 import { loadTs } from "./helpers/load-ts.mjs";
 
-const { FEEDBACK_EMAIL, feedbackMailto } = await loadTs("shared/feedback.ts");
+const { FEEDBACK_EMAIL, feedbackMailto, feedbackOpensIn } = await loadTs("shared/feedback.ts");
 
 test("feedback email goes to support with the version details filled in", () => {
   const url = new URL(
-    feedbackMailto({ appVersion: "1.3.0-beta.19", osVersion: "15.1.0", arch: "arm64" }),
+    feedbackMailto({
+      appVersion: "1.3.0-beta.19",
+      osVersion: "15.1.0",
+      arch: "arm64",
+    }),
   );
   assert.equal(FEEDBACK_EMAIL, "support@getdayboard.com");
   assert.equal(url.protocol, "mailto:");
@@ -21,9 +25,27 @@ test("feedback email goes to support with the version details filled in", () => 
 });
 
 test("mail apps get spaces as %20, not +", () => {
-  const url = feedbackMailto({ appVersion: "1.3.0", osVersion: "14.6", arch: "arm64" });
+  const url = feedbackMailto({
+    appVersion: "1.3.0",
+    osVersion: "14.6",
+    arch: "arm64",
+  });
   assert.doesNotMatch(url, /\+/);
   assert.match(url, /subject=DayBoard%20feedback%20\(1\.3\.0\)/);
+});
+
+test("Settings names the app a new email opens in, and says nothing when there is none", async () => {
+  assert.equal(feedbackOpensIn("HeroSpace (Alpha)"), "Send feedback opens in HeroSpace (Alpha).");
+  assert.equal(feedbackOpensIn(" Mail "), "Send feedback opens in Mail.");
+  assert.equal(feedbackOpensIn(""), "");
+  const [service, handlers, settings] = await Promise.all([
+    readFile(new URL("../main/services/feedback.ts", import.meta.url), "utf8"),
+    readFile(new URL("../main/handlers/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../renderer/settings/feedback-settings.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(service, /app\.getApplicationNameForProtocol\("mailto:"\)/);
+  assert.match(handlers, /ipcMain\.handle\("app:feedbackMailApp", \(\) => feedbackMailApp\(\)\)/);
+  assert.match(settings, /invoke<string>\("app:feedbackMailApp"\)/);
 });
 
 test("Help menu and Settings both offer feedback", async () => {

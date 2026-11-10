@@ -24,3 +24,9 @@ export function feedbackMailto({ appVersion, osVersion, arch }: FeedbackContext)
   ].join("\r\n");
   return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
+
+/** Names the app Send feedback will open, so an unexpected default mail app isn't a surprise. */
+export function feedbackOpensIn(mailApp: string): string {
+  const name = mailApp.trim();
+  return name ? `Send feedback opens in ${name}.` : "";
+}

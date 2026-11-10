@@ -16,7 +16,7 @@ import { registerLicenseHandlers } from "./license.js";
 import { registerMeetingNotesHandlers } from "./meeting-notes.js";
 import { registerAgentHandlers } from "./agent.js";
 import { assertLicenseAccess } from "../services/license/index.js";
-import { copyFeedbackAddress, openFeedbackEmail } from "../services/feedback.js";
+import { copyFeedbackAddress, feedbackMailApp, openFeedbackEmail } from "../services/feedback.js";
 import { setLicenseAccessGuard } from "../platform/ipc.js";
 import { isSettingsTab } from "../../shared/settings-navigation.js";
 import { getSettingsWindow, openSettingsWindow, setMainTabCount } from "../window.js";
@@ -66,6 +66,7 @@ export function registerHandlers(): void {
 
   ipcMain.handle("app:sendFeedback", () => openFeedbackEmail());
   ipcMain.handle("app:copyFeedbackAddress", () => copyFeedbackAddress());
+  ipcMain.handle("app:feedbackMailApp", () => feedbackMailApp());
 
   registerProductivityHandlers();
   registerMailHandlers();
