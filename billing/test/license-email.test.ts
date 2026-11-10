@@ -366,14 +366,14 @@ test("a provider outage never blocks the order: the key is ready and the schedul
   assert.equal((await claim()).email, "sent");
 });
 
-test("the schedule gives up 48 hours after the key was issued", async () => {
+test("the schedule gives up 23 hours after the email was queued", async () => {
   const f = setup();
   f.state.provider = 500;
   const { orderId, sessionId, claim } = await f.order();
   assert.equal((await f.signed("checkout.session.completed", "evt_paid", sessionId)).status, 200);
   f.state.provider = 0;
   const hours = (count: number) => Date.now() - count * 3600 * 1000;
-  f.db.sql.prepare("UPDATE license_emails SET queued_at=?,next_at=0").run(hours(48) - 1000);
+  f.db.sql.prepare("UPDATE license_emails SET queued_at=?,next_at=0").run(hours(23) - 1000);
   await f.cron();
   assert.equal(f.attempts.length, 1);
   assert.equal(f.email(orderId)!.state, "failed");
@@ -384,10 +384,34 @@ test("the schedule gives up 48 hours after the key was issued", async () => {
 
   f.db.sql
     .prepare("UPDATE license_emails SET state='pending',queued_at=?,next_at=0")
-    .run(hours(47));
+    .run(hours(22));
   await f.cron();
   assert.equal(f.attempts.length, 2);
   assert.equal(f.email(orderId)!.state, "sent");
+});
+
+test("webhook redelivery cannot resend after the idempotency retry window", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const f = setup();
+  // A lost response cannot tell us whether the provider accepted the email.
+  f.state.provider = "down";
+  const { orderId, sessionId, claim } = await f.order();
+  assert.equal((await f.signed("checkout.session.completed", "evt_paid", sessionId)).status, 200);
+  const queuedAt = f.email(orderId)!.queued_at;
+  f.state.provider = 0;
+  for (const hours of [23, 25, 49]) {
+    t.mock.timers.setTime(queuedAt + hours * 3600 * 1000);
+    assert.equal(
+      (await f.signed("checkout.session.completed", `evt_retry_${hours}`, sessionId)).status,
+      200,
+    );
+    await f.cron();
+    assert.equal(f.attempts.length, 1);
+    assert.equal(f.email(orderId)!.state, "failed");
+  }
+  const claimed = await claim();
+  assert.match(claimed.licenseKey!, keyPattern);
+  assert.equal(claimed.email, undefined);
 });
 
 test("a refund or dispute before the email is sent cancels it", async () => {

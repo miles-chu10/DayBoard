@@ -13,7 +13,9 @@ import { DEFAULT_SITE_ORIGIN } from "./pages.ts";
 // An attempt holds the order this long, so a parallel delivery can't send a second copy. It is
 // shorter than the 15-minute schedule, so each scheduled run retries what the last one left.
 const ATTEMPT_HOLD_MS = 10 * 60 * 1000;
-const GIVE_UP_MS = 48 * 60 * 60 * 1000;
+// Resend forgets idempotency keys after 24 hours. Stop before then even after a lost reply,
+// leaving an hour for in-flight requests and clock skew rather than risking a duplicate email.
+const GIVE_UP_MS = 23 * 60 * 60 * 1000;
 // Each order costs a Stripe request and a Resend request: stay well inside one invocation's limits.
 const ORDERS_PER_RUN = 5;
 
@@ -57,13 +59,19 @@ export async function deliverLicenseEmail(
 ): Promise<void> {
   try {
     const now = Date.now();
+    // Webhook redeliveries also use this path, so the cron cannot be the only expiry guard.
+    await env.DB.prepare(
+      "UPDATE license_emails SET state='failed' WHERE order_id=? AND state='pending' AND queued_at<=?",
+    )
+      .bind(orderId, now - GIVE_UP_MS)
+      .run();
     const claimed = await env.DB.prepare(
       `UPDATE license_emails SET attempts=attempts+1,next_at=?
-      WHERE order_id=? AND state='pending' AND next_at<=?
+      WHERE order_id=? AND state='pending' AND next_at<=? AND queued_at>?
       AND EXISTS (SELECT 1 FROM orders WHERE id=license_emails.order_id AND state='ready')
       RETURNING queued_at`,
     )
-      .bind(now + ATTEMPT_HOLD_MS, orderId, now)
+      .bind(now + ATTEMPT_HOLD_MS, orderId, now, now - GIVE_UP_MS)
       .first<{ queued_at: number }>();
     if (!claimed) return;
     // Checked like a waitlist address, but sent as Stripe gave it rather than lowercased.
@@ -126,7 +134,7 @@ export async function retryLicenseEmails(
         AND order_id IN (SELECT id FROM orders WHERE state<>?)`,
       ).bind("ready"),
       env.DB.prepare(
-        "UPDATE license_emails SET state='failed' WHERE state='pending' AND queued_at<?",
+        "UPDATE license_emails SET state='failed' WHERE state='pending' AND queued_at<=?",
       ).bind(now - GIVE_UP_MS),
     ]);
     const due = await env.DB.prepare(

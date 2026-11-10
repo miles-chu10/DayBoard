@@ -7,10 +7,10 @@
 -- the order's Stripe Checkout Session.
 --
 -- state is pending (owed, and the scheduled retry sends it), sent (the provider accepted it),
--- failed (not accepted within 48 hours of queued_at) or skipped (the Session had no usable
+-- failed (not accepted within 23 hours of queued_at) or skipped (the Session had no usable
 -- address, or the order was refunded or disputed first). next_at is the earliest time of the next
 -- attempt. Claiming an attempt moves it forward, so parallel deliveries send once. queued_at also
--- names the provider's idempotency key, so a retry after a lost reply can't send twice.
+-- names the provider's idempotency key. Retries stop before its 24-hour retention expires.
 CREATE TABLE license_emails (
   order_id TEXT PRIMARY KEY REFERENCES orders(id),
   state TEXT NOT NULL CHECK (state IN ('pending', 'sent', 'failed', 'skipped')),
