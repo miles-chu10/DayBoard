@@ -49,6 +49,7 @@ export type AccentColor =
   | "graphite";
 export type Density = "default" | "compact";
 export type DetailView = "dialog" | "inline" | "sidebar";
+export type MailRows = "line" | "preview";
 export type LaunchView = "today" | "agenda" | SourceId | "assistant" | "review";
 export type CalendarRange =
   | "today"
@@ -81,6 +82,8 @@ export interface AppSettings {
     density: Density;
     /** Where item details open: pop-up window, inline under the row, or a right-hand panel. */
     detailView: DetailView;
+    /** Inbox rows: one line each, or three lines with a preview of the message. */
+    mailRows: MailRows;
     /** The sidebar's views: their order, which are hidden (Home never is), and count pills. */
     sidebar: { order: SidebarView[]; hidden: SidebarView[]; counts: boolean };
     /** The first-run welcome was finished or skipped; settings saved before it existed count as done. */

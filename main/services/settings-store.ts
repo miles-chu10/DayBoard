@@ -8,6 +8,7 @@ import type {
   AccentColor,
   Density,
   DetailView,
+  MailRows,
   AIProvider,
   ApiProviderId,
   AppSettings,
@@ -51,6 +52,7 @@ const ACCENTS: AccentColor[] = [
 ];
 const DENSITIES: Density[] = ["default", "compact"];
 const DETAIL_VIEWS: DetailView[] = ["dialog", "inline", "sidebar"];
+const MAIL_ROWS: MailRows[] = ["line", "preview"];
 // The App Store edition can't run the subscription CLIs, so it offers API keys only.
 const PROVIDERS: AIProvider[] = isAppStoreBuild
   ? [...API_PROVIDERS]
@@ -100,6 +102,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     accent: "system",
     density: "default",
     detailView: "dialog",
+    mailRows: "line",
     sidebar: { order: [...SIDEBAR_VIEWS], hidden: [], counts: true },
     onboarded: false,
   },
@@ -254,6 +257,7 @@ export function normalizeSettings(value: unknown): AppSettings {
       accent: oneOf(general.accent, ACCENTS, defaults.general.accent),
       density: oneOf(general.density, DENSITIES, defaults.general.density),
       detailView: oneOf(general.detailView, DETAIL_VIEWS, defaults.general.detailView),
+      mailRows: oneOf(general.mailRows, MAIL_ROWS, defaults.general.mailRows),
       sidebar: normalizeSidebar(general.sidebar),
       // Only a new install, with no settings file, starts with the welcome still to show.
       onboarded: bool(general.onboarded, true),

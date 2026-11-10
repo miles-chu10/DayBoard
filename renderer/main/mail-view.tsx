@@ -240,6 +240,7 @@ export function MailView() {
                               onReply={setReplyTo}
                               onOpen={toggleOpen}
                               selected={selectedId === message.id}
+                              oneLine={settings?.general.mailRows !== "preview"}
                             />
                             {detailView === "inline" && selectedId === message.id
                               ? renderDetail("panel")

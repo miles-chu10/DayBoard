@@ -17,7 +17,7 @@ import {
   toast,
 } from "@renderer/ui";
 import type { NativeThemeInfo } from "@shared/bridge-protocol";
-import type { CalendarRange, Density, DetailView, LaunchView } from "@main/shared-types";
+import type { CalendarRange, Density, DetailView, LaunchView, MailRows } from "@main/shared-types";
 
 import { useSettingsEditor } from "../lib/settings";
 import { CALENDAR_OPTIONS } from "../lib/calendar-range-options";
@@ -254,6 +254,30 @@ export function GeneralTab() {
                 <Label>
                   <RadioGroupItem value="sidebar" />
                   Side panel
+                </Label>
+              </RadioGroup>
+            </Field>
+            <Field
+              label="Inbox rows"
+              description="One line fits more emails and shows the preview for the selected one."
+            >
+              <RadioGroup
+                value={settings.general.mailRows}
+                onValueChange={(value) =>
+                  edit((draft) => {
+                    draft.general.mailRows = value as MailRows;
+                  })
+                }
+                orientation="horizontal"
+                aria-label="Inbox rows"
+              >
+                <Label>
+                  <RadioGroupItem value="line" />
+                  One line
+                </Label>
+                <Label>
+                  <RadioGroupItem value="preview" />
+                  With preview
                 </Label>
               </RadioGroup>
             </Field>

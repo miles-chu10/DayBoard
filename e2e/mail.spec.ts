@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { launchDemo } from "./fixtures";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { createTestProfile, launchDemo } from "./fixtures";
 
 function sidebarItem(page: Page, title: string) {
   return page
@@ -177,6 +179,74 @@ test("Subscriptions lists newsletters with open rates and offers to unsubscribe"
     await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog", { name: "Subscriptions" })).toBeVisible();
     expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("Inbox rows are one line; the selected row shows its preview and hover swaps the time for actions", async ({
+  playwright: _playwright,
+}, testInfo) => {
+  const profile = await createTestProfile();
+  await writeFile(
+    path.join(profile, "demo-settings.json"),
+    JSON.stringify({ general: { detailView: "inline" } }),
+  );
+  const demo = await launchDemo(profile);
+  try {
+    const page = demo.page;
+    await openInbox(page);
+    const priya = page.getByRole("button", { name: "Open email from Priya Shah", exact: true });
+    const jordan = page.getByRole("button", { name: "Open email from Jordan Lee", exact: true });
+    await expect(priya).toContainText("Launch announcement — final copy?");
+    await expect(priya).toContainText("Needs Reply: Final-copy decision requested");
+    await expect(priya).not.toContainText("Hey Alex, I made a few edits");
+    const restHeight = (await jordan.boundingBox())!.height;
+    expect(restHeight).toBeLessThan(48);
+
+    // At rest the row shows the time; hovering or focusing it shows the actions in the same cell.
+    await page.mouse.move(5, 5);
+    const reply = jordan.getByRole("button", { name: "Reply", exact: true });
+    const actions = reply.locator("xpath=..");
+    await expect(actions).toHaveCSS("opacity", "0");
+    await jordan.hover();
+    await expect(actions).toHaveCSS("opacity", "1");
+    expect((await jordan.boundingBox())!.height).toBe(restHeight);
+    await page.mouse.move(5, 5);
+    await jordan.focus();
+    await expect(actions).toHaveCSS("opacity", "1");
+
+    // Selecting a row brings its preview back and keeps its actions showing.
+    await priya.click();
+    await expect(priya).toHaveAttribute("aria-expanded", "true");
+    await expect(priya).toContainText("Hey Alex, I made a few edits");
+    await page.mouse.move(5, 5);
+    await expect(
+      priya.getByRole("button", { name: "Archive", exact: true }).locator("xpath=.."),
+    ).toHaveCSS("opacity", "1");
+    await page.screenshot({ path: testInfo.outputPath("inbox-one-line.png") });
+  } finally {
+    await demo.close();
+  }
+});
+
+test("Inbox rows setting With preview keeps the three-line rows", async ({
+  playwright: _playwright,
+}, testInfo) => {
+  const profile = await createTestProfile();
+  await writeFile(
+    path.join(profile, "demo-settings.json"),
+    JSON.stringify({ general: { mailRows: "preview" } }),
+  );
+  const demo = await launchDemo(profile);
+  try {
+    const page = demo.page;
+    await openInbox(page);
+    const priya = page.getByRole("button", { name: "Open email from Priya Shah", exact: true });
+    await expect(priya).toContainText("Hey Alex, I made a few edits");
+    await expect(priya.getByText("Needs Reply", { exact: true })).toBeVisible();
+    await expect(priya.getByRole("button", { name: "Archive", exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("inbox-with-preview.png") });
   } finally {
     await demo.close();
   }
