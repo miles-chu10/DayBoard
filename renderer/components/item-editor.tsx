@@ -27,6 +27,7 @@ import {
   eventTimesChanged,
   dateTimeInputToIso,
   eventEditorFields,
+  itemEditKey,
   itemEditorCanSave,
   nextCalendarDate,
   reminderDueChanged,
@@ -202,6 +203,7 @@ export function ItemEditButton({
       </Button>
       {open ? (
         <ItemEditor
+          key={itemEditKey(item)}
           item={item}
           onClose={() => setOpen(false)}
           onSaved={() => {
@@ -215,7 +217,7 @@ export function ItemEditButton({
 }
 
 function ItemEditor({
-  item,
+  item: opened,
   onClose,
   onSaved,
 }: {
@@ -223,6 +225,9 @@ function ItemEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // Edit the item as it was when the editor opened. A background refresh passes a new copy of
+  // the same item, and following it reloaded the form over what had been typed.
+  const [item] = useState(opened);
   const queryClient = useQueryClient();
   const fieldId = useId();
   const kind = kindFor(item);
@@ -237,13 +242,10 @@ function ItemEditor({
   const [eventForEditing, setEventForEditing] = useState<CalendarEventItem | null>(() =>
     isCalendarEvent(item) ? item : null,
   );
-  const [eventLoad, setEventLoad] = useState<{ item: EditableItem; error: string | null } | null>(
-    null,
-  );
-  // A replacement item needs its own full details before any fields can be saved.
-  const currentEventLoad = eventLoad?.item === item ? eventLoad : null;
-  const loadingEvent = kind === "event" && !demo && !currentEventLoad;
-  const eventLoadError = currentEventLoad?.error ?? null;
+  // Null until this event's full details have loaded or failed to load.
+  const [eventLoad, setEventLoad] = useState<{ error: string | null } | null>(null);
+  const loadingEvent = kind === "event" && !demo && !eventLoad;
+  const eventLoadError = eventLoad?.error ?? null;
   const title = fields.title.trim();
   const eventTimesValid = itemEditorCanSave(kind, fields);
   const saveDisabled =
@@ -262,10 +264,10 @@ function ItemEditor({
         if (cancelled) return;
         setEventForEditing(fullEvent);
         setFields(eventEditorFields(fullEvent));
-        setEventLoad({ item, error: null });
+        setEventLoad({ error: null });
       })
       .catch((error) => {
-        if (!cancelled) setEventLoad({ item, error: errorMessage(error) });
+        if (!cancelled) setEventLoad({ error: errorMessage(error) });
       });
     return () => {
       cancelled = true;

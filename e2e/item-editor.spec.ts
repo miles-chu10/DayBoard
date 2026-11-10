@@ -8,7 +8,7 @@ import { launchEnvironment, root } from "./fixtures";
 
 // This isolated renderer component test uses real React/UI components and a fake IPC boundary.
 // It does not run the packaged app or use any account, native permission, or provider service.
-test("event editor blocks reloads, recovers from a failed load, and ignores stale replies", async () => {
+test("event editor keeps typed edits through refreshes, recovers from a failed load, and ignores stale replies", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "dayboard-editor-regression-"));
   let app: ElectronApplication | undefined;
   try {
@@ -131,12 +131,26 @@ test("event editor blocks reloads, recovers from a failed load, and ignores stal
     );
     await expect(save).toBeEnabled();
 
+    // A background refresh hands the editor a new copy of the same event. Following it used
+    // to reload the form over whatever had been typed.
+    const title = page.getByRole("textbox", { name: "Title", exact: true });
+    await title.fill("Typed during a refresh");
     await control("replace");
+    await control("replace");
+    await expect(title).toHaveValue("Typed during a refresh");
+    await expect(title).toBeEnabled();
+    await expect(save).toBeEnabled();
+    expect(await pending()).toBe(1);
+
+    await control("select", 1);
     await expect.poll(pending).toBe(2);
     await expect(save).toBeDisabled();
     await control("reject", 1);
     await expect(page.getByText(/Couldn’t load this event’s full details/)).toBeVisible();
-    await control("replace");
+    await expect(save).toBeDisabled();
+    // Reopening the editor retries the load.
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect.poll(pending).toBe(3);
     await expect(page.getByText(/Couldn’t load this event’s full details/)).toHaveCount(0);
     await expect(save).toBeDisabled();
@@ -153,7 +167,6 @@ test("event editor blocks reloads, recovers from a failed load, and ignores stal
     await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue(
       "Newest event",
     );
-    const title = page.getByRole("textbox", { name: "Title", exact: true });
     await title.fill("Unsaved responsive draft");
     const draft = await title.elementHandle();
     for (const [width, layout] of [

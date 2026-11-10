@@ -66,6 +66,14 @@ export function eventEditorFields(event: CalendarEventItem): ItemEditorFields {
   };
 }
 
+/**
+ * Identifies the item an editor is open on. A refreshed copy of the same item keeps its key, so
+ * the editor and what was typed in it stay; a different item gets a new editor.
+ */
+export function itemEditKey(item: { key: string } | { calendarId: string; id: string }): string {
+  return "calendarId" in item ? JSON.stringify(["event", item.calendarId, item.id]) : item.key;
+}
+
 export function eventTimesAreValid(
   fields: Pick<ItemEditorFields, "allDay" | "start" | "end">,
 ): boolean {

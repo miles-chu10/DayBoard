@@ -88,3 +88,17 @@ test("unchanged event times are omitted so the event keeps its own time zone", a
   assert.equal(form.eventTimesChanged(original, { ...fields, allDay: true }), true);
   assert.equal(form.eventTimesChanged(original, { ...fields, end: "2026-09-22T11:00" }), true);
 });
+
+test("a refreshed copy of an item keeps its editor; a different item gets a new one", async () => {
+  const form = await load();
+  const opened = event();
+  // What a background calendar refresh produces: the same event as a new object.
+  const refreshed = { ...opened, title: "Renamed elsewhere", selectionKey: "event:x:0" };
+  assert.equal(form.itemEditKey(refreshed), form.itemEditKey(opened));
+  assert.notEqual(form.itemEditKey(event({ id: "occurrence-2" })), form.itemEditKey(opened));
+  assert.notEqual(form.itemEditKey(event({ calendarId: "calendar-2" })), form.itemEditKey(opened));
+  assert.equal(
+    form.itemEditKey({ key: "task:list-1:task-1", title: "Buy milk" }),
+    "task:list-1:task-1",
+  );
+});
