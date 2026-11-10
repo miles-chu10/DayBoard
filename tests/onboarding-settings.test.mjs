@@ -33,3 +33,11 @@ test("only a new install starts with the first-run welcome still to show", () =>
   assert.equal(normalizeSettings({ general: { onboarded: false } }).general.onboarded, false);
   assert.equal(normalizeSettings({ general: { onboarded: true } }).general.onboarded, true);
 });
+
+test("Inbox rows default to one line and keep an explicit choice", () => {
+  assert.equal(DEFAULT_SETTINGS.general.mailRows, "line");
+  // Settings saved before the option existed get the one-line rows.
+  assert.equal(normalizeSettings({}).general.mailRows, "line");
+  assert.equal(normalizeSettings({ general: { mailRows: "dense" } }).general.mailRows, "line");
+  assert.equal(normalizeSettings({ general: { mailRows: "preview" } }).general.mailRows, "preview");
+});
