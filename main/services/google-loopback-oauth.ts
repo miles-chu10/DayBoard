@@ -8,12 +8,15 @@ import type { OAuthTokensInput } from "../platform/index.js";
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const TIMEOUT_MS = 10 * 60 * 1000;
+const RESTARTED = "Google sign-in was cancelled or started again.";
 
 interface LoopbackOptions {
   clientId: string;
   clientSecret: string;
   scopes: string[];
   extraParameters: Record<string, string>;
+  /** Aborting stops a cancelled or replaced sign-in. */
+  signal?: AbortSignal;
 }
 
 interface TokenResponse {
@@ -38,6 +41,7 @@ function resultPage(message: string): string {
 export async function authorizeGoogleWithLoopback(
   options: LoopbackOptions,
 ): Promise<OAuthTokensInput> {
+  if (options.signal?.aborted) throw new Error(RESTARTED);
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = randomBytes(16).toString("base64url");
@@ -50,10 +54,20 @@ export async function authorizeGoogleWithLoopback(
   const redirectUri = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
   try {
+    if (options.signal?.aborted) throw new Error(RESTARTED);
     const code = await new Promise<string>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error("Google sign-in timed out. Try again.")),
         TIMEOUT_MS,
+      );
+
+      options.signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(new Error(RESTARTED));
+        },
+        { once: true },
       );
 
       server.on("request", (request, response) => {
@@ -102,6 +116,7 @@ export async function authorizeGoogleWithLoopback(
     });
 
     const response = await fetch(TOKEN_URL, {
+      signal: options.signal,
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -117,6 +132,8 @@ export async function authorizeGoogleWithLoopback(
       }),
     });
     const body = (await response.json()) as TokenResponse;
+    // A newer sign-in owns the account now; these tokens must not replace it.
+    if (options.signal?.aborted) throw new Error(RESTARTED);
     if (!response.ok || !body.access_token) {
       throw new Error(
         body.error_description ?? body.error ?? `Google sign-in failed (${response.status}).`,
@@ -131,6 +148,8 @@ export async function authorizeGoogleWithLoopback(
       tokenType: body.token_type,
       updatedAt: new Date(),
     };
+  } catch (error) {
+    throw options.signal?.aborted ? new Error(RESTARTED) : error;
   } finally {
     server.closeAllConnections();
     server.close();

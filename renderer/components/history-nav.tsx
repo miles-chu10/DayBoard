@@ -1,4 +1,5 @@
 import { useEffect, useReducer } from "react";
+import { navigateHistory } from "../lib/navigation-guard";
 import { useRouter } from "@tanstack/react-router";
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@renderer/ui";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -11,8 +12,8 @@ function useHistoryState() {
   return {
     canBack: index > 0,
     canForward: index < router.history.length - 1,
-    back: () => router.history.back(),
-    forward: () => router.history.forward(),
+    back: () => void navigateHistory(router.history, "back"),
+    forward: () => void navigateHistory(router.history, "forward"),
   };
 }
 
@@ -26,10 +27,10 @@ export function useHistoryShortcuts() {
       const index = router.history.location.state.__TSR_index ?? 0;
       if (event.key === "[" && index > 0) {
         event.preventDefault();
-        router.history.back();
+        void navigateHistory(router.history, "back");
       } else if (event.key === "]" && index < router.history.length - 1) {
         event.preventDefault();
-        router.history.forward();
+        void navigateHistory(router.history, "forward");
       }
     }
     window.addEventListener("keydown", keydown);

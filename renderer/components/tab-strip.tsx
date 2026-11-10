@@ -1,15 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useOptionalSplitView } from "@renderer/ui";
 import { cn } from "@renderer/ui/utils";
 import { Plus, X } from "lucide-react";
 
+import { createTabNavigation } from "../lib/tab-navigation";
 import { invoke } from "../lib/ipc";
 import { NAV_ITEMS } from "../lib/navigation";
 import { readStored, writeStored } from "../lib/storage";
 import {
-  activeTab,
   cleanSearch,
   closeTab,
   openTab,
@@ -49,7 +49,7 @@ export function useTabs(): TabsContextValue {
 
 /** Tabs follow the router: the active tab records each navigation, and switching tabs navigates. */
 export function TabsProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const location = useRouterState({
     select: (state) => ({
       pathname: state.location.pathname,
@@ -83,14 +83,22 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     void invoke("tabs:setCount", { count }).catch(() => undefined);
   }, [count]);
 
-  const show = useCallback(
-    (next: TabsState) => {
-      setState(next);
-      const tab = activeTab(next);
-      void navigate({ to: tab.route as never, search: tab.search as never });
-    },
-    [navigate],
+  const [navigation] = useState(() =>
+    createTabNavigation({
+      history: router.history,
+      commit: setState,
+      navigate: (route, search, state) =>
+        // The registered editor guard was just flushed. Do not enqueue it a second time.
+        router.navigate({
+          to: route as never,
+          search: search as never,
+          state,
+          ignoreBlocker: true,
+        }),
+    }),
   );
+  useEffect(() => navigation.subscribe(), [navigation]);
+  const show = navigation.show;
 
   const value = useMemo<TabsContextValue>(
     () => ({
@@ -99,11 +107,11 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       close: (id) => {
         const next = closeTab(state, id);
         if (next.active !== state.active) show(next);
-        else setState(next);
+        else navigation.commit(next);
       },
       select: (id) => show(selectTab(state, id)),
     }),
-    [state, show],
+    [state, show, navigation],
   );
 
   // ⌘T and ⌘W arrive from the app menu; ⌃Tab, ⌃⇧Tab and ⌘1–9 switch tabs here.

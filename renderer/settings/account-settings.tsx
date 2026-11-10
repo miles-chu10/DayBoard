@@ -41,8 +41,8 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
           <Status variant="success">Connected</Status>
         </Field>
         <Field>
-          <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
-            {connect.isPending ? "Waiting for Browser…" : "Sign in again"}
+          <Button onClick={() => connect.mutate()}>
+            {connect.isPending ? "Restart Google sign-in" : "Sign in again"}
           </Button>
           <Button onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
             Sign out
@@ -68,12 +68,8 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
         <Status variant="neutral">Not signed in</Status>
       </Field>
       <Field>
-        <Button
-          variant="accent"
-          onClick={() => connect.mutate()}
-          disabled={connect.isPending || !status.hasCredentials}
-        >
-          {connect.isPending ? "Waiting for Browser…" : "Sign in with Google"}
+        <Button variant="accent" onClick={() => connect.mutate()} disabled={!status.hasCredentials}>
+          {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
         </Button>
       </Field>
     </FieldSet>

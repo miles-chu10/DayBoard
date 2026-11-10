@@ -23,7 +23,8 @@ import {
 } from "../services/google-api.js";
 import {
   GoogleAuthError,
-  connectGoogle,
+  authorizeGoogle,
+  completeGoogleSignIn,
   disconnectGoogle,
   getGoogleStatus,
 } from "../services/google-auth.js";
@@ -543,7 +544,14 @@ export function registerProductivityHandlers(): void {
 
   ipcMain.handle("google:connect", async () => {
     assertNotDemo("google:connect");
-    return changeAccount(() => googleMutation("google:connect", connectGoogle));
+    // Waiting for the browser can take the full sign-in timeout, so it holds no lock: saves
+    // keep working and the account changes only once Google has answered.
+    const authorization = await googleMutation("google:connect", authorizeGoogle);
+    // The sign-in is already approved, so let a save in flight finish rather than refuse it.
+    while (hasPendingWrites()) await drainPendingWrites();
+    return changeAccount(() =>
+      googleMutation("google:connect", () => completeGoogleSignIn(authorization)),
+    );
   });
 
   ipcMain.handle("google:disconnect", async () => {

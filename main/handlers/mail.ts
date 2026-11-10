@@ -104,8 +104,22 @@ async function send(request: MailSendRequest): Promise<void> {
   );
 }
 
-const outbox = createOutbox<MailSendRequest>({
-  send: (request) => trackPendingWrite(() => send(request)),
+/** A held email keeps the account it was written in, so a later sign-in can't send it. */
+interface HeldMail {
+  request: MailSendRequest;
+  scope: string;
+}
+
+const outbox = createOutbox<HeldMail>({
+  // Checked inside the tracked write, which an account change can't overlap.
+  send: ({ request, scope }) =>
+    trackPendingWrite(async () => {
+      if ((await requireAgendaScope()) !== scope)
+        throw new Error(
+          "Your Google account changed before this email went out, so it wasn't sent.",
+        );
+      await send(request);
+    }),
   onResult: (id, result) => {
     if (!result.ok) logger.error("mail", "mail:send failed", result.error);
     else ipcMain.broadcast("data:changed", { source: "mail" });
@@ -225,8 +239,9 @@ export function registerMailHandlers(): void {
   ipcMain.handle("mail:send", async (_event, payload: unknown): Promise<MailSendTicket> => {
     assertNotDemo("mail:send");
     const request = parseSendRequest(payload);
+    const scope = await requireAgendaScope();
     const delay = (await getSettings()).mail.undoSendSeconds * 1000;
-    const ticket = outbox.queue(request, delay);
+    const ticket = outbox.queue({ request, scope }, delay);
     if (ticket.sent) {
       const result = await ticket.sent;
       if (!result.ok) throw new Error(result.error);

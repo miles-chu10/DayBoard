@@ -27,6 +27,7 @@ import {
   eventTimesChanged,
   dateTimeInputToIso,
   eventEditorFields,
+  itemEditKey,
   itemEditorCanSave,
   nextCalendarDate,
   reminderDueChanged,
@@ -202,6 +203,7 @@ export function ItemEditButton({
       </Button>
       {open ? (
         <ItemEditor
+          key={itemEditKey(item)}
           item={item}
           onClose={() => setOpen(false)}
           onSaved={() => {
@@ -237,40 +239,41 @@ function ItemEditor({
   const [eventForEditing, setEventForEditing] = useState<CalendarEventItem | null>(() =>
     isCalendarEvent(item) ? item : null,
   );
-  const [eventLoad, setEventLoad] = useState<{ item: EditableItem; error: string | null } | null>(
-    null,
-  );
-  // A replacement item needs its own full details before any fields can be saved.
-  const currentEventLoad = eventLoad?.item === item ? eventLoad : null;
-  const loadingEvent = kind === "event" && !demo && !currentEventLoad;
-  const eventLoadError = currentEventLoad?.error ?? null;
+  // Null until this event's full details have loaded or failed to load.
+  const [eventLoad, setEventLoad] = useState<{ error: string | null } | null>(null);
+  const loadingEvent = kind === "event" && !demo && !eventLoad;
+  const eventLoadError = eventLoad?.error ?? null;
   const title = fields.title.trim();
   const eventTimesValid = itemEditorCanSave(kind, fields);
   const saveDisabled =
     demo || !scope || !title || !eventTimesValid || loadingEvent || Boolean(eventLoadError);
 
+  // Details load once per event, not per copy of it: a background refresh passes a new copy of
+  // the same event, and reloading for it replaced what had been typed. Saves still use the
+  // current copy, so a reminder's refreshed reference is the one submitted.
+  const eventCalendarId = isCalendarEvent(item) ? item.calendarId : null;
+  const eventId = isCalendarEvent(item) ? item.id : null;
   useEffect(() => {
-    if (kind !== "event" || demo || !scope) return;
-    const event = item as CalendarEventItem;
+    if (!eventCalendarId || !eventId || demo || !scope) return;
     let cancelled = false;
     void invoke<CalendarEventItem>("calendar:getForEditing", {
-      calendarId: event.calendarId,
-      eventId: event.id,
+      calendarId: eventCalendarId,
+      eventId,
       expectedScope: scope,
     })
       .then((fullEvent) => {
         if (cancelled) return;
         setEventForEditing(fullEvent);
         setFields(eventEditorFields(fullEvent));
-        setEventLoad({ item, error: null });
+        setEventLoad({ error: null });
       })
       .catch((error) => {
-        if (!cancelled) setEventLoad({ item, error: errorMessage(error) });
+        if (!cancelled) setEventLoad({ error: errorMessage(error) });
       });
     return () => {
       cancelled = true;
     };
-  }, [demo, item, kind, scope]);
+  }, [demo, eventCalendarId, eventId, scope]);
 
   function setField<Key extends keyof typeof fields>(key: Key, value: (typeof fields)[Key]) {
     setFields((current) => ({ ...current, [key]: value }));

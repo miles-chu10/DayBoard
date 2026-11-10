@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useBlocker, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import {
   AlertDialog,
   Button,
@@ -18,9 +18,9 @@ import { HistoryNav } from "../components/history-nav";
 import { usePublishViewContext } from "../components/shell";
 import { WindowActions } from "../components/view-actions";
 import { useNoteActions, useNotes } from "../lib/agent-data";
+import { registerNavigationGuard } from "../lib/navigation-guard";
 import { errorMessage } from "../lib/ipc";
-
-const SAVE_DELAY = 600;
+import { createNoteAutosave, type NoteSaveState } from "../lib/note-autosave";
 
 function edited(at: number): string {
   const date = new Date(at);
@@ -127,67 +127,48 @@ function NotesList({ onOpen }: { onOpen: (id: string | "new") => void }) {
   );
 }
 
-type SaveState = "saved" | "unsaved" | "saving";
-
 /** Saves a moment after typing stops, on ⌘S, and when the editor closes. */
 function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void }) {
   const { save, remove } = useNoteActions();
+  const router = useRouter();
   const [title, setTitle] = useState(note?.title ?? "");
   const [body, setBody] = useState(note?.body ?? "");
   const [previewing, setPreviewing] = useState(false);
-  const [state, setState] = useState<SaveState>("saved");
+  const [state, setState] = useState<NoteSaveState>("saved");
   const [deleting, setDeleting] = useState(false);
-  const id = useRef(note?.id);
-  const pending = useRef<{ title: string; body: string } | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Saves run one at a time, so a new note is created once and later saves update it.
-  const chain = useRef<Promise<void>>(Promise.resolve());
-
-  const persist = save.mutateAsync;
-  const flush = useCallback(() => {
-    clearTimeout(timer.current);
-    chain.current = chain.current.then(async () => {
-      const draft = pending.current;
-      if (!draft) return;
-      pending.current = null;
-      if (!id.current && !draft.title.trim() && !draft.body.trim()) return setState("saved");
-      setState("saving");
-      try {
-        const saved = await persist({
-          ...(id.current ? { id: id.current } : {}),
-          ...draft,
-        });
-        id.current = saved.id;
-        setState(pending.current ? "unsaved" : "saved");
-      } catch {
-        setState("unsaved");
-      }
-    });
-    return chain.current;
-  }, [persist]);
+  const [autosave] = useState(() =>
+    createNoteAutosave({ id: note?.id, persist: save.mutateAsync, onState: setState }),
+  );
 
   function change(next: { title: string; body: string }) {
     setTitle(next.title);
     setBody(next.body);
-    pending.current = next;
-    setState("unsaved");
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flush(), SAVE_DELAY);
+    autosave.change(next);
   }
 
-  // Closing the editor or leaving Notes keeps what was typed.
-  useEffect(() => () => void flush(), [flush]);
+  // Router transitions (sidebar, tabs and opening another note) must save before
+  // unmounting. A failed save leaves the editor and its draft available to retry or copy.
+  useBlocker({
+    shouldBlockFn: async () => !(await autosave.flush()),
+    enableBeforeUnload: () => autosave.hasPendingChanges(),
+  });
+
+  useEffect(
+    () => registerNavigationGuard(router.history, autosave.flush),
+    [router.history, autosave],
+  );
+
+  // Best effort for non-router teardown; route navigation is guarded above.
+  useEffect(() => () => void autosave.flush(), [autosave]);
 
   async function back() {
-    await flush();
-    onBack();
+    // A failed save has already shown why; stay here so the text can be saved or copied.
+    if (await autosave.flush()) onBack();
   }
 
   async function deleteNote() {
-    clearTimeout(timer.current);
-    pending.current = null;
-    await chain.current;
-    if (id.current) await remove.mutateAsync(id.current);
+    const id = await autosave.discard();
+    if (id) await remove.mutateAsync(id);
     onBack();
   }
 
@@ -233,7 +214,7 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
           onKeyDown={(event) => {
             if (event.key === "s" && event.metaKey) {
               event.preventDefault();
-              void flush();
+              void autosave.flush();
             }
           }}
         >
