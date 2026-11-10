@@ -8,12 +8,15 @@ import type { OAuthTokensInput } from "../platform/index.js";
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const TIMEOUT_MS = 10 * 60 * 1000;
+const RESTARTED = "Google sign-in was started again.";
 
 interface LoopbackOptions {
   clientId: string;
   clientSecret: string;
   scopes: string[];
   extraParameters: Record<string, string>;
+  /** Aborting stops waiting for the browser, for a sign-in that is being started again. */
+  signal?: AbortSignal;
 }
 
 interface TokenResponse {
@@ -38,6 +41,7 @@ function resultPage(message: string): string {
 export async function authorizeGoogleWithLoopback(
   options: LoopbackOptions,
 ): Promise<OAuthTokensInput> {
+  if (options.signal?.aborted) throw new Error(RESTARTED);
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = randomBytes(16).toString("base64url");
@@ -54,6 +58,15 @@ export async function authorizeGoogleWithLoopback(
       const timer = setTimeout(
         () => reject(new Error("Google sign-in timed out. Try again.")),
         TIMEOUT_MS,
+      );
+
+      options.signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(new Error(RESTARTED));
+        },
+        { once: true },
       );
 
       server.on("request", (request, response) => {

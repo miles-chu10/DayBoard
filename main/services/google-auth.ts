@@ -7,6 +7,7 @@ import {
   OAuthService,
   OAuthTokenStateChangedError,
 } from "../platform/index.js";
+import type { OAuthTokensInput } from "../platform/index.js";
 
 import type { GoogleAccountStatus } from "../shared-types.js";
 import { GOOGLE_APP_CLIENT_ID, GOOGLE_APP_CLIENT_SECRET } from "./google-oauth-app-client.js";
@@ -121,7 +122,13 @@ export async function getGoogleStatus(): Promise<GoogleAccountStatus> {
   };
 }
 
-export async function connectGoogle(): Promise<void> {
+let authorizing: AbortController | null = null;
+
+/**
+ * Opens Google sign-in in the browser and waits for the answer, which can take minutes. The
+ * connected account is untouched until `completeGoogleSignIn` stores the result.
+ */
+export async function authorizeGoogle(): Promise<OAuthTokensInput> {
   const client = appClient();
   if (!client) {
     throw new GoogleAuthError(
@@ -129,14 +136,30 @@ export async function connectGoogle(): Promise<void> {
       "Google sign-in isn't configured in this build. Add the app OAuth client and try again.",
     );
   }
-  const oauth = getService(client);
-  const tokens = await authorizeGoogleWithLoopback({
-    clientId: client.clientId,
-    clientSecret: client.clientSecret,
-    scopes: SCOPES,
-    extraParameters: AUTHORIZATION_PARAMETERS,
-  });
-  await oauth.setTokens(tokens);
+  // A new attempt replaces one still waiting on a browser tab that was closed.
+  authorizing?.abort();
+  const attempt = new AbortController();
+  authorizing = attempt;
+  try {
+    return await authorizeGoogleWithLoopback({
+      clientId: client.clientId,
+      clientSecret: client.clientSecret,
+      scopes: SCOPES,
+      extraParameters: AUTHORIZATION_PARAMETERS,
+      signal: attempt.signal,
+    });
+  } finally {
+    if (authorizing === attempt) authorizing = null;
+  }
+}
+
+/** Replaces the connected account with the one that just signed in. */
+export async function completeGoogleSignIn(tokens: OAuthTokensInput): Promise<void> {
+  const client = appClient();
+  if (!client) {
+    throw new GoogleAuthError("needs-setup", "Google sign-in isn't configured in this build.");
+  }
+  await getService(client).setTokens(tokens);
   const accessToken = tokens.accessToken;
   let email: string | null = null;
   try {

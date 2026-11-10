@@ -99,7 +99,8 @@ export const GOOGLE_REDIRECT_URI = "https://example.test/callback";
 export class GoogleAuthError extends Error { constructor(reason, message) { super(message); this.reason = reason; } }
 export async function getGoogleStatus() { return { hasCredentials: true, connected: true, email: fixture().email, clientIdHint: null }; }
 export async function clearGoogleCredentials() {}
-export async function connectGoogle() { await fixture().onConnect?.(); }
+export async function authorizeGoogle() { await fixture().onAuthorize?.(); return { accessToken: "fixture" }; }
+export async function completeGoogleSignIn() { await fixture().onConnect?.(); }
 export async function disconnectGoogle() {}
 export async function saveGoogleCredentials() {}
 `;
@@ -417,6 +418,51 @@ test("account replacement holds write and scope admission through status read an
       1,
     );
     assert.notEqual(await invoke("agenda:getScope"), previousScope);
+  });
+});
+
+test("saves keep working while Google sign-in waits for the browser", async () => {
+  await withFixture(async (state) => {
+    const invoke = await loadHarness(state);
+    const previousScope = await invoke("agenda:getScope");
+    const waiting = Promise.withResolvers();
+    const approved = Promise.withResolvers();
+    // The browser tab is open; it can sit there for the full ten-minute timeout.
+    state.onAuthorize = async () => {
+      waiting.resolve();
+      await approved.promise;
+    };
+    state.onConnect = () => {
+      state.email = "new-account@example.test";
+    };
+    const connecting = invoke("google:connect");
+    await waiting.promise;
+    assert.equal(await invoke("agenda:getScope"), previousScope);
+    await invoke("tasks:create", { title: "Saved while the browser is open" });
+    assert.equal(
+      state.broadcasts.filter(({ channel }) => channel === "accounts:changed").length,
+      0,
+    );
+    approved.resolve();
+    const status = await connecting;
+    assert.equal(status.google.email, "new-account@example.test");
+    assert.notEqual(await invoke("agenda:getScope"), previousScope);
+  });
+});
+
+test("an abandoned Google sign-in leaves the current account untouched", async () => {
+  await withFixture(async (state) => {
+    const invoke = await loadHarness(state);
+    const previousScope = await invoke("agenda:getScope");
+    state.onAuthorize = async () => {
+      throw new Error("Google sign-in timed out. Try again.");
+    };
+    await assert.rejects(invoke("google:connect"), /timed out/);
+    assert.equal(await invoke("agenda:getScope"), previousScope);
+    assert.equal(
+      state.broadcasts.filter(({ channel }) => channel === "accounts:changed").length,
+      0,
+    );
   });
 });
 
