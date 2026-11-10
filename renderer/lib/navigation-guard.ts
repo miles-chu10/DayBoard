@@ -11,13 +11,18 @@ export function registerNavigationGuard(history: RouterHistory, canLeave: () => 
   };
 }
 
-export async function navigateHistory(history: RouterHistory, direction: "back" | "forward") {
+/** Flushes the current editor without navigating; callers must commit synchronously if allowed. */
+export async function canNavigate(history: RouterHistory): Promise<boolean> {
+  const location = history.location;
   const guard = guards.get(history);
   if (guard) {
     const attempt = ++guard.attempt;
-    if (!(await guard.canLeave())) return;
-    // An unmount or a newer command supersedes a navigation still waiting for a save.
-    if (guards.get(history) !== guard || guard.attempt !== attempt) return;
+    if (!(await guard.canLeave())) return false;
+    if (guards.get(history) !== guard || guard.attempt !== attempt) return false;
   }
-  history[direction]();
+  return history.location === location;
+}
+
+export async function navigateHistory(history: RouterHistory, direction: "back" | "forward") {
+  if (await canNavigate(history)) history[direction]();
 }
