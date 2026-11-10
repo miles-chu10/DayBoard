@@ -68,8 +68,8 @@ function SourceEmptyState({ result, label }: { result: UnavailableResult; label:
           title="Google Isn't Connected"
           description={`Sign in with Google to show your ${label}.`}
           actions={
-            <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
-              {connect.isPending ? "Waiting for Browser…" : "Sign in with Google"}
+            <Button onClick={() => connect.mutate()}>
+              {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
             </Button>
           }
         />

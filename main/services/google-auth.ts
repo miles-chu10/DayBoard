@@ -124,11 +124,16 @@ export async function getGoogleStatus(): Promise<GoogleAccountStatus> {
 
 let authorizing: AbortController | null = null;
 
+interface GoogleAuthorization {
+  tokens: OAuthTokensInput;
+  signal: AbortSignal;
+}
+
 /**
  * Opens Google sign-in in the browser and waits for the answer, which can take minutes. The
  * connected account is untouched until `completeGoogleSignIn` stores the result.
  */
-export async function authorizeGoogle(): Promise<OAuthTokensInput> {
+export async function authorizeGoogle(): Promise<GoogleAuthorization> {
   const client = appClient();
   if (!client) {
     throw new GoogleAuthError(
@@ -141,30 +146,40 @@ export async function authorizeGoogle(): Promise<OAuthTokensInput> {
   const attempt = new AbortController();
   authorizing = attempt;
   try {
-    return await authorizeGoogleWithLoopback({
+    const tokens = await authorizeGoogleWithLoopback({
       clientId: client.clientId,
       clientSecret: client.clientSecret,
       scopes: SCOPES,
       extraParameters: AUTHORIZATION_PARAMETERS,
       signal: attempt.signal,
     });
-  } finally {
+    if (attempt.signal.aborted) throw new Error("Google sign-in was cancelled or replaced.");
+    return { tokens, signal: attempt.signal };
+  } catch (error) {
     if (authorizing === attempt) authorizing = null;
+    throw error;
   }
 }
 
+function assertCurrentAuthorization(authorization: GoogleAuthorization): void {
+  if (authorization.signal.aborted || authorizing?.signal !== authorization.signal)
+    throw new Error("Google sign-in was cancelled or replaced.");
+}
+
 /** Replaces the connected account with the one that just signed in. */
-export async function completeGoogleSignIn(tokens: OAuthTokensInput): Promise<void> {
+export async function completeGoogleSignIn(authorization: GoogleAuthorization): Promise<void> {
+  assertCurrentAuthorization(authorization);
+  const { tokens, signal } = authorization;
   const client = appClient();
   if (!client) {
     throw new GoogleAuthError("needs-setup", "Google sign-in isn't configured in this build.");
   }
-  await getService(client).setTokens(tokens);
   const accessToken = tokens.accessToken;
   let email: string | null = null;
   try {
     const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
     });
     if (response.ok) {
       const info = (await response.json()) as { email?: unknown };
@@ -173,10 +188,19 @@ export async function completeGoogleSignIn(tokens: OAuthTokensInput): Promise<vo
   } catch (error) {
     logger.warn("google-auth", "Could not read Google account email", error);
   }
-  await writeProfile({ email });
+  // The attempt remains cancellable while waiting for saves and the profile response.
+  assertCurrentAuthorization(authorization);
+  try {
+    await getService(client).setTokens(tokens);
+    await writeProfile({ email });
+  } finally {
+    if (authorizing?.signal === signal) authorizing = null;
+  }
 }
 
 export async function disconnectGoogle(): Promise<void> {
+  authorizing?.abort();
+  authorizing = null;
   const client = appClient();
   if (!client) {
     await writeProfile({ email: null });

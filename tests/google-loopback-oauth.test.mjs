@@ -76,3 +76,12 @@ test("a sign-in replaced during its token exchange hands back no tokens", async 
   await realFetch(`${redirect}/?code=fixture&state=${state}`);
   await refused;
 });
+
+test("cancelling while the callback listener starts never opens the browser", async () => {
+  const attempt = new AbortController();
+  const before = opened.length;
+  const pending = authorizeGoogleWithLoopback(options(attempt.signal));
+  attempt.abort();
+  await assert.rejects(pending, /cancelled/);
+  assert.equal(opened.length, before);
+});

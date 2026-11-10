@@ -546,11 +546,11 @@ export function registerProductivityHandlers(): void {
     assertNotDemo("google:connect");
     // Waiting for the browser can take the full sign-in timeout, so it holds no lock: saves
     // keep working and the account changes only once Google has answered.
-    const tokens = await googleMutation("google:connect", authorizeGoogle);
+    const authorization = await googleMutation("google:connect", authorizeGoogle);
     // The sign-in is already approved, so let a save in flight finish rather than refuse it.
     while (hasPendingWrites()) await drainPendingWrites();
     return changeAccount(() =>
-      googleMutation("google:connect", () => completeGoogleSignIn(tokens)),
+      googleMutation("google:connect", () => completeGoogleSignIn(authorization)),
     );
   });
 

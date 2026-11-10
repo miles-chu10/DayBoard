@@ -90,3 +90,36 @@ test("deleting during a save that fails does not bring the note back", async () 
   assert.equal(await autosave.flush(), true);
   assert.equal(saves.length, 1);
 });
+
+test("navigation waits for newer edits typed while the first save is in flight", async () => {
+  let finishFirst!: (value: { id: string }) => void;
+  let failSecond!: (error: Error) => void;
+  const first = new Promise<{ id: string }>((resolve) => {
+    finishFirst = resolve;
+  });
+  const second = new Promise<{ id: string }>((_resolve, reject) => {
+    failSecond = reject;
+  });
+  const saves: { id?: string; title: string; body: string }[] = [];
+  const autosave = createNoteAutosave({
+    id: undefined,
+    persist: (note) => {
+      saves.push(note);
+      return saves.length === 1 ? first : second;
+    },
+    onState: () => {},
+    delay: 60_000,
+  });
+  autosave.change({ title: "Plan", body: "first" });
+  const leaving = autosave.flush();
+  await Promise.resolve();
+  autosave.change({ title: "Plan", body: "first and latest" });
+  finishFirst({ id: "created" });
+  await Promise.resolve();
+  assert.equal(autosave.hasPendingChanges(), true);
+  assert.deepEqual(saves[1], { id: "created", title: "Plan", body: "first and latest" });
+  failSecond(new Error("Synthetic persistent save failure"));
+  assert.equal(await leaving, false);
+  assert.equal(autosave.hasPendingChanges(), true);
+  await autosave.discard();
+});

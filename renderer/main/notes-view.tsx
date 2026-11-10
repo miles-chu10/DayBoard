@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useBlocker, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import {
   AlertDialog,
   Button,
@@ -18,6 +18,7 @@ import { HistoryNav } from "../components/history-nav";
 import { usePublishViewContext } from "../components/shell";
 import { WindowActions } from "../components/view-actions";
 import { useNoteActions, useNotes } from "../lib/agent-data";
+import { registerNavigationGuard } from "../lib/navigation-guard";
 import { errorMessage } from "../lib/ipc";
 import { createNoteAutosave, type NoteSaveState } from "../lib/note-autosave";
 
@@ -129,6 +130,7 @@ function NotesList({ onOpen }: { onOpen: (id: string | "new") => void }) {
 /** Saves a moment after typing stops, on ⌘S, and when the editor closes. */
 function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void }) {
   const { save, remove } = useNoteActions();
+  const router = useRouter();
   const [title, setTitle] = useState(note?.title ?? "");
   const [body, setBody] = useState(note?.body ?? "");
   const [previewing, setPreviewing] = useState(false);
@@ -144,7 +146,19 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
     autosave.change(next);
   }
 
-  // Closing the editor or leaving Notes keeps what was typed.
+  // Router transitions (sidebar, tabs and opening another note) must save before
+  // unmounting. A failed save leaves the editor and its draft available to retry or copy.
+  useBlocker({
+    shouldBlockFn: async () => !(await autosave.flush()),
+    enableBeforeUnload: () => autosave.hasPendingChanges(),
+  });
+
+  useEffect(
+    () => registerNavigationGuard(router.history, autosave.flush),
+    [router.history, autosave],
+  );
+
+  // Best effort for non-router teardown; route navigation is guarded above.
   useEffect(() => () => void autosave.flush(), [autosave]);
 
   async function back() {

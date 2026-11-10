@@ -304,13 +304,8 @@ function ConnectStep() {
           ) : google.connected ? (
             <Connected>Connected</Connected>
           ) : google.hasCredentials ? (
-            <Button
-              size="small"
-              variant="accent"
-              onClick={() => connect.mutate()}
-              disabled={connect.isPending}
-            >
-              {connect.isPending ? "Waiting for Browser…" : "Sign in with Google"}
+            <Button size="small" variant="accent" onClick={() => connect.mutate()}>
+              {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
             </Button>
           ) : (
             <Status variant="neutral">Unavailable</Status>

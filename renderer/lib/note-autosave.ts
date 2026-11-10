@@ -19,30 +19,38 @@ export function createNoteAutosave(options: {
   let pending: NoteDraft | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let discarded = false;
+  let saving = false;
   let chain: Promise<boolean> = Promise.resolve(true);
 
   /** Resolves false when the save failed; the text is kept for the next flush. */
   function flush(): Promise<boolean> {
     clearTimeout(timer);
     chain = chain.then(async () => {
-      const draft = pending;
-      if (!draft) return true;
-      pending = null;
-      if (!id && !draft.title.trim() && !draft.body.trim()) {
-        options.onState("saved");
-        return true;
+      // Typing can continue while persistence is awaiting IPC. Do not allow navigation until
+      // those newer edits have also been saved.
+      while (pending) {
+        const draft = pending;
+        pending = null;
+        clearTimeout(timer);
+        if (!id && !draft.title.trim() && !draft.body.trim()) {
+          options.onState("saved");
+          continue;
+        }
+        saving = true;
+        options.onState("saving");
+        try {
+          id = (await options.persist({ ...(id ? { id } : {}), ...draft })).id;
+          options.onState(pending ? "unsaved" : "saved");
+        } catch {
+          // Keep the failed draft, unless newer typing replaced it, so it is retried, not dropped.
+          if (!discarded) pending ??= draft;
+          options.onState("unsaved");
+          return false;
+        } finally {
+          saving = false;
+        }
       }
-      options.onState("saving");
-      try {
-        id = (await options.persist({ ...(id ? { id } : {}), ...draft })).id;
-        options.onState(pending ? "unsaved" : "saved");
-        return true;
-      } catch {
-        // Keep the failed draft, unless newer typing replaced it, so it is retried, not dropped.
-        if (!discarded) pending ??= draft;
-        options.onState("unsaved");
-        return false;
-      }
+      return true;
     });
     return chain;
   }
@@ -55,6 +63,7 @@ export function createNoteAutosave(options: {
       timer = setTimeout(() => void flush(), options.delay ?? 600);
     },
     flush,
+    hasPendingChanges: () => pending !== null || saving,
     /** Drops unsaved edits (the note is being deleted) and waits for a save already running. */
     async discard(): Promise<string | undefined> {
       clearTimeout(timer);
