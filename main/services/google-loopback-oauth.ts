@@ -115,6 +115,7 @@ export async function authorizeGoogleWithLoopback(
     });
 
     const response = await fetch(TOKEN_URL, {
+      signal: options.signal,
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -130,6 +131,8 @@ export async function authorizeGoogleWithLoopback(
       }),
     });
     const body = (await response.json()) as TokenResponse;
+    // A newer sign-in owns the account now; these tokens must not replace it.
+    if (options.signal?.aborted) throw new Error(RESTARTED);
     if (!response.ok || !body.access_token) {
       throw new Error(
         body.error_description ?? body.error ?? `Google sign-in failed (${response.status}).`,
@@ -144,6 +147,8 @@ export async function authorizeGoogleWithLoopback(
       tokenType: body.token_type,
       updatedAt: new Date(),
     };
+  } catch (error) {
+    throw options.signal?.aborted ? new Error(RESTARTED) : error;
   } finally {
     server.closeAllConnections();
     server.close();

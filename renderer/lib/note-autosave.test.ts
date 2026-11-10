@@ -75,3 +75,18 @@ test("deleting drops unsaved edits and reports the note to delete", async () => 
   await autosave.flush();
   assert.deepEqual(saves, []);
 });
+
+test("deleting during a save that fails does not bring the note back", async () => {
+  const { autosave, saves, fixture } = harness();
+  fixture.fail = true;
+  autosave.change({ title: "", body: "deleted before it saved" });
+  const failing = autosave.flush();
+  await Promise.resolve();
+  assert.equal(saves.length, 1);
+  assert.equal(await autosave.discard(), undefined);
+  await failing;
+  fixture.fail = false;
+  // Closing the editor flushes once more; nothing is left to save.
+  assert.equal(await autosave.flush(), true);
+  assert.equal(saves.length, 1);
+});

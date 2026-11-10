@@ -55,3 +55,24 @@ test("a sign-in that was already replaced never opens the browser wait", async (
   await assert.rejects(authorizeGoogleWithLoopback(options(attempt.signal)), /started again/);
   assert.equal(opened.length, before);
 });
+
+test("a sign-in replaced during its token exchange hands back no tokens", async (t) => {
+  const attempt = new AbortController();
+  const realFetch = globalThis.fetch;
+  t.after(() => (globalThis.fetch = realFetch));
+  globalThis.fetch = async (url, init) => {
+    if (String(url) !== "https://oauth2.googleapis.com/token") return realFetch(url, init);
+    // The newer sign-in starts while Google is still answering this one.
+    attempt.abort();
+    return Response.json({ access_token: "superseded" });
+  };
+  const index = opened.length;
+  const refused = assert.rejects(
+    authorizeGoogleWithLoopback(options(attempt.signal)),
+    /started again/,
+  );
+  const redirect = await redirectOf(index);
+  const state = new URL(opened[index]).searchParams.get("state");
+  await realFetch(`${redirect}/?code=fixture&state=${state}`);
+  await refused;
+});

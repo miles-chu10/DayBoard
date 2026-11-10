@@ -18,6 +18,7 @@ export function createNoteAutosave(options: {
   let id = options.id;
   let pending: NoteDraft | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let discarded = false;
   let chain: Promise<boolean> = Promise.resolve(true);
 
   /** Resolves false when the save failed; the text is kept for the next flush. */
@@ -38,7 +39,7 @@ export function createNoteAutosave(options: {
         return true;
       } catch {
         // Keep the failed draft, unless newer typing replaced it, so it is retried, not dropped.
-        pending ??= draft;
+        if (!discarded) pending ??= draft;
         options.onState("unsaved");
         return false;
       }
@@ -57,6 +58,8 @@ export function createNoteAutosave(options: {
     /** Drops unsaved edits (the note is being deleted) and waits for a save already running. */
     async discard(): Promise<string | undefined> {
       clearTimeout(timer);
+      // A save already running must not put its draft back if it fails.
+      discarded = true;
       pending = null;
       await chain;
       return id;
