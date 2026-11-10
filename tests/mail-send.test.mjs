@@ -346,13 +346,16 @@ test("demo mode refuses to snooze, since that changes Gmail", async () => {
   }
 });
 
+// One timestamp for every sample: the list puts the most recent sender first, so a clock tick
+// between separate Date.now() calls would reorder senders with the same message count.
+const newsletterDate = Date.now();
 const newsletter = (fromEmail, overrides = {}) => ({
   from: fromEmail.split("@")[0],
   fromEmail,
   listUnsubscribe: "",
   listUnsubscribePost: "",
   unread: false,
-  date: Date.now(),
+  date: newsletterDate,
   ...overrides,
 });
 
