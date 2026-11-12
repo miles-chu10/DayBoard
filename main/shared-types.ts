@@ -104,6 +104,11 @@ export interface AppSettings {
     /** Per-calendar override; calendars without an entry use Google's own visibility. */
     visibility: Record<string, boolean>;
   };
+  /** Per-list visibility for Google Tasks lists and Apple Reminders lists; a missing entry is shown. */
+  lists: {
+    tasks: Record<string, boolean>;
+    reminders: Record<string, boolean>;
+  };
   privacy: {
     /** Anonymous daily check-in with the license service (release builds only). */
     usageCheckIn: boolean;
@@ -370,6 +375,8 @@ export interface ReminderItem {
   /** Calendar-qualified provider identity when available; `ref` is a mutable transport reference. */
   identity: string;
   ref: string;
+  /** The EventKit list (calendar) identifier. */
+  listId?: string;
   listTitle: string;
   title: string;
   notes: string | null;
@@ -426,6 +433,13 @@ export interface GoogleCalendarInfo {
   color: string | null;
   primary: boolean;
   defaultVisible: boolean;
+}
+
+/** A Google Tasks list or an Apple Reminders list, for choosing which ones appear. */
+export interface ItemListInfo {
+  id: string;
+  title: string;
+  color?: string | null;
 }
 
 export interface CalendarListResult {

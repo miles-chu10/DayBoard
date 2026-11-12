@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { CalendarEventItem, SourceResult, TaskItem } from "@main/shared-types";
 
-import { buildAgenda, findRelatedTodos, getAvailableSlots } from "./agenda";
+import { buildAgenda, findRelatedTodos, findTimedTwin, getAvailableSlots } from "./agenda";
 import { agendaSpanDays, validateAgendaSearch } from "./agenda-search";
 import { groupByDay } from "./day-items";
 import { buildTodos, type Todo } from "./todos";
@@ -253,6 +253,28 @@ test("findRelatedTodos normalizes titles and returns suggestions without merging
     findRelatedTodos(source, [source, related, duplicateTitle, unrelated]).map((item) => item.key),
     ["duplicate", "related"],
   );
+});
+
+test("findTimedTwin offers a same-day timed reminder's time for a Google task", () => {
+  const task = todo({ key: "task", title: "🏋️‍♂️Gym: Pull Day", dueDate: "2026-11-12" });
+  const twin = todo({
+    key: "reminder",
+    source: "reminders",
+    title: "🏋️ Gym: pull day",
+    dueDate: "2026-11-12",
+    dueTime: "13:30",
+  });
+  const otherDay = { ...twin, key: "other-day", dueDate: "2026-11-13" };
+  const untimed = { ...twin, key: "untimed", dueTime: null };
+  const looser = { ...twin, key: "looser", title: "Gym: Push Day" };
+  const done = { ...twin, key: "done", completed: true };
+
+  assert.equal(findTimedTwin(task, [otherDay, untimed, looser, done, twin])?.key, "reminder");
+  assert.equal(findTimedTwin(task, [otherDay, untimed, looser, done]), undefined);
+  // Only a Google task without a time needs one; reminders already carry theirs.
+  assert.equal(findTimedTwin({ ...task, dueTime: "09:00" }, [twin]), undefined);
+  assert.equal(findTimedTwin({ ...task, dueDate: null }, [twin]), undefined);
+  assert.equal(findTimedTwin({ ...twin, dueTime: null, key: "r2" }, [twin]), undefined);
 });
 
 test("buildTodos scopes Google task keys by list and provider id", () => {

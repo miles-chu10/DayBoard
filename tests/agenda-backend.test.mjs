@@ -79,6 +79,7 @@ export async function findAgendaEvent(requestId) {
   return fixture().remoteEvents.get(requestId) ?? null;
 }
 export async function listTasksWithCoverage() { return { items: [], coverage: { complete: true, loaded: 0 } }; }
+export async function listTaskLists() { return []; }
 export async function listEventsWithCoverage() { return { items: [], coverage: { complete: true, loaded: 0 } }; }
 export async function createEvent() {}
 export async function createReplyDraft() { return { draftId: "draft" }; }
@@ -112,6 +113,7 @@ export async function getRemindersAccess() { await fixture().beforeRemindersAcce
 export async function createReminder() {}
 export async function listCompletedReminders() { return []; }
 export async function listReminders() { return []; }
+export async function listReminderLists() { return []; }
 export async function openRemindersPrivacySettings() {}
 export async function requestRemindersAccess() { return "full-access"; }
 export async function setReminderCompleted() {}

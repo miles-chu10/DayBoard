@@ -160,3 +160,45 @@ test("tabs come back after a relaunch, with the active tab showing the launch vi
     await second.close();
   }
 });
+
+test("Hiding a Google Tasks list or a Reminders list removes its items everywhere", async ({
+  playwright: _playwright,
+}, testInfo) => {
+  const demo = await launchDemo();
+  try {
+    const page = demo.page;
+    await sidebarItem(page, "Tasks").click();
+    await expect(page.getByText("Book flights for conference", { exact: true })).toBeVisible();
+    await sidebarItem(page, "Reminders").click();
+    await expect(page.getByText("Renew passport", { exact: true })).toBeVisible();
+
+    await page.evaluate(() => (globalThis as AppGlobal).dayboard.ipc.invoke("window:openSettings"));
+    await expect
+      .poll(() => demo.app.windows().find((window) => /settings-window/.test(window.url())))
+      .not.toBeUndefined();
+    const settings = demo.app.windows().find((window) => /settings-window/.test(window.url()))!;
+    await settings.waitForLoadState("domcontentloaded");
+    await settings.getByRole("tab", { name: "Sources", exact: true }).click();
+    const taskLists = settings.getByRole("group", { name: "Google Tasks Lists" });
+    const reminderLists = settings.getByRole("group", { name: "Apple Reminders Lists" });
+    await expect(taskLists.getByRole("switch", { name: "Show Personal" })).toBeChecked();
+    await taskLists.getByRole("switch", { name: "Show Personal" }).click();
+    await reminderLists.getByRole("switch", { name: "Show Errands" }).click();
+    await expect(taskLists.getByRole("switch", { name: "Show Personal" })).not.toBeChecked();
+    await taskLists.scrollIntoViewIfNeeded();
+    await settings.screenshot({ path: testInfo.outputPath("list-settings.png") });
+
+    await expect(page.getByText("Renew passport", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Pick up dry cleaning", { exact: true })).toBeVisible();
+    await sidebarItem(page, "Tasks").click();
+    await expect(page.getByText("Book flights for conference", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Finalize launch announcement", { exact: true })).toBeVisible();
+
+    // Showing the list again brings its items back.
+    await taskLists.getByRole("switch", { name: "Show Personal" }).click();
+    await expect(page.getByText("Book flights for conference", { exact: true })).toBeVisible();
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});

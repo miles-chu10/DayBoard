@@ -119,7 +119,6 @@ function Shell() {
       inspectorSize={{ default: 360, min: 300, max: 560 }}
       inspectorCollapsed={false}
     >
-      <SidebarControl />
       <CommandMenu />
       <div data-window-content className="flex h-full min-h-0 flex-col bg-background">
         <TabStrip />
@@ -127,6 +126,9 @@ function Shell() {
           <Outlet />
         </div>
       </div>
+      {/* After the page so its no-drag hit region wins: Chromium applies app-region rectangles in
+          document order, and with the sidebar hidden this button sits over the page's drag header. */}
+      <SidebarControl />
     </SplitView>
   );
 }

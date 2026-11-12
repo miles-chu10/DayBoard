@@ -3,7 +3,7 @@ import { cn } from "@renderer/ui/utils";
 import type { SourceColor } from "@main/shared-types";
 
 import { SourceHeading } from "../components/source-dot";
-import { useAccounts, useCalendars, useConnectGoogle } from "../lib/queries";
+import { useAccounts, useCalendars, useConnectGoogle, useItemLists } from "../lib/queries";
 import { useSettingsEditor } from "../lib/settings";
 import { COLOR_OPTIONS, SOURCE_IDS, SOURCE_META } from "../lib/sources";
 import { GoogleSettings, RemindersSettings } from "./account-settings";
@@ -73,6 +73,58 @@ function CalendarsSettings() {
   );
 }
 
+function ListsSettings({ source }: { source: "tasks" | "reminders" }) {
+  const { settings, edit } = useSettingsEditor();
+  const lists = useItemLists(source, true);
+  const label = source === "tasks" ? "Google Tasks Lists" : "Apple Reminders Lists";
+
+  return (
+    <FieldSet title={label} description="Choose which of your lists appear on the dashboard.">
+      {lists.isPending || !settings ? (
+        <Field label="Lists">
+          <Status variant="loading">Loading…</Status>
+        </Field>
+      ) : lists.isError ? (
+        <Field label="Lists" description="Couldn't load your lists.">
+          <Button size="small" onClick={() => void lists.refetch()}>
+            Retry
+          </Button>
+        </Field>
+      ) : lists.data.length === 0 ? (
+        <Field label="Lists" description="No lists found." />
+      ) : (
+        lists.data.map((list) => (
+          <Field
+            key={list.id}
+            label={
+              <span className="flex items-center gap-2 min-w-0">
+                {list.color ? (
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: list.color }}
+                  />
+                ) : null}
+                <span className="truncate">{list.title}</span>
+              </span>
+            }
+          >
+            <Switch
+              checked={settings.lists[source][list.id] ?? true}
+              onCheckedChange={(checked) =>
+                edit((draft) => {
+                  draft.lists[source][list.id] = checked;
+                })
+              }
+              aria-label={`Show ${list.title}`}
+            />
+          </Field>
+        ))
+      )}
+    </FieldSet>
+  );
+}
+
 export function SourcesTab() {
   const { settings, edit } = useSettingsEditor();
   const accounts = useAccounts();
@@ -118,7 +170,9 @@ export function SourcesTab() {
 
       <GoogleSettings status={accounts.data?.google} />
       {accounts.data?.google.connected ? <CalendarsSettings /> : null}
+      {accounts.data?.google.connected ? <ListsSettings source="tasks" /> : null}
       <RemindersSettings access={accounts.data?.reminders} />
+      {accounts.data?.reminders === "full-access" ? <ListsSettings source="reminders" /> : null}
     </>
   );
 }

@@ -311,6 +311,25 @@ function titleTokens(title: string): Set<string> {
   );
 }
 
+/**
+ * The Google Tasks API keeps only a deadline's date, even when Google Calendar shows a time. An
+ * open Apple reminder with the same title words and date, and a time, is very likely the same
+ * to-do (a synced or hand-copied twin), so its time can be offered.
+ */
+export function findTimedTwin(todo: Todo, todos: Todo[]): Todo | undefined {
+  if (todo.source !== "tasks" || !todo.dueDate || todo.dueTime) return undefined;
+  const target = [...titleTokens(todo.title)].sort().join(" ");
+  if (!target) return undefined;
+  return todos.find(
+    (candidate) =>
+      candidate.source === "reminders" &&
+      !candidate.completed &&
+      candidate.dueDate === todo.dueDate &&
+      candidate.dueTime !== null &&
+      [...titleTokens(candidate.title)].sort().join(" ") === target,
+  );
+}
+
 /** Returns similar open to-dos as suggestions; it never deduplicates or merges them. */
 export function findRelatedTodos(todo: Todo, todos: Todo[]): Todo[] {
   const target = titleTokens(todo.title);

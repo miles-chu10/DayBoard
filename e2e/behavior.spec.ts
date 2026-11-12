@@ -376,3 +376,23 @@ test("⌘N reaches focused row action controls", async ({ playwright: _playwrigh
     await demo.close();
   }
 });
+
+test("a Google task's missing time is explained and its timed reminder twin named", async ({
+  playwright: _playwright,
+}, testInfo) => {
+  const demo = await launchDemo();
+  try {
+    await navigate(demo.page, "Tasks");
+    await demo.page.getByText("Call Mom", { exact: true }).first().click();
+    const details = demo.page.getByRole("dialog");
+    await expect(details).toContainText("Time not shared by Google");
+    await expect(details).not.toContainText("Anytime");
+    await expect(details).toContainText(
+      "The matching Apple reminder is at 7:00 PM; link them to show that time.",
+    );
+    await demo.page.screenshot({ path: testInfo.outputPath("google-task-time.png") });
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
