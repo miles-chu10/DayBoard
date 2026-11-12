@@ -142,7 +142,7 @@ async function load(
         }
         if (exposeCli) {
           api.onLoad({ filter: /cli-providers\.ts$/ }, async (args) => ({
-            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, handleGrokLine, handleKimiLine, createState};`,
+            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, handleGrokLine, handleKimiLine, grokArgs, createState};`,
             loader: "ts",
             resolveDir: root + "main/services/ai",
           }));
@@ -1693,6 +1693,18 @@ test("Grok Build streaming-json and Kimi Code stream-json become text, tools, mo
       ["t1", "success"],
     ],
   );
+});
+test("Grok runs answer-only, with its MCP meta-tools removed and MCP calls denied", async () => {
+  const cli = await load("main/services/ai/cli-providers.ts", { exposeCli: true });
+  const args = cli.grokArgs("/tmp/work", "policy", "question");
+  const value = (flag) => args[args.indexOf(flag) + 1];
+  assert.equal(value("--tools"), "todo_write");
+  assert.equal(value("--disallowed-tools"), "search_tool,use_tool");
+  assert.equal(value("--deny"), "MCPTool(*)");
+  assert.equal(value("--system-prompt-override"), "policy");
+  assert.equal(value("-p"), "question");
+  for (const flag of ["--no-subagents", "--no-plan", "--no-memory", "--disable-web-search"])
+    assert.ok(args.includes(flag), flag);
 });
 test("legacy display tokens use the known input count while the measured record stays null", async () => {
   const report = (options) => {

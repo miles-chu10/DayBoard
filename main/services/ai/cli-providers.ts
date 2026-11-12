@@ -789,12 +789,13 @@ function handleGrokLine(line: string, state: ParseState, options: CliRunOptions)
   }
 }
 
-async function runGrok(options: CliRunOptions): Promise<string> {
-  const bin = await resolveCli("grok");
-  if (!bin) throw new Error(MISSING_MESSAGE.grok);
-  const cwd = await workDir();
-  // Answer-only: one harmless built-in tool, no shell, edits, web, subagents, plans or memory.
-  const args = [
+/**
+ * Answer-only: one harmless built-in tool, no shell, edits, web, subagents, plans or memory.
+ * `--tools` keeps Grok's MCP meta-tools, which reach every MCP server in the user's Grok config,
+ * so those are removed and every MCP call is denied as well.
+ */
+function grokArgs(cwd: string, system: string, prompt: string): string[] {
+  return [
     "--no-auto-update",
     "--output-format",
     "streaming-json",
@@ -802,6 +803,10 @@ async function runGrok(options: CliRunOptions): Promise<string> {
     cwd,
     "--tools",
     "todo_write",
+    "--disallowed-tools",
+    "search_tool,use_tool",
+    "--deny",
+    "MCPTool(*)",
     "--no-subagents",
     "--no-plan",
     "--no-memory",
@@ -809,10 +814,17 @@ async function runGrok(options: CliRunOptions): Promise<string> {
     "--max-turns",
     "4",
     "--system-prompt-override",
-    options.system,
+    system,
     "-p",
-    options.prompt,
+    prompt,
   ];
+}
+
+async function runGrok(options: CliRunOptions): Promise<string> {
+  const bin = await resolveCli("grok");
+  if (!bin) throw new Error(MISSING_MESSAGE.grok);
+  const cwd = await workDir();
+  const args = grokArgs(cwd, options.system, options.prompt);
   const state = createState();
   const outcome = await runDirect({
     label: LABEL.grok,
