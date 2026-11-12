@@ -2,8 +2,8 @@
 
 import { Menu, Tray, nativeImage, type Rectangle } from "electron";
 
-import icon from "./assets/trayTemplate.png?asset";
-import icon2x from "./assets/trayTemplate@2x.png?asset";
+import icon from "./assets/tray.png?asset";
+import icon2x from "./assets/tray@2x.png?asset";
 import { setTrayBoundsProvider } from "./panel-window.js";
 
 export interface TrayActions {
@@ -17,16 +17,16 @@ export interface TrayActions {
 
 let tray: Tray | null = null;
 
-function templateImage() {
+// A color image, not a template: the file names must not end in "Template", or macOS tints them.
+function trayImage() {
   const image = nativeImage.createFromPath(icon);
   image.addRepresentation({ scaleFactor: 2, buffer: nativeImage.createFromPath(icon2x).toPNG() });
-  image.setTemplateImage(true);
   return image;
 }
 
 export function startTray(actions: TrayActions): void {
   if (tray) return;
-  const created = new Tray(templateImage());
+  const created = new Tray(trayImage());
   tray = created;
   created.setToolTip("DayBoard");
   const menu = Menu.buildFromTemplate([
