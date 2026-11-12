@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { admin } from "./admin.ts";
+import { assets } from "./assets.ts";
 import { waitlistSignup, type WaitUntil } from "./beta.ts";
 import { checkout } from "./checkout.ts";
 import { config, type Env } from "./config.ts";
@@ -55,6 +56,7 @@ export function createWorker(
             "/receipt",
             "/buy.js",
             "/receipt.js",
+            ...Object.keys(assets),
             "/v1/checkout",
             "/v1/checkout/status",
             "/v1/checkout/claim",

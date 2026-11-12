@@ -1,6 +1,7 @@
 // UI-only disposable preview. The actual Worker/D1/payment contracts are tested separately.
 // This server never contacts Stripe, accepts card details, or touches license/account storage.
 import { createServer } from "node:http";
+import { assets } from "../billing/src/assets.ts";
 import {
   DEFAULT_SITE_ORIGIN,
   buyPage,
@@ -26,6 +27,9 @@ const server = createServer(async (request, response) => {
     response.end(
       markup(url.pathname === "/buy" ? buyPage(orderId, context) : receiptPage(context)),
     );
+  } else if (assets[url.pathname]) {
+    response.setHeader("Content-Type", assets[url.pathname].type);
+    response.end(assets[url.pathname].body());
   } else if (url.pathname === "/buy.js" || url.pathname === "/receipt.js") {
     response.setHeader("Content-Type", "text/javascript; charset=utf-8");
     response.end(url.pathname === "/buy.js" ? buyScript : receiptScript);
