@@ -1,3 +1,4 @@
+import { CalendarDays, ListTodo, Settings, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Callout, Input, Text } from "@renderer/ui";
 
@@ -6,7 +7,7 @@ import { OverdueSummary } from "../components/overdue-summary";
 import { SourceDot } from "../components/source-dot";
 import { buildAgenda } from "../lib/agenda";
 import { identifyCalendarEvents } from "../lib/calendar-identity";
-import { longToday, todayISO } from "../lib/dates";
+import { dayHeading, longToday, todayISO } from "../lib/dates";
 import { ageLabel, isStale, needsYou } from "../lib/home";
 import { errorMessage, invoke, openSettings } from "../lib/ipc";
 import { useLicenseSnapshot } from "../lib/license";
@@ -26,7 +27,7 @@ import {
   usePanelEscape,
   usePanelShown,
 } from "./panel-ipc";
-import { todayItems, type TodayItem } from "./today-items";
+import { upcomingItems, todayItems, type TodayItem } from "./today-items";
 
 const OVERDUE_OPEN_KEY = "menubar:overdueOpen:v1";
 const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
@@ -35,10 +36,13 @@ function ItemRow({ item, wideTime = false }: { item: TodayItem; wideTime?: boole
   return (
     <button
       type="button"
-      className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+      className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${item.kind === "event" ? "bg-control-subtle" : ""}`}
       onClick={() => void openMain(item.kind === "event" ? "/calendar" : "/agenda")}
     >
-      <SourceDot source={item.source} className={item.past ? "opacity-50" : undefined} />
+      <SourceDot
+        source={item.source}
+        className={`${item.kind === "event" ? "h-6 w-0.5 rounded-full" : ""} ${item.past ? "opacity-50" : ""}`}
+      />
       <Text
         as="span"
         variant="small"
@@ -143,7 +147,8 @@ export function MenuBarPanel() {
   const settings = useSettings().data;
   const now = useAgendaClock();
   const today = todayISO();
-  const calendar = useCalendarRange(today, 1);
+  const calendar = useCalendarRange(today, 7);
+  const [view, setView] = useState<"today" | "upcoming">("today");
   const tasks = useTasks();
   const reminders = useReminders();
   const planning = useAgendaState();
@@ -193,11 +198,18 @@ export function MenuBarPanel() {
     planning.data?.duplicateLinks,
     on,
   );
+  const scheduleLoading =
+    (on.calendar && calendar.isPending) ||
+    (on.tasks && tasks.isPending) ||
+    (on.reminders && reminders.isPending);
+  const schedulePartial =
+    (on.calendar && (calendar.isError || (calendar.data && calendar.data.state !== "ok"))) ||
+    (on.tasks && tasks.isError) ||
+    (on.reminders && reminders.isError);
   const events = identifyCalendarEvents(calendar.data?.state === "ok" ? calendar.data.items : []);
-  const { overdueCount, overdue, items } = todayItems(
-    buildAgenda({ events, todos, startDate: today, days: 1, now, sources: on }),
-    now,
-  );
+  const agenda = buildAgenda({ events, todos, startDate: today, days: 7, now, sources: on });
+  const { overdueCount, overdue, items, hiddenCount } = todayItems(agenda, now);
+  const upcoming = upcomingItems(agenda, now);
   // The AI-only box would only fail while the license locks AI; the manual form stays free.
   const ai = panelAiCapture(settings, license?.status);
   const canAsk = featureOn(settings, "assistant");
@@ -225,11 +237,11 @@ export function MenuBarPanel() {
   }
 
   return (
-    <div ref={container} className="flex flex-col gap-3 p-3">
-      <div className="flex items-baseline justify-between gap-2">
+    <div ref={container} className="flex max-h-[560px] flex-col gap-3 p-3">
+      <div className="flex shrink-0 items-baseline justify-between gap-2">
         <div>
           <Text as="h1" variant="large-strong">
-            Today
+            {view === "today" ? "Today" : "Upcoming"}
           </Text>
           <Text as="p" variant="small" color="secondary">
             {longToday()}
@@ -241,66 +253,9 @@ export function MenuBarPanel() {
         </Button>
       </div>
 
-      <MeetingCard surface="menubar" />
-
-      {sourceOn(settings, "mail") ? <WaitingOnYou now={now} /> : null}
-
-      {overdueCount ? (
-        <section aria-label="Overdue items" className="flex flex-col">
-          <OverdueSummary count={overdueCount} open={overdueOpen} onOpenChange={setOverdueOpen}>
-            <div className="flex flex-col">
-              {overdue.map((item) => (
-                <ItemRow key={item.key} item={item} wideTime />
-              ))}
-              {overdueCount > overdue.length ? (
-                <Button
-                  size="small"
-                  variant="transparent"
-                  className="self-start"
-                  onClick={() => void openMain("/agenda")}
-                >
-                  {overdueCount - overdue.length} more in DayBoard
-                </Button>
-              ) : null}
-            </div>
-          </OverdueSummary>
-        </section>
-      ) : null}
-
-      <section aria-label="Today's items" className="flex flex-col">
-        {items.length ? (
-          items.map((item) => <ItemRow key={item.key} item={item} />)
-        ) : (
-          <Text as="p" variant="small" color="secondary">
-            Nothing else today.
-          </Text>
-        )}
-      </section>
-
-      {shown.length ? (
-        <section aria-label="Recent captures" className="flex flex-col gap-1">
-          <Text as="h2" variant="small" color="secondary">
-            Recently added
-          </Text>
-          {shown.map((record) => (
-            <div key={record.id} className="flex items-center gap-2">
-              <Text as="span" variant="small" truncate className="flex-1">
-                {record.state === "undone" ? `Undone: ${record.text}` : record.text}
-                {record.error ? ` — ${record.error}` : ""}
-              </Text>
-              {record.canUndo ? (
-                <Button size="small" variant="transparent" onClick={() => undo(record.id)}>
-                  Undo
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </section>
-      ) : null}
-
       {error ? <Callout color="red">{error}</Callout> : null}
       {ai.available ? (
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Input
             aria-label="Add or ask"
             className="flex-1"
@@ -324,7 +279,7 @@ export function MenuBarPanel() {
           ) : null}
         </div>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button
             className="flex-1"
             onClick={() => {
@@ -341,6 +296,171 @@ export function MenuBarPanel() {
           ) : null}
         </div>
       )}
+
+      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-label="Agenda feed">
+        {scheduleLoading ? (
+          <Text as="p" variant="small" color="secondary" role="status">
+            Loading schedule…
+          </Text>
+        ) : null}
+        {schedulePartial ? (
+          <Text as="p" variant="small" color="secondary" role="status">
+            Some sources are unavailable. Open DayBoard to check connections.
+          </Text>
+        ) : null}
+        {view === "today" ? (
+          <>
+            <MeetingCard surface="menubar" />
+
+            {sourceOn(settings, "mail") ? <WaitingOnYou now={now} /> : null}
+
+            {overdueCount ? (
+              <section aria-label="Overdue items" className="flex flex-col">
+                <OverdueSummary
+                  count={overdueCount}
+                  open={overdueOpen}
+                  onOpenChange={setOverdueOpen}
+                >
+                  <div className="flex flex-col">
+                    {overdue.map((item) => (
+                      <ItemRow key={item.key} item={item} wideTime />
+                    ))}
+                    {overdueCount > overdue.length ? (
+                      <Button
+                        size="small"
+                        variant="transparent"
+                        className="self-start"
+                        onClick={() => void openMain("/agenda")}
+                      >
+                        {overdueCount - overdue.length} more in DayBoard
+                      </Button>
+                    ) : null}
+                  </div>
+                </OverdueSummary>
+              </section>
+            ) : null}
+
+            <section aria-label="Today's items" className="flex flex-col gap-1">
+              <Text as="h2" variant="small" color="secondary">
+                Today · {items.length + hiddenCount}
+              </Text>
+              {items.length ? (
+                items.map((item) => <ItemRow key={item.key} item={item} />)
+              ) : (
+                <Text as="p" variant="small" color="secondary">
+                  {scheduleLoading ? "" : "Nothing else today in available sources."}
+                </Text>
+              )}
+            </section>
+
+            {hiddenCount ? (
+              <Button size="small" variant="transparent" onClick={() => void openMain("/agenda")}>
+                {hiddenCount} more in DayBoard
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <section aria-label="Upcoming items" className="flex flex-col gap-4">
+            <Text as="p" variant="small" color="secondary">
+              The next six days
+            </Text>
+            {upcoming.length ? (
+              upcoming.map((day) => (
+                <section
+                  key={day.date}
+                  aria-label={dayHeading(day.date)}
+                  className="flex flex-col gap-1"
+                >
+                  <Text as="h2" variant="small" color="secondary" className="px-2">
+                    {dayHeading(day.date)} · {day.items.length + day.hiddenCount}
+                  </Text>
+                  {day.items.map((item) => (
+                    <ItemRow key={item.key} item={item} />
+                  ))}
+                  {day.hiddenCount ? (
+                    <Button
+                      size="small"
+                      variant="transparent"
+                      onClick={() => void openMain("/agenda")}
+                    >
+                      {day.hiddenCount} more in DayBoard
+                    </Button>
+                  ) : null}
+                </section>
+              ))
+            ) : (
+              <Text as="p" variant="small" color="secondary">
+                {scheduleLoading
+                  ? ""
+                  : "No scheduled items in the next six days in available sources."}
+              </Text>
+            )}
+          </section>
+        )}
+
+        {shown.length ? (
+          <section aria-label="Recent captures" className="flex flex-col gap-1">
+            <Text as="h2" variant="small" color="secondary">
+              Recently added
+            </Text>
+            {shown.map((record) => (
+              <div key={record.id} className="flex items-center gap-2">
+                <Text as="span" variant="small" truncate className="flex-1">
+                  {record.state === "undone" ? `Undone: ${record.text}` : record.text}
+                  {record.error ? ` — ${record.error}` : ""}
+                </Text>
+                {record.canUndo ? (
+                  <Button size="small" variant="transparent" onClick={() => undo(record.id)}>
+                    Undo
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </section>
+        ) : null}
+      </div>
+      <nav
+        aria-label="Menu bar navigation"
+        className="flex shrink-0 items-center gap-1 border-t border-separator pt-2"
+      >
+        <Button
+          size="small"
+          variant={view === "today" ? "muted" : "transparent"}
+          aria-pressed={view === "today"}
+          onClick={() => setView("today")}
+        >
+          <Sun aria-hidden="true" />
+          Today
+        </Button>
+        <Button
+          size="small"
+          variant={view === "upcoming" ? "muted" : "transparent"}
+          aria-pressed={view === "upcoming"}
+          onClick={() => setView("upcoming")}
+        >
+          <CalendarDays aria-hidden="true" />
+          Upcoming
+        </Button>
+        <div className="flex-1" />
+        <Button
+          size="small"
+          variant="transparent"
+          iconOnly
+          aria-label="Open agenda"
+          onClick={() => void openMain("/agenda")}
+        >
+          <ListTodo aria-hidden="true" />
+        </Button>
+        <Button
+          size="small"
+          variant="transparent"
+          iconOnly
+          aria-label="Open settings"
+          onClick={() => void openSettings()}
+        >
+          <Settings aria-hidden="true" />
+        </Button>
+      </nav>
     </div>
   );
 }
