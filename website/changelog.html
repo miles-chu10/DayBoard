@@ -483,6 +483,42 @@
       </header>
 
       <div class="wrap changelog">
+      <article class="release" id="v1.3.2" aria-labelledby="v1.3.2-title">
+        <div class="release-meta">
+          <p class="release-date">
+            <span class="release-dot is-stable" aria-hidden="true"></span>
+            <time datetime="2026-11-12">November 12, 2026</time>
+            <span class="release-badge is-stable">Release</span>
+          </p>
+          <h2 id="v1.3.2-title"><a href="#v1.3.2">DayBoard 1.3.2</a></h2>
+          
+          
+        </div>
+        <div class="release-body">
+          <div class="release-card" aria-hidden="true">
+            <img src="assets/icon-180.png" alt="" width="72" height="72" />
+            <span class="release-card-name">DayBoard 1.3.2</span>
+            <span class="release-card-sub">See what&#39;s new before you update</span>
+          </div>
+          <div class="release-notes">
+            <p>DayBoard 1.3.2 brings back a Software Update window that shows each version&#39;s release notes before it installs. It also keeps the day&#39;s earlier meetings in the menu bar, makes the columns in the main window easier to resize, and has a new icon.</p>
+            <section class="release-section release-new">
+              <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" /></svg>New features</h3>
+              <ul><li><strong>An update window with release notes.</strong> When DayBoard finds a new version it now asks first and shows what changed, with Skip This Version, Install on Quit and Install and Relaunch. DayBoard → Check for Updates… shows its progress in the same window: checking, downloading, ready to install, or up to date (#127).</li><li><strong>Choose how updates arrive.</strong> Settings → Updates → Download and install updates automatically downloads updates in the background and installs them when you quit. When it is off, DayBoard asks first. The update window has the same switch (#127).</li><li><strong>A changelog on the website.</strong> <a href="https://getdayboard.com/changelog">getdayboard.com/changelog</a> lists every release with its notes (#127).</li><li><strong>Earlier meetings stay in the menu bar.</strong> The menu-bar panel lists all of today&#39;s events in order. Meetings that have ended turn gray and no longer disappear, and an event is never cut to make room for to-dos (#125).</li><li><strong>Easier column resizing.</strong> The dividers beside the sidebar and the side panel highlight when you point at them and while you drag. Double-click a divider to return its column to the default width (#124).</li><li><strong>Grok replaces Muse under subscription accounts.</strong> Settings → AI → Subscription accounts now lists Grok, which uses a SuperGrok or X subscription through xAI&#39;s Grok Build CLI (<code>grok login</code>). Grok answers questions only and does not use MCP servers. Muse is no longer listed; if you had picked it, DayBoard goes back to the default and asks you to choose again (#128).</li><li><strong>A new icon.</strong> DayBoard has a new Sunbeam icon in the Dock, in Finder and on the website. The menu bar icon is now in color (#121).</li><li><strong>Clearer Google sign-in.</strong> The sign-in button follows Google&#39;s branding, and DayBoard shows what data it reads before every Google sign-in. If a permission was left unticked on Google&#39;s screen, the affected feature says <strong>Google Permission Needed</strong> and asks you to sign in again (#122).</li><li><strong>A confirmation before AI turns on.</strong> Settings and the welcome flow ask you to confirm before the AI features are switched on (#122).</li><li><strong>Choose which task lists appear.</strong> Settings → Sources has a switch for each Google Tasks list and each Apple Reminders list (#129).</li><li><strong>Times for Google tasks.</strong> Google does not share a task&#39;s time of day, so DayBoard now says <strong>Time not shared by Google</strong> and shows the time from the matching Apple reminder when there is one (#129).</li></ul>
+            </section>
+            <section class="release-section release-fixed">
+              <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4 2.5-2.5Z" /></svg>Bug fixes</h3>
+              <ul><li>The button that shows a hidden sidebar again now responds to clicks (#129).</li></ul>
+            </section>
+            <section class="release-section release-other">
+              <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></svg>Updating</h3>
+              <p>Apple Silicon, macOS 14+. AI and MCP remain optional.</p><p>Questions: support@getdayboard.com.</p><ul><li><strong>From 1.3.0,</strong> DayBoard updates itself to 1.3.2 the way it did before: it downloads the update in the background and shows <strong>Restart to update</strong> in the toolbar. The new update window is part of 1.3.2, so you&#39;ll see it from the next update on.</li><li>Your data, sign-ins, trial and license stay where they are.</li></ul>
+            </section>
+            <p class="release-links"><a href="https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.2">GitHub release and checksums</a></p>
+          </div>
+        </div>
+      </article>
+
       <article class="release" id="v1.3.0" aria-labelledby="v1.3.0-title">
         <div class="release-meta">
           <p class="release-date">
