@@ -90,6 +90,7 @@ function useStoredBoolean(
 export function ResizeHandle({
   onResize,
   onCommit,
+  onReset,
   value,
   min,
   max,
@@ -100,6 +101,8 @@ export function ResizeHandle({
 }: {
   onResize: (deltaX: number) => void;
   onCommit?: () => void;
+  /** Double-click returns the column to its default width. */
+  onReset?: () => void;
   value: number;
   min: number;
   max: number;
@@ -109,6 +112,7 @@ export function ResizeHandle({
   className?: string;
 }) {
   const dragging = React.useRef(false);
+  const [isDragging, setIsDragging] = React.useState(false);
   const lastX = React.useRef(0);
   React.useEffect(() => {
     function onMove(event: MouseEvent) {
@@ -119,6 +123,7 @@ export function ResizeHandle({
     function onUp() {
       if (!dragging.current) return;
       dragging.current = false;
+      setIsDragging(false);
       document.body.style.cursor = "";
       onCommit?.();
     }
@@ -160,11 +165,15 @@ export function ResizeHandle({
         event.preventDefault();
         event.currentTarget.focus();
         dragging.current = true;
+        setIsDragging(true);
         lastX.current = event.clientX;
         document.body.style.cursor = "col-resize";
       }}
+      onDoubleClick={onReset}
+      title={onReset ? `${label}. Double-click to reset.` : undefined}
+      data-dragging={isDragging || undefined}
       className={cn(
-        "resize-handle relative z-10 w-px shrink-0 cursor-col-resize bg-separator after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-['']",
+        "resize-handle relative z-10 w-px shrink-0 cursor-col-resize bg-separator transition-colors after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[''] hover:bg-accent data-[dragging]:bg-accent",
         className,
       )}
     />
@@ -312,6 +321,7 @@ export function SplitView({
           label="Resize sidebar"
           controls={sidebarId}
           onCommit={() => setSidebarWidth(sidebarWidth)}
+          onReset={() => setSidebarWidth(sidebarSize.default ?? 200)}
           onResize={(dx) =>
             setSidebarWidth(
               Math.min(sidebarMax, Math.max(sidebarSize.min ?? 0, fittedSidebar + dx)),
@@ -382,6 +392,7 @@ export function SplitView({
           label="Resize details"
           controls={inspectorId}
           onCommit={() => setInspectorWidth(inspectorWidth)}
+          onReset={() => setInspectorWidth(inspectorSize.default ?? 280)}
           onResize={(dx) =>
             setInspectorWidth(
               Math.min(
