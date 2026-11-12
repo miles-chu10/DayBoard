@@ -1,6 +1,6 @@
 # DayBoard billing service
 
-This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics. Its only emails are the optional license key email to buyers ([below](#license-key-email)) and the optional owner notification about new waitlist signups.
+This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics. Its only email is the optional license key email to buyers ([below](#license-key-email)).
 
 ## Local verification
 
@@ -19,21 +19,14 @@ Tests call a fake Stripe transport with the **real Stripe SDK webhook verifier**
 
 For a visual-only preview, run `node --import tsx scripts/preview-billing.mjs` from the repository root. Its page banner identifies a disposable UI fixture; it never contacts Stripe or opens account/license storage. The real payment and authorization behavior is exercised separately by the tests above.
 
-## Waitlist signups
+## Waitlist (closed)
 
-`POST /v1/waitlist` stores addresses from the website's waitlist forms in the `beta_signups` table, which keeps its original internal name (`migrations/0002_beta_signups.sql` and `migrations/0004_waitlist_cohort.sql`). `POST /v1/beta-signup` is a legacy alias for pages cached before the rename: the same handler, rows, duplicate check and rate-limit bucket, so it can't create a second entry or double anyone's attempts. Signups work before any Stripe setup. They need only the D1 binding, `SERVICE_ORIGIN`, `HASH_SECRET`, and `SITE_ORIGIN`: the website's exact HTTPS origin. Browsers can call the endpoints only from that origin (CORS). If the binding, `HASH_SECRET` or `SITE_ORIGIN` is missing, they answer `503 signup_unconfigured`; a request addressed to any origin other than `SERVICE_ORIGIN` gets `403 origin_mismatch`.
+The website waitlist closed with the official 1.3.0 release on 2026-11-12. `POST /v1/waitlist` and its legacy alias `/v1/beta-signup` now answer `410 {"error": "waitlist_closed"}` to every request, before any configuration check. They read nothing from the request, write nothing to D1, count no rate limit and send no email. `SIGNUP_EMAIL` and `SIGNUP_NOTIFY_TO` are no longer read; a deployment that still has them is unaffected.
 
-- The request body is `{"email": "...", "company": ""}` as JSON, 1 KB at most. Addresses are trimmed and lowercased. Plus addressing is kept, so `name+tag@` and `name@` are separate entries. Older clients may leave out `company`, but when it's present it must be a string.
-- New and already-listed addresses get the same `200 {"ok": true}`, so the form can't reveal who signed up. A filled `company` field (hidden from people) is treated as a bot: it gets the same answer and nothing is stored.
-- Invalid addresses get `400 invalid_email`, and malformed bodies `400 invalid_body`. More than five attempts per minute from one IP address, counted across both routes, get `429 rate_limited`.
-- `{"ok": true}` is sent only after D1 confirms the write. A database failure, including a result that doesn't confirm the write, gets `503 service_unavailable` with the CORS header, so the page can offer a retry. Failures are logged with a generic message only, never the address or the raw error.
-- Each row holds `email`, `created_at`, `cohort` and `classification`. The service writes only the address and time, so every new row is `waitlist` / `unreviewed`, whatever the request contains. Migration 0004 labeled the reviewed first cohort, the rows created at or before `1791139887001` (2026-10-04 18:51:27 UTC), as `early_access` / `reviewed`. It labels the reserved test address `dayboard-verify+notify@example.com` as `likely_test` wherever a database holds it, and never inserts it. None of these values records an invitation, an access grant or proof that someone owns the address.
+The earlier signups stay in the `beta_signups` table, which keeps its original internal name (`migrations/0002_beta_signups.sql` and `migrations/0004_waitlist_cohort.sql`). Deleting them is a separate decision that needs the owner's explicit OK and a backup first.
+
+- Each row holds `email`, `created_at`, `cohort` and `classification`. Migration 0004 labeled the reviewed first cohort, the rows created at or before `1791139887001` (2026-10-04 18:51:27 UTC), as `early_access` / `reviewed`; later rows are `waitlist` / `unreviewed`. It labels the reserved test address `dayboard-verify+notify@example.com` as `likely_test` wherever a database holds it. None of these values records an invitation, an access grant or proof that someone owns the address.
 - Migration 0005 adds `email_suppressions`, for addresses that asked not to be emailed, and two views that leave them out: `dayboard_mailing_recipients` (one row per address that isn't `likely_test` or suppressed) and `waitlist_signups` (the list newest first, with the signup time in UTC and its age). A suppression stores the address trimmed and lowercased, the request and recording times, the reason `unsubscribe` and a reference to where the request came from. The Worker never reads or writes it.
-- With the optional `SIGNUP_EMAIL` binding and `SIGNUP_NOTIFY_TO` (an address verified in the zone's Email Routing), it emails that address once per new row from `signups@<site host>`, with the subject "New DayBoard waitlist signup". The email goes out after the reply, so new and listed addresses answer equally fast. Duplicates and hidden-field submissions send nothing, and a failed email neither fails nor repeats the signup.
-
-These protections have limits. CORS keeps other websites' pages out, but scripts can send any `Origin` header. The rate limit counts per IP address, so someone with many addresses (an IPv6 range, for example) gets more attempts, and the hidden field stops only simple bots. There's no CAPTCHA, and nothing confirms that an address belongs to the person who entered it. Add Cloudflare edge rules if abuse appears.
-
-For a signup-only deployment, start from `wrangler.signup.example.jsonc` (copy it to the git-ignored `wrangler.jsonc`) and follow `docs/launch/website-deploy.md`. The live service follows that document's "Existing deployment: waitlist rollout" section.
 
 From `billing/`, review the list without test rows or count it by cohort:
 
@@ -76,7 +69,7 @@ Copy `wrangler.example.jsonc` to `wrangler.jsonc` (git-ignored) in the intended 
 | `PRICE_CURRENCY`   | Lowercase three-letter currency of that price                             |
 | `ENVIRONMENT`      | `test` or `live`; must match the Stripe secret and all Stripe objects     |
 | `ACTIVATION_LIMIT` | Merchant-chosen decimal device cap, 1–99                                  |
-| `SITE_ORIGIN`      | Exact HTTPS origin of the website allowed to post waitlist signups        |
+| `SITE_ORIGIN`      | Exact HTTPS origin of the website, for the pricing and refund links       |
 | `MAIL_FROM`        | Optional. Sender of the [license key email](#license-key-email)           |
 
 The buy and receipt pages link to `/pricing` and `/refund` on `SITE_ORIGIN` (on `https://getdayboard.com` when it isn't set) and show `ACTIVATION_LIMIT` as the Mac cap. The price and refund copy ($5 once, 14 days) and the support address `support@getdayboard.com` are fixed text in `src/pages.ts`; change them there if the policy changes.

@@ -1,3 +1,5 @@
+// The waitlist closed on 2026-11-12: /v1/waitlist and /v1/beta-signup now answer 410, so the
+// signup checks below fail by design. Kept for reference until it is rewritten; see billing/README.md.
 // Post-deploy check for the website and its waitlist API. It signs up one synthetic address through
 // /v1/waitlist, repeats it through the legacy /v1/beta-signup alias, and ends by printing the D1
 // commands that confirm and delete that row.
