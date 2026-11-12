@@ -1,5 +1,7 @@
 # DayBoard website and waitlist deployment
 
+> **Historical.** The waitlist closed with DayBoard 1.3.0 on 2026-11-12: the site no longer has signup forms, and the billing Worker answers `410 waitlist_closed` on `/v1/waitlist` and `/v1/beta-signup` (see `billing/README.md`, "Waitlist (closed)"). The signup steps and checks below no longer apply. The site deploy itself still works as described.
+
 Take the website and its waitlist API live on Cloudflare once the domain is bought, checking each step before the next. getdayboard.com is already live: to ship the waitlist on that deployment, follow [Existing deployment: waitlist rollout](#existing-deployment-waitlist-rollout) and skip the first-time setup in sections 1 to 4.
 
 | Placeholder                   | Meaning                                                 |
