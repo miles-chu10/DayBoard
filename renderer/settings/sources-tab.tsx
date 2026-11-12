@@ -80,7 +80,7 @@ export function SourcesTab() {
   return (
     <>
       <FieldSet
-        title="Dashboard Sources"
+        title="DayBoard Sources"
         description="Choose what appears on your dashboard and the color that marks it everywhere."
       >
         {settings ? (

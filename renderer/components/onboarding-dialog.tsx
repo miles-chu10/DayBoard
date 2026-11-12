@@ -29,7 +29,7 @@ import {
   providerIndicator,
   type OnboardingStep,
 } from "../lib/onboarding";
-import { useAccounts, useConnectGoogle, useRequestRemindersAccess } from "../lib/queries";
+import { useAccounts, useRequestRemindersAccess } from "../lib/queries";
 import {
   PROVIDER_DETAIL,
   PROVIDER_LABEL,
@@ -38,6 +38,8 @@ import {
 } from "../lib/settings";
 import { shortcutKeys, SHORTCUTS } from "../lib/shortcuts";
 import { useStartAtLogin } from "../lib/use-start-at-login";
+import { AIConsentDialog } from "./ai-consent-dialog";
+import { GoogleConnect } from "./google-sign-in";
 import { ProviderMark } from "./provider-logo";
 import { SourceIcon } from "./source-dot";
 import { AppleRemindersLogo, GmailLogo, GoogleCalendarLogo, GoogleTasksLogo } from "./source-logos";
@@ -59,6 +61,7 @@ export function OnboardingDialog({ onDone }: { onDone: () => void }) {
   const [step, setStep] = React.useState<OnboardingStep>("welcome");
   const [direction, setDirection] = React.useState<Direction>("none");
   const [choice, setChoice] = React.useState<AIProvider | "">("");
+  const [confirmingAi, setConfirmingAi] = React.useState(false);
   const index = ONBOARDING_STEPS.indexOf(step);
   const current = settings?.ai.enabled && settings.ai.providerChosen ? settings.ai.provider : "";
   // AI turns on only with a tool that's installed: an AI feature that runs (such as sorting new
@@ -130,7 +133,7 @@ export function OnboardingDialog({ onDone }: { onDone: () => void }) {
               ) : step === "ai" && choice && choice !== current ? (
                 <>
                   <Button onClick={next}>Not now</Button>
-                  <Button variant="accent" onClick={turnOnAi} disabled={!ready}>
+                  <Button variant="accent" onClick={() => setConfirmingAi(true)} disabled={!ready}>
                     Turn on AI
                   </Button>
                 </>
@@ -147,6 +150,14 @@ export function OnboardingDialog({ onDone }: { onDone: () => void }) {
           </div>
         </div>
         <DayPreview step={step} assistant={choice || current} />
+        {choice ? (
+          <AIConsentDialog
+            open={confirmingAi}
+            onOpenChange={setConfirmingAi}
+            provider={choice}
+            onConfirm={turnOnAi}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -271,7 +282,6 @@ function ConnectStep() {
   ) : (
     <Status variant="loading">Checking…</Status>
   );
-  const connect = useConnectGoogle();
   const requestReminders = useRequestRemindersAccess();
   const google = accounts?.google;
   const reminders = accounts?.reminders;
@@ -304,9 +314,7 @@ function ConnectStep() {
           ) : google.connected ? (
             <Connected>Connected</Connected>
           ) : google.hasCredentials ? (
-            <Button size="small" variant="accent" onClick={() => connect.mutate()}>
-              {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
-            </Button>
+            <GoogleConnect />
           ) : (
             <Status variant="neutral">Unavailable</Status>
           )}

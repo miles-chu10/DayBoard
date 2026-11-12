@@ -9,7 +9,7 @@ import {
 } from "../platform/index.js";
 import type { OAuthTokensInput } from "../platform/index.js";
 
-import type { GoogleAccountStatus } from "../shared-types.js";
+import type { GoogleAccess, GoogleAccountStatus } from "../shared-types.js";
 import { GOOGLE_APP_CLIENT_ID, GOOGLE_APP_CLIENT_SECRET } from "./google-oauth-app-client.js";
 import { authorizeGoogleWithLoopback } from "./google-loopback-oauth.js";
 
@@ -28,13 +28,32 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 
+/** The scope each Google source can't work without. */
+const ACCESS_SCOPES: Record<GoogleAccess, string> = {
+  tasks: "https://www.googleapis.com/auth/tasks",
+  mail: "https://www.googleapis.com/auth/gmail.modify",
+  calendar: "https://www.googleapis.com/auth/calendar.events",
+};
+
+/**
+ * Sources whose scope the user left unticked on Google's consent screen. A token saved without a
+ * scope list (older builds) is treated as fully granted; Google's own 403 still applies.
+ */
+export function missingGoogleAccess(grantedScope: string | undefined): GoogleAccess[] {
+  if (grantedScope === undefined) return [];
+  const granted = new Set(grantedScope.split(/\s+/).filter(Boolean));
+  return (Object.keys(ACCESS_SCOPES) as GoogleAccess[]).filter(
+    (access) => !granted.has(ACCESS_SCOPES[access]),
+  );
+}
+
 interface GoogleAccountProfile {
   email: string | null;
 }
 
 export class GoogleAuthError extends Error {
   constructor(
-    readonly reason: "needs-setup" | "not-connected",
+    readonly reason: "needs-setup" | "not-connected" | "not-granted",
     message: string,
   ) {
     super(message);
@@ -111,7 +130,13 @@ function getService(client: { clientId: string; clientSecret: string }): OAuthSe
 export async function getGoogleStatus(): Promise<GoogleAccountStatus> {
   const client = appClient();
   if (!client) {
-    return { hasCredentials: false, connected: false, email: null, clientIdHint: null };
+    return {
+      hasCredentials: false,
+      connected: false,
+      email: null,
+      clientIdHint: null,
+      missingAccess: [],
+    };
   }
   const tokens = await getService(client).getTokens();
   return {
@@ -119,6 +144,7 @@ export async function getGoogleStatus(): Promise<GoogleAccountStatus> {
     connected: tokens !== null,
     email: (await readProfile()).email,
     clientIdHint: null,
+    missingAccess: tokens ? missingGoogleAccess(tokens.scope) : [],
   };
 }
 
@@ -245,15 +271,21 @@ function refreshFailure(error: unknown): {
   return { kind: "temporary", code };
 }
 
-export async function getGoogleAccessToken(): Promise<string> {
+/** Pass `access` to refuse the call when the user didn't grant that source's scope. */
+export async function getGoogleAccessToken(access?: GoogleAccess): Promise<string> {
   const client = appClient();
   if (!client) {
     throw new GoogleAuthError("needs-setup", "Google sign-in isn't configured in this build.");
   }
   const oauth = getService(client);
   // A never-connected account isn't an expired session: say so, and don't log a refresh failure.
-  if (!(await oauth.getTokens().catch(() => null)))
-    throw new GoogleAuthError("not-connected", "Google account is not connected.");
+  const stored = await oauth.getTokens().catch(() => null);
+  if (!stored) throw new GoogleAuthError("not-connected", "Google account is not connected.");
+  if (access && missingGoogleAccess(stored.scope).includes(access))
+    throw new GoogleAuthError(
+      "not-granted",
+      "DayBoard wasn't given this Google permission. Sign in again and allow it.",
+    );
   try {
     return await oauth.getAccessToken();
   } catch (error) {

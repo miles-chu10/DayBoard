@@ -542,7 +542,7 @@ test("External MCP is keyed, can be turned off, and hides or blocks writes when 
       ),
       {
         status: 503,
-        body: "Dayboard's MCP server is turned off. Turn it on in Settings → MCP Servers.",
+        body: "DayBoard's MCP server is turned off. Turn it on in Settings → MCP Servers.",
       },
       "off refuses even a valid key",
     );

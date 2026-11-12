@@ -601,7 +601,7 @@ async function runCodex(options: CliRunOptions): Promise<string> {
     "--json",
     "--skip-git-repo-check",
     "--ephemeral",
-    // Dashboard owns these settings and MCP connections; keep CLI preferences separate.
+    // DayBoard owns these settings and MCP connections; keep CLI preferences separate.
     "--ignore-user-config",
     "--sandbox",
     "read-only",

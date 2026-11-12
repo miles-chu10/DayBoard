@@ -48,11 +48,40 @@ const auth = await import(
   `data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text).toString("base64")}`
 );
 
-async function accessWith(oauth) {
+async function accessWith(oauth, access) {
   globalThis.oauth = oauth;
   globalThis.warns = [];
-  return auth.getGoogleAccessToken();
+  return auth.getGoogleAccessToken(access);
 }
+
+const TASKS = "https://www.googleapis.com/auth/tasks";
+const GMAIL = "https://www.googleapis.com/auth/gmail.modify";
+const CALENDAR = "https://www.googleapis.com/auth/calendar.events";
+
+test("lists the Google sources whose permission was left unticked", () => {
+  assert.deepEqual(auth.missingGoogleAccess(`openid email ${TASKS} ${CALENDAR}`), ["mail"]);
+  assert.deepEqual(auth.missingGoogleAccess("openid email"), ["tasks", "mail", "calendar"]);
+  assert.deepEqual(auth.missingGoogleAccess(`${TASKS} ${GMAIL} ${CALENDAR}`), []);
+  // Tokens saved before scopes were recorded count as fully granted.
+  assert.deepEqual(auth.missingGoogleAccess(undefined), []);
+});
+
+test("refuses a source the user didn't grant, before refreshing the token", async () => {
+  let refreshed = false;
+  const oauth = {
+    getTokens: async () => ({ accessToken: "t", scope: `openid ${TASKS} ${CALENDAR}` }),
+    getAccessToken: async () => {
+      refreshed = true;
+      return "token";
+    },
+  };
+  await assert.rejects(
+    accessWith(oauth, "mail"),
+    (error) => error instanceof auth.GoogleAuthError && error.reason === "not-granted",
+  );
+  assert.equal(refreshed, false);
+  assert.equal(await accessWith(oauth, "tasks"), "token");
+});
 
 for (const [name, getTokens] of [
   ["no stored tokens", async () => null],

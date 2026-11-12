@@ -168,6 +168,7 @@ export const demoAccounts: AccountsStatus = {
     connected: true,
     email: "alex.rivera@example.com",
     clientIdHint: null,
+    missingAccess: [],
   },
   reminders: "full-access",
 };

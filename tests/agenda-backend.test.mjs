@@ -97,7 +97,7 @@ const authStub = `
 const fixture = () => globalThis.__agendaFixture;
 export const GOOGLE_REDIRECT_URI = "https://example.test/callback";
 export class GoogleAuthError extends Error { constructor(reason, message) { super(message); this.reason = reason; } }
-export async function getGoogleStatus() { return { hasCredentials: true, connected: true, email: fixture().email, clientIdHint: null }; }
+export async function getGoogleStatus() { return { hasCredentials: true, connected: true, email: fixture().email, clientIdHint: null, missingAccess: [] }; }
 export async function clearGoogleCredentials() {}
 export async function authorizeGoogle() { await fixture().onAuthorize?.(); return { accessToken: "fixture" }; }
 export async function completeGoogleSignIn() { await fixture().onConnect?.(); }

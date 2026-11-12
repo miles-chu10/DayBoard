@@ -315,11 +315,16 @@ export type ProviderStatus =
       message: string;
     };
 
+/** A Google source that needs its own permission on Google's consent screen. */
+export type GoogleAccess = "tasks" | "mail" | "calendar";
+
 export interface GoogleAccountStatus {
   hasCredentials: boolean;
   connected: boolean;
   email: string | null;
   clientIdHint: string | null;
+  /** Sources the signed-in user didn't allow on Google's consent screen. */
+  missingAccess: GoogleAccess[];
 }
 
 export interface AccountsStatus {
@@ -349,6 +354,8 @@ export type SourceResult<T> =
     }
   | { state: "needs-setup" }
   | { state: "not-connected" }
+  /** Signed in, but the user left this source's permission unticked at Google. */
+  | { state: "not-granted" }
   | { state: "no-access"; access: RemindersAccess }
   | { state: "disabled" };
 
