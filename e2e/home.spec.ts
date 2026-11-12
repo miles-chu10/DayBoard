@@ -108,10 +108,11 @@ test("Home cards customize, persist, collapse, reset and fit narrow windows", as
     const cards = page.locator("[data-home-module]");
     await expect(cards).toHaveCount(4);
     await page.screenshot({ path: testInfo.outputPath("home-default.png") });
+    await page.getByRole("button", { name: "Collapse Agenda", exact: true }).click();
     await page.getByRole("button", { name: "Customize", exact: true }).click();
     await page
       .getByRole("button", { name: "Drag Needs you", exact: true })
-      .dragTo(page.locator('[data-home-module="suggested"]'));
+      .dragTo(page.getByRole("button", { name: "Drag Suggested", exact: true }));
     await expect(cards.nth(2)).toHaveAttribute("data-home-module", "waiting");
     await page.getByRole("button", { name: "Reset layout", exact: true }).click();
     await page.getByRole("button", { name: "Move Needs you up", exact: true }).click();

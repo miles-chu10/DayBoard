@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, GripVertical, SlidersHorizontal } from "lucide-react";
 import { Button, Text } from "@renderer/ui";
 import { cn } from "@renderer/ui/utils";
@@ -66,7 +66,7 @@ export function HomeDashboard({
 }) {
   const [layout, setLayout] = useState(() => readStored(KEY, isHomeLayout) ?? defaultHomeLayout());
   const [editing, setEditing] = useState(false);
-  const [dragging, setDragging] = useState<HomeModuleId | null>(null);
+  const dragging = useRef<HomeModuleId | null>(null);
   const [notice, setNotice] = useState("");
   function save(next: HomeModule[]) {
     setLayout(next);
@@ -104,14 +104,6 @@ export function HomeDashboard({
           editing && "rounded-xl border border-separator p-2",
           editing && item.hidden && "opacity-60",
         )}
-        onDragOver={(event) => {
-          if (dragging) event.preventDefault();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (dragging) save(moveHomeModule(layout, dragging, index));
-          setDragging(null);
-        }}
       >
         {editing && (
           <div
@@ -120,16 +112,30 @@ export function HomeDashboard({
           >
             <button
               type="button"
-              draggable
               aria-label={`Drag ${module.title}`}
               title={`Drag ${module.title} to reorder`}
-              className="cursor-grab rounded p-1"
-              onDragStart={(event) => {
-                setDragging(item.id);
-                event.dataTransfer.setData("text/plain", item.id);
-                event.dataTransfer.effectAllowed = "move";
+              className="touch-none cursor-grab rounded p-1 active:cursor-grabbing"
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                dragging.current = item.id;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                event.preventDefault();
               }}
-              onDragEnd={() => setDragging(null)}
+              onPointerUp={(event) => {
+                const id = dragging.current;
+                dragging.current = null;
+                if (event.currentTarget.hasPointerCapture(event.pointerId))
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                const target = document
+                  .elementFromPoint(event.clientX, event.clientY)
+                  ?.closest("[data-home-module]")
+                  ?.getAttribute("data-home-module");
+                const to = layout.findIndex((candidate) => candidate.id === target);
+                if (id && to >= 0) save(moveHomeModule(layout, id, to));
+              }}
+              onPointerCancel={() => {
+                dragging.current = null;
+              }}
             >
               <GripVertical className="size-4" />
             </button>
