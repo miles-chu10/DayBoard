@@ -145,7 +145,7 @@ for (const [name, options, message] of refusals) {
 
 test("the published script is complete, pinned and never asks for a password", () => {
   assert.equal(spawnSync("bash", ["-n"], { input: source }).status, 0, "bash can parse it");
-  assert.match(source, /^VERSION="\d+\.\d+\.\d+-beta\.\d+"$/m);
+  assert.match(source, /^VERSION="\d+\.\d+\.\d+(?:-beta\.\d+)?"$/m);
   assert.match(source, /^DMG_SHA256="[0-9a-f]{64}"$/m);
   assert.match(source, new RegExp(`^TEAM_ID="${TEAM}"$`, "m"));
   assert.match(source, /^PATH="\/usr\/bin:\/bin:\/usr\/sbin:\/sbin"$/m);

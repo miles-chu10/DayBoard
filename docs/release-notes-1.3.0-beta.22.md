@@ -44,5 +44,36 @@ Questions: support@getdayboard.com.
 
 ## Release verification
 
-Not yet released. This section is filled in from the signed release run and the published
-assets.
+The [signed release run](https://github.com/miles-chu10/DayBoard/actions/runs/43159907828)
+published this prerelease on 2026-11-12 at 05:28 UTC from `2fbb738`, the commit the
+[signed beta dry run](https://github.com/miles-chu10/DayBoard/actions/runs/43157148759) built
+first. The run passed its tests, build, Developer ID signing, app and DMG notarization, package
+verification and fictional-data smoke checks. The release contains the DMG, ZIP, both blockmaps,
+`latest-mac.yml`, `release-manifest.json` and `SHA256SUMS.txt`.
+
+Checked on a Mac from the published downloads: every `SHA256SUMS.txt` line matches the files and
+GitHub's own digests, and `latest-mac.yml` gives this version with the ZIP's and DMG's actual
+SHA-512 and size. The DMG passes `xcrun stapler validate`, and `spctl` accepts it as Notarized
+Developer ID. The apps in the ZIP and the DMG are 1.3.0-beta.22, pass
+`codesign --verify --deep --strict` and `stapler validate`, and are accepted as Notarized
+Developer ID (team `LGJS5APK9X`). The shipped `app.asar` names the live license service and the
+live product, and no other product.
+
+Update from beta.21: on 2026-11-12 at 05:43 UTC, an installed beta.21 found beta.22 through
+Settings → Updates and installed it with the in-app updater. The installer finished with status
+0, and the relaunched app is 1.3.0-beta.22 with the same code signature as the app in the
+published ZIP, accepted as Notarized Developer ID. The update left the settings file untouched,
+and Google sign-in and the DayBoard Pro license were kept: the app came back signed in, with Pro
+active.
+
+Checked in the updated app with a real account: the Inbox shows one line per email with sender,
+subject, triage chip and time, and Reply, Archive and Open in Gmail take the time's place on the
+row with keyboard focus. Settings → General → Inbox rows → With preview brings back the
+three-line rows, and One line restores them. Settings → License → Deactivate this device opens
+the confirmation, and Cancel leaves Pro active. Not clicked through on the real account, because
+each would change real mail, events or notes: the preview on an opened email (opening an unread
+email marks it read), the Add task action, and the four #115 fixes. Those are covered by the
+tests in the release run.
+
+DMG: `DayBoard-1.3.0-beta.22-arm64.dmg` (138,340,119 bytes). Its published SHA-256 is
+`a68bf0ccbb33b93d26f337e6d9abd9ce9d2ca29711083e6fdac0597e297f4a04`.

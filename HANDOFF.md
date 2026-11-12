@@ -12,7 +12,16 @@ Open items, with what each waits on, are under "Remaining work".
 
 ### Releases
 
-- **Latest published beta: `1.3.0-beta.19`** (prerelease `v1.3.0-beta.19`), the first release
+- **Latest release: `1.3.0`** (`v1.3.0`, GitHub's latest release, not a prerelease). Signed
+  macOS release run 43164221054 published it on 2026-11-12 at 06:10 UTC from `fb3861d` (#119).
+  It is the same code as `1.3.0-beta.22` with only the version changed. Notes and verification:
+  `docs/release-notes-1.3.0.md`. An installed beta.22 updated itself to 1.3.0 through the in-app
+  updater, and 1.3.0 offers official releases only. The website, `install.sh` and
+  `tests/website-version.test.mjs` name 1.3.0 and its DMG.
+- Betas after beta.19: `1.3.0-beta.20`, `1.3.0-beta.21` and `1.3.0-beta.22` (the release
+  candidate for 1.3.0, published 2026-11-12 at 05:28 UTC from `2fbb738`). Each has its notes and
+  verification in `docs/release-notes-1.3.0-beta.<n>.md`.
+- `1.3.0-beta.19` (prerelease `v1.3.0-beta.19`) was the first release
   built with licensing on. Signed macOS release run 42573752532 published it on 2026-11-09 at
   06:47 UTC from `350d99b` (#90), after signed beta dry run 42571797367 passed on the same commit.
   Notes and verification: `docs/release-notes-1.3.0-beta.19.md`. `/release-check` on the Mac: all
