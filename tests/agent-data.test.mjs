@@ -260,3 +260,25 @@ test("the JSON store reads once, writes atomically, and starts over from an unre
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("a stale editor cannot overwrite an agent's newer note", () => {
+  const first = notes.saveNote([], { title: "Note", body: "original" }, 10, "conflict");
+  const agent = notes.saveNote(
+    first.notes,
+    { id: "conflict", title: "Note", body: "agent edit", expectedUpdatedAt: 10 },
+    10,
+    "unused",
+  );
+  assert.ok(agent.note.updatedAt > 10);
+  assert.throws(
+    () =>
+      notes.saveNote(
+        agent.notes,
+        { id: "conflict", title: "Note", body: "stale editor", expectedUpdatedAt: 10 },
+        20,
+        "unused",
+      ),
+    /changed elsewhere/,
+  );
+  assert.equal(agent.note.body, "agent edit");
+});

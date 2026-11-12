@@ -41,6 +41,7 @@ export function noteTitle(title: string, body: string): string {
 
 export function parseNoteInput(value: unknown): {
   id?: string;
+  expectedUpdatedAt?: number;
   title: string;
   body: string;
 } {
@@ -52,7 +53,15 @@ export function parseNoteInput(value: unknown): {
     throw new Error("A note title must be text.");
   if (typeof input.body !== "string") throw new Error("A note body must be text.");
   if (input.body.length > MAX_NOTE_BODY) throw new Error("This note is too long to save.");
+  if (
+    input.expectedUpdatedAt !== undefined &&
+    (typeof input.expectedUpdatedAt !== "number" || !Number.isFinite(input.expectedUpdatedAt))
+  )
+    throw new Error("A note version must be a finite timestamp.");
   return {
+    ...(input.expectedUpdatedAt !== undefined
+      ? { expectedUpdatedAt: input.expectedUpdatedAt as number }
+      : {}),
     ...(input.id ? { id: input.id as string } : {}),
     title: (input.title as string | undefined) ?? "",
     body: input.body,
@@ -62,12 +71,20 @@ export function parseNoteInput(value: unknown): {
 /** Creates a note, or updates the one with `input.id`; returns the list and the saved note. */
 export function saveNote(
   notes: Note[],
-  input: { id?: string; title: string; body: string },
+  input: { id?: string; expectedUpdatedAt?: number; title: string; body: string },
   now: number,
   newId: string,
 ): { notes: Note[]; note: Note } {
   const existing = input.id ? notes.find((note) => note.id === input.id) : undefined;
   if (input.id && !existing) throw new Error("That note no longer exists.");
+  if (
+    existing &&
+    input.expectedUpdatedAt !== undefined &&
+    existing.updatedAt !== input.expectedUpdatedAt
+  )
+    throw new Error(
+      "This note changed elsewhere. Copy your unsaved text before reopening the latest note.",
+    );
   if (!existing && notes.length >= MAX_NOTES)
     throw new Error(`DayBoard keeps up to ${MAX_NOTES} notes. Delete one to add another.`);
   const note: Note = {
@@ -75,7 +92,7 @@ export function saveNote(
     title: noteTitle(input.title, input.body),
     body: input.body,
     createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
+    updatedAt: existing ? Math.max(now, existing.updatedAt + 1) : now,
   };
   return {
     notes: existing ? notes.map((item) => (item.id === note.id ? note : item)) : [...notes, note],

@@ -70,6 +70,14 @@ export function createMailSchedule(deps: {
   let tail: Promise<unknown> = Promise.resolve();
   let handle: unknown;
   let running = false;
+  const retries = new WeakMap<MailScheduleEntry, { attempts: number; at: number }>();
+  function defer(entry: MailScheduleEntry) {
+    const attempts = (retries.get(entry)?.attempts ?? 0) + 1;
+    retries.set(entry, {
+      attempts,
+      at: deps.now() + Math.min(MAX_WAIT, 60_000 * 2 ** Math.min(attempts - 1, 6)),
+    });
+  }
 
   // Every read-modify-write runs in order, so a check and a user action can't interleave.
   function serial<T>(work: () => Promise<T>): Promise<T> {
@@ -96,7 +104,9 @@ export function createMailSchedule(deps: {
     timers.clearTimeout(handle);
     handle = undefined;
     if (!running) return;
-    const waiting = list.filter((entry) => !entry.due).map((entry) => entry.dueAt);
+    const waiting = list
+      .filter((entry) => !entry.due)
+      .map((entry) => Math.max(entry.dueAt, retries.get(entry)?.at ?? 0));
     const hasDue = list.some((entry) => entry.due);
     if (!waiting.length && !hasDue) return;
     const wait = waiting.length ? Math.min(...waiting) - deps.now() : MAX_WAIT;
@@ -112,13 +122,16 @@ export function createMailSchedule(deps: {
       const now = deps.now();
       let dirty = false;
       for (const entry of [...list]) {
+        if ((retries.get(entry)?.at ?? 0) > now) continue;
         if (entry.kind === "snooze") {
           if (entry.dueAt > now) continue;
           try {
             await deps.unsnooze(entry);
           } catch {
-            continue; // Offline or signed out: try again at the next check.
+            defer(entry);
+            continue; // Keep the due date, but back off offline retries.
           }
+          retries.delete(entry);
           list.splice(list.indexOf(entry), 1);
           dirty = true;
           deps.onDue?.(entry);
@@ -127,8 +140,10 @@ export function createMailSchedule(deps: {
           try {
             replied = await deps.hasReply(entry);
           } catch {
+            defer(entry);
             continue;
           }
+          retries.delete(entry);
           if (replied) {
             list.splice(list.indexOf(entry), 1);
             dirty = true;

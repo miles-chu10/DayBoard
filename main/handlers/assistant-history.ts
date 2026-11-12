@@ -2,12 +2,13 @@ import { ipcMain } from "../platform/index.js";
 
 import {
   getAssistantHistory,
+  normalizeChat,
   importLegacyAssistantChat,
   saveAssistantChat,
   selectAssistantChat,
 } from "../services/assistant-history-store.js";
 import { trackPendingWrite } from "../services/pending-writes.js";
-import { createSerialQueue } from "../services/file-store.js";
+import { createCoalescedSaveQueue } from "../services/coalesced-save-queue.js";
 import { requireAgendaScope, requireExpectedAgendaScope } from "./productivity.js";
 
 function asObject(value: unknown, channel: string): Record<string, unknown> {
@@ -19,9 +20,13 @@ function asObject(value: unknown, channel: string): Record<string, unknown> {
 export function registerAssistantHistoryHandlers(): void {
   // Include scope lookup in request order: a fast reload must never overtake
   // a submitted save whose account lookup is still awaiting the native store.
-  const requests = createSerialQueue();
+  const requests = createCoalescedSaveQueue(async (input: Record<string, unknown>) => {
+    const scope = await requireAgendaScope();
+    requireExpectedAgendaScope(input, scope, "assistant:saveChat");
+    return saveAssistantChat(scope, input.chat);
+  });
   ipcMain.handle("assistant:getHistory", () =>
-    requests(async () => {
+    requests.run(async () => {
       const scope = await requireAgendaScope();
       const history = await getAssistantHistory(scope);
       // Account changes can race a slow disk read. Never return one account's
@@ -37,14 +42,10 @@ export function registerAssistantHistoryHandlers(): void {
   ipcMain.handle("assistant:saveChat", async (_event, payload: unknown) => {
     const channel = "assistant:saveChat";
     const input = asObject(payload, channel);
-    // Start tracking before scope resolution so account changes and normal quit
-    // cannot pass through the gap before the durable store has been entered.
+    const chat = normalizeChat(input.chat);
+    // Track the batching window too: quitting must wait for the latest submitted snapshot.
     return trackPendingWrite(() =>
-      requests(async () => {
-        const scope = await requireAgendaScope();
-        requireExpectedAgendaScope(input, scope, channel);
-        return saveAssistantChat(scope, input.chat);
-      }),
+      requests.save(JSON.stringify([input.expectedScope, chat.id]), { ...input, chat }),
     );
   });
 
@@ -52,7 +53,7 @@ export function registerAssistantHistoryHandlers(): void {
     const channel = "assistant:selectChat";
     const input = asObject(payload, channel);
     return trackPendingWrite(() =>
-      requests(async () => {
+      requests.run(async () => {
         const scope = await requireAgendaScope();
         requireExpectedAgendaScope(input, scope, channel);
         return selectAssistantChat(scope, input.id);
@@ -64,7 +65,7 @@ export function registerAssistantHistoryHandlers(): void {
     const channel = "assistant:importLegacyChat";
     const input = asObject(payload, channel);
     return trackPendingWrite(() =>
-      requests(async () => {
+      requests.run(async () => {
         const scope = await requireAgendaScope();
         requireExpectedAgendaScope(input, scope, channel);
         return importLegacyAssistantChat(scope, input.messages);

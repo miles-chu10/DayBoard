@@ -89,7 +89,7 @@ export function useNoteActions() {
   const queryClient = useQueryClient();
   const refresh = () => void queryClient.invalidateQueries({ queryKey: agentKeys.notes });
   const save = useMutation({
-    mutationFn: (note: { id?: string; title: string; body: string }) =>
+    mutationFn: (note: { id?: string; expectedUpdatedAt?: number; title: string; body: string }) =>
       invoke<Note>("notes:save", note),
     onSuccess: refresh,
     onError: (error) => toast.error(`Couldn't save the note: ${errorMessage(error)}`),

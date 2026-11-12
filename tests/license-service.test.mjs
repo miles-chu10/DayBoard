@@ -410,7 +410,7 @@ test("future validation timestamp fails closed and refreshes after clock rollbac
 
     if (outcome === "transient") {
       assert.equal((await service.refresh(rollback)).state, "network-error");
-      assert.equal(v.calls.validate.length, 3);
+      assert.equal(v.calls.validate.length, 2); // transient retry is throttled, still fails closed
       assert.equal(s.current().lastValidationAt, NOW.toISOString());
     } else if (outcome === "valid") {
       assert.equal((await service.getStatus(rollback)).state, "licensed");
@@ -1012,4 +1012,23 @@ test("reset sets only an unreadable record aside and leaves transient errors to 
   await assert.rejects(transient.activate(A, "Mac", NOW), /EIO/);
   assert.deepEqual(flaky.replaced, []);
   assert.equal(v.calls.activate.length, 0);
+});
+
+test("transient validation failure backs off without extending offline grace", async () => {
+  let offline = false;
+  const { service, s, v } = await setup(OPTIONS, null, {
+    validate: (_key, instanceId) => {
+      if (offline) throw new Error("offline");
+      return { valid: true, instanceId, license: LICENSE, meta: META };
+    },
+  });
+  await service.activate(A, "Mac", NOW);
+  offline = true;
+  await service.refresh(new Date(+NOW + DAY));
+  const calls = v.calls.validate.length;
+  await service.refresh(new Date(+NOW + DAY + 1000));
+  assert.equal(v.calls.validate.length, calls);
+  assert.equal(s.current().lastValidationAt, NOW.toISOString());
+  await service.refresh(new Date(+NOW + DAY + 60_000));
+  assert.equal(v.calls.validate.length, calls + 1);
 });

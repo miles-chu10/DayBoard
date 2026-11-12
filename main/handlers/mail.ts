@@ -167,6 +167,10 @@ export const mailSchedule = createMailSchedule({
 });
 
 /** Sends every email still in its undo window; quitting runs this before the app exits. */
+export function heldMailCount(): number {
+  return outbox.held();
+}
+
 export async function drainMailOutbox(): Promise<void> {
   await outbox.drain();
   await mailSchedule.drain();

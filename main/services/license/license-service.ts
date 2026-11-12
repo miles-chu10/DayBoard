@@ -160,6 +160,14 @@ export class LicenseService {
   private readonly store: LicenseStore;
   private readonly options: LicenseServiceOptions;
   private pending: Promise<void> = Promise.resolve();
+  private validationRetry: {
+    key: string;
+    instance: string | null;
+    validatedAt: string | null;
+    attemptedAt: number;
+    nextAt: number;
+    attempts: number;
+  } | null = null;
   /** In memory, so the first refresh after each launch retries unconfirmed releases. */
   private nextReleaseRetryAt = 0;
   /** The network phase of a background release retry; never rejects and never takes the lock. */
@@ -497,14 +505,31 @@ export class LicenseService {
       now.getTime() - Date.parse(record.lastValidationAt) >= this.options.revalidateIntervalMs;
     if (!due) return this.computeStatus(record, now);
 
+    const retry = this.validationRetry;
+    const sameActivation =
+      retry?.key === record.licenseKey &&
+      retry.instance === record.instanceId &&
+      retry.validatedAt === record.lastValidationAt;
+    if (sameActivation && now.getTime() >= retry.attemptedAt && now.getTime() < retry.nextAt)
+      return this.computeStatus(record, now);
     let result;
     try {
       result = await this.verifier.validate(record.licenseKey, record.instanceId ?? undefined);
     } catch {
+      const attempts = sameActivation ? retry.attempts + 1 : 1;
+      this.validationRetry = {
+        key: record.licenseKey,
+        instance: record.instanceId,
+        validatedAt: record.lastValidationAt,
+        attemptedAt: now.getTime(),
+        nextAt: now.getTime() + Math.min(3_600_000, 60_000 * 2 ** Math.min(attempts - 1, 6)),
+        attempts,
+      };
       // Network/server unreachable: don't flip validity, just report the current (possibly
       // grace-period) status computed from the unchanged record.
       return this.computeStatus(record, now);
     }
+    this.validationRetry = null;
     if (!result.valid && result.error === "invalid_instance" && record.instanceId)
       return this.reactivate(record, record.licenseKey, now);
     if (result.valid && (!result.meta || !result.license || !result.instanceId)) {

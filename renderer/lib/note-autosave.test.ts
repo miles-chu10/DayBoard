@@ -123,3 +123,44 @@ test("navigation waits for newer edits typed while the first save is in flight",
   assert.equal(autosave.hasPendingChanges(), true);
   await autosave.discard();
 });
+
+test("autosave carries forward acknowledged note versions and retains conflicted text", async () => {
+  const requests: Array<{ expectedUpdatedAt?: number; body: string }> = [];
+  let conflict = false;
+  const autosave = createNoteAutosave({
+    id: "note",
+    updatedAt: 10,
+    persist: async (input) => {
+      requests.push(input);
+      if (conflict) throw new Error("changed elsewhere");
+      return { id: "note", updatedAt: 11 };
+    },
+    onState: () => {},
+  });
+  autosave.change({ title: "Note", body: "first edit" });
+  assert.equal(await autosave.flush(), true);
+  conflict = true;
+  autosave.change({ title: "Note", body: "unsaved edit" });
+  assert.equal(await autosave.flush(), false);
+  assert.equal(autosave.hasPendingChanges(), true);
+  assert.deepEqual(
+    requests.map((item) => item.expectedUpdatedAt),
+    [10, 11],
+  );
+});
+
+test("a conflicting draft can be saved separately, and failed recovery keeps the text", async () => {
+  const { autosave, saves, fixture } = harness("original");
+  const draft = { title: "My edits", body: "Unsaved text" };
+  fixture.fail = true;
+  autosave.change(draft);
+  assert.equal(await autosave.flush(), false);
+  assert.equal(await autosave.saveCopy(draft), false);
+  assert.equal(autosave.hasPendingChanges(), true);
+  fixture.fail = false;
+  assert.equal(await autosave.saveCopy(draft), true);
+  assert.deepEqual(saves.at(-1), draft);
+  assert.equal(autosave.hasPendingChanges(), false);
+  assert.equal(await autosave.flush(), true);
+  assert.equal(saves.length, 3);
+});

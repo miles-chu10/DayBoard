@@ -685,6 +685,7 @@ function registerAgentWriteTools(server: McpServer): void {
         if (!current) return failure("Note not found. IDs come from list_notes.");
         const note = await putNote({
           id: note_id,
+          expectedUpdatedAt: current.updatedAt,
           title: title ?? current.title,
           body,
         });

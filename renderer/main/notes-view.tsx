@@ -136,8 +136,14 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
   const [previewing, setPreviewing] = useState(false);
   const [state, setState] = useState<NoteSaveState>("saved");
   const [deleting, setDeleting] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [autosave] = useState(() =>
-    createNoteAutosave({ id: note?.id, persist: save.mutateAsync, onState: setState }),
+    createNoteAutosave({
+      id: note?.id,
+      updatedAt: note?.updatedAt,
+      persist: save.mutateAsync,
+      onState: setState,
+    }),
   );
 
   function change(next: { title: string; body: string }) {
@@ -162,11 +168,23 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
   useEffect(() => () => void autosave.flush(), [autosave]);
 
   async function back() {
+    if (recovering) return;
     // A failed save has already shown why; stay here so the text can be saved or copied.
     if (await autosave.flush()) onBack();
   }
 
+  async function saveCopy() {
+    if (recovering) return;
+    setRecovering(true);
+    try {
+      if (await autosave.saveCopy({ title, body })) onBack();
+    } finally {
+      setRecovering(false);
+    }
+  }
+
   async function deleteNote() {
+    if (recovering) return;
     const id = await autosave.discard();
     if (id) await remove.mutateAsync(id);
     onBack();
@@ -177,7 +195,13 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
       <ScrollArea
         className="h-full"
         leading={
-          <Button iconOnly aria-label="All notes" title="All notes" onClick={() => void back()}>
+          <Button
+            disabled={recovering}
+            iconOnly
+            aria-label="All notes"
+            title="All notes"
+            onClick={() => void back()}
+          >
             <ChevronLeft />
           </Button>
         }
@@ -200,6 +224,7 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
             </Button>
             <Button
               iconOnly
+              disabled={recovering}
               aria-label="Delete note"
               title="Delete note"
               onClick={() => setDeleting(true)}
@@ -218,7 +243,19 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
             }
           }}
         >
+          {save.isError && (
+            <div role="alert" className="flex flex-col gap-2">
+              <Text>{errorMessage(save.error)}</Text>
+              <Text color="secondary">
+                Your text is still here. Save it as a separate note to keep both versions.
+              </Text>
+              <Button disabled={recovering} onClick={() => void saveCopy()}>
+                Save my edits as a new note
+              </Button>
+            </div>
+          )}
           <Input
+            disabled={recovering}
             aria-label="Note title"
             placeholder="Title"
             value={title}
@@ -238,6 +275,7 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
             </section>
           ) : (
             <Textarea
+              disabled={recovering}
               aria-label="Note"
               placeholder="Write in Markdown…"
               autoFocus={!note}

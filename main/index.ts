@@ -13,7 +13,7 @@ import { startMcpHttpServer } from "./services/mcp-http-server.js";
 import { mcpProjectIdForProfile } from "./services/mcp-port.js";
 import { drainAgendaStore } from "./services/agenda-store.js";
 import { drainProductivityWrites } from "./handlers/productivity.js";
-import { drainMailOutbox } from "./handlers/mail.js";
+import { drainMailOutbox, heldMailCount } from "./handlers/mail.js";
 import { createSaveQuitGuard } from "./services/quit-guard.js";
 import { drainPendingWrites } from "./services/pending-writes.js";
 import { drainSettingsStores } from "./services/settings-store.js";
@@ -36,6 +36,19 @@ async function drainAppWrites(): Promise<void> {
 }
 
 const saveBeforeQuit = createSaveQuitGuard({
+  confirmBeforeDrain: async () => {
+    if (!heldMailCount()) return true;
+    const result = await dialog.showMessageBox({
+      type: "warning",
+      title: "Emails are waiting to send",
+      message: "Send pending emails now and quit?",
+      detail: "Keeping DayBoard open preserves the remaining Undo send time.",
+      buttons: ["Keep Open", "Send and Quit"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    return result.response === 1;
+  },
   drain: async () => {
     await pauseAndDrainAppOperations();
     await drainAppWrites();

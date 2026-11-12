@@ -120,6 +120,7 @@ async function loadHandlers() {
           api.onLoad({ filter: /^store$/, namespace: "history-handler" }, () => ({
             contents: `
             export const getAssistantHistory = async (scope) => globalThis.__assistantHistoryCalls.push(['get', scope]) && { scope, chats: [], activeChatId: null, legacyImported: false };
+            export const normalizeChat = chat => chat;
             export const saveAssistantChat = async (scope, chat) => globalThis.__assistantHistoryCalls.push(['save', scope, chat]) && { scope, chats: [], activeChatId: null, legacyImported: false };
             export const selectAssistantChat = async (scope, id) => globalThis.__assistantHistoryCalls.push(['select', scope, id]) && { scope, chats: [], activeChatId: id, legacyImported: false };
             export const importLegacyAssistantChat = async (scope, messages) => globalThis.__assistantHistoryCalls.push(['import', scope, messages]) && { scope, chats: [], activeChatId: null, legacyImported: false };
@@ -492,4 +493,27 @@ test("user messages keep mention chips, drop empty lists and read files saved be
     await assert.rejects(bad([{ kind: "task", label: "" }]), /invalid mention label/);
     await assert.rejects(bad("Lunch"), /invalid message payload/);
   });
+});
+
+test("coalescing never merges matching chat ids across account scopes", async () => {
+  globalThis.__assistantHistoryHandlers = new Map();
+  globalThis.__assistantHistoryCalls = [];
+  globalThis.__assistantHistoryTrack = (operation) => operation();
+  globalThis.__assistantHistoryScopes = ["google:b", "google:b"];
+  try {
+    (await loadHandlers()).registerAssistantHistoryHandlers();
+    const save = globalThis.__assistantHistoryHandlers.get("assistant:saveChat");
+    const stale = save({}, { expectedScope: "google:a", chat: { id: "shared", title: "old" } });
+    const current = save({}, { expectedScope: "google:b", chat: { id: "shared", title: "new" } });
+    await assert.rejects(stale, /account changed before this save/);
+    await current;
+    assert.deepEqual(globalThis.__assistantHistoryCalls, [
+      ["save", "google:b", { id: "shared", title: "new" }],
+    ]);
+  } finally {
+    delete globalThis.__assistantHistoryHandlers;
+    delete globalThis.__assistantHistoryCalls;
+    delete globalThis.__assistantHistoryScopes;
+    delete globalThis.__assistantHistoryTrack;
+  }
 });
