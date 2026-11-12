@@ -28,6 +28,7 @@ const MARK: Record<AssistantProvider, Mark> = {
   codex: { path: OPENAI_PATH, className: "text-primary" },
   glaze: { path: SPARKLE_PATH, className: "text-accent" },
   gemini: { path: GEMINI_PATH, className: "text-[#4796E3]" },
+  grok: { letter: "x", className: "text-primary" },
   muse: { letter: "M", className: "text-[#0866FF]" },
   openai: { path: OPENAI_PATH, className: "text-primary" },
   anthropic: { path: ANTHROPIC_PATH, className: "text-primary" },

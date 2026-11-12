@@ -142,7 +142,7 @@ async function load(
         }
         if (exposeCli) {
           api.onLoad({ filter: /cli-providers\.ts$/ }, async (args) => ({
-            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, createState};`,
+            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, handleGrokLine, grokArgs, createState};`,
             loader: "ts",
             resolveDir: root + "main/services/ai",
           }));
@@ -1550,10 +1550,10 @@ test("one-shot CLI usage records the configured model id and the model the CLI r
   const gemini = await run("gemini", { geminiModel: "gemini-configured" });
   assert.equal(gemini.requestedModelId, "gemini-configured");
   assert.equal(gemini.modelId, "gemini-resolved");
-  assert.equal(
-    (await run("muse", { museModel: "muse-configured" })).requestedModelId,
-    "muse-configured",
-  );
+  // Grok gets no model flag, so nothing is claimed as requested; Grok reports what ran.
+  const grok = await run("grok", {});
+  assert.equal(grok.requestedModelId, null);
+  assert.equal(grok.modelId, "grok-resolved");
   assert.equal(
     (await run("codex", { codexModel: "codex-configured" })).requestedModelId,
     "codex-configured",
@@ -1629,6 +1629,59 @@ test("Claude-format CLI usage keeps a null input total but reports the known inp
     records.map((record) => record.outputTokens),
     [5, 5, 5, 5, 5],
   );
+});
+test("Grok Build streaming-json becomes text, tools, model and usage", async () => {
+  const cli = await load("main/services/ai/cli-providers.ts", { exposeCli: true });
+  const seen = { text: "", tools: [], models: [], usage: [] };
+  const options = {
+    onDelta: (text) => (seen.text += text),
+    onTool: (event) => seen.tools.push(event),
+    onModel: (id) => seen.models.push(id),
+    onUsage: (record) => seen.usage.push(record),
+  };
+  const grok = cli.createState();
+  for (const event of [
+    { type: "thought", data: "hidden reasoning" },
+    { type: "tool_call", toolCallId: "c1", toolName: "todo_write", status: "in_progress" },
+    { type: "tool_call_update", toolCallId: "c1", status: "completed" },
+    { type: "text", data: "Two meetings " },
+    { type: "text", data: "today." },
+    {
+      type: "end",
+      stopReason: "end_turn",
+      usage: {
+        input_tokens: 80,
+        cache_read_input_tokens: 20,
+        cache_creation_input_tokens: 0,
+        output_tokens: 9,
+      },
+      modelUsage: { "grok-4.7": { inputTokens: 80, outputTokens: 9 } },
+    },
+  ])
+    cli.handleGrokLine(JSON.stringify(event), grok, options);
+  assert.equal(grok.text, "Two meetings today.");
+  assert.deepEqual(seen.models, ["grok-4.7"]);
+  assert.deepEqual(
+    seen.tools.map((tool) => tool.status),
+    ["running", "success"],
+  );
+  assert.equal(seen.usage[0].inputTokens, 100);
+  assert.equal(seen.usage[0].outputTokens, 9);
+  const failed = cli.createState();
+  cli.handleGrokLine(JSON.stringify({ type: "error", message: "Not signed in" }), failed, options);
+  assert.equal(failed.error, "Not signed in");
+});
+test("Grok runs answer-only, with its MCP meta-tools removed and MCP calls denied", async () => {
+  const cli = await load("main/services/ai/cli-providers.ts", { exposeCli: true });
+  const args = cli.grokArgs("/tmp/work", "policy", "question");
+  const value = (flag) => args[args.indexOf(flag) + 1];
+  assert.equal(value("--tools"), "todo_write");
+  assert.equal(value("--disallowed-tools"), "search_tool,use_tool");
+  assert.equal(value("--deny"), "MCPTool(*)");
+  assert.equal(value("--system-prompt-override"), "policy");
+  assert.equal(value("-p"), "question");
+  for (const flag of ["--no-subagents", "--no-plan", "--no-memory", "--disable-web-search"])
+    assert.ok(args.includes(flag), flag);
 });
 test("legacy display tokens use the known input count while the measured record stays null", async () => {
   const report = (options) => {

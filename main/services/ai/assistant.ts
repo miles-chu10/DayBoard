@@ -159,9 +159,9 @@ export async function runAssistant(
       contextWindow: model.contextWindow,
     });
   };
-  // Antigravity and Muse have no per-run MCP configuration, so they answer from the snapshot alone.
+  // Antigravity and Grok get no per-run MCP configuration, so they answer from the snapshot alone.
   const servers =
-    provider === "gemini" || provider === "muse"
+    provider === "gemini" || provider === "grok"
       ? []
       : resolveAssistantMcpServers(
           settings.ai.useMcpInAssistant,
@@ -172,7 +172,7 @@ export async function runAssistant(
     provider === "claude" ||
     provider === "codex" ||
     provider === "gemini" ||
-    provider === "muse"
+    provider === "grok"
   ) {
     const startedAt = Date.now();
     const text = await runCliCompletion({

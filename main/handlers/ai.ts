@@ -231,9 +231,9 @@ export function registerAIHandlers(): void {
       input.provider !== "claude" &&
       input.provider !== "codex" &&
       input.provider !== "gemini" &&
-      input.provider !== "muse"
+      input.provider !== "grok"
     ) {
-      throw new Error("ai:providerStatus: provider must be claude, codex, gemini, or muse");
+      throw new Error("ai:providerStatus: provider must be claude, codex, gemini, or grok");
     }
     if (isDemoMode()) {
       return {
@@ -308,24 +308,24 @@ export function registerAIHandlers(): void {
         claude: false,
         codex: false,
         gemini: false,
-        muse: false,
+        grok: false,
         ...(Object.fromEntries(API_PROVIDERS.map((provider) => [provider, false])) as Record<
           ApiProviderId,
           boolean
         >),
       };
-    const [claude, codex, gemini, muse, keys] = await Promise.all([
+    const [claude, codex, gemini, grok, keys] = await Promise.all([
       resolveCli("claude"),
       resolveCli("codex"),
       resolveCli("gemini"),
-      resolveCli("muse"),
+      resolveCli("grok"),
       getApiKeyStatuses(),
     ]);
     return {
       claude: Boolean(claude),
       codex: Boolean(codex),
       gemini: Boolean(gemini),
-      muse: Boolean(muse),
+      grok: Boolean(grok),
       ...(Object.fromEntries(
         API_PROVIDERS.map((provider) => [provider, keys[provider].configured]),
       ) as Record<ApiProviderId, boolean>),

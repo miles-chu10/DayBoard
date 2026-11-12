@@ -146,19 +146,6 @@ export function useAllApiModels(available: ProviderAvailability | undefined) {
   ) as Record<ApiProviderId, ApiModelInfo[] | undefined>;
 }
 
-export function MuseModelField({ settings, edit }: { settings: AppSettings; edit: SettingsEdit }) {
-  return (
-    <Field label="Model" description="Muse Spark models from your Meta account.">
-      <SettingSelect
-        label="Muse model"
-        value={settings.ai.museModel}
-        options={modelChoices("muse", settings.ai, {})}
-        onChange={(value) => edit((draft) => applyModelChoice(draft.ai, "muse", value, {}))}
-      />
-    </Field>
-  );
-}
-
 export function useGeminiModels(enabled: boolean) {
   return useQuery({
     queryKey: ["gemini-models"],
