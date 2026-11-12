@@ -21,6 +21,10 @@ columns in the main window easier to resize.
 - **Easier column resizing.** The dividers beside the sidebar and the side panel highlight when
   you point at them and while you drag. Double-click a divider to return its column to the default
   width (#124).
+- **Grok replaces Muse under subscription accounts.** Settings → AI → Subscription accounts now
+  lists Grok, which uses a SuperGrok or X subscription through xAI's Grok Build CLI (`grok login`).
+  Grok answers questions only and does not use MCP servers. Muse is no longer listed; if you had
+  picked it, DayBoard goes back to the default and asks you to choose again (#128).
 
 ## Updating
 
