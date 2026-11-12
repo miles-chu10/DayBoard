@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "@renderer/ui";
 import type {
+  ItemListInfo,
   AccountsStatus,
   AgendaCreateBlockInput,
   AgendaDuplicateLink,
@@ -37,6 +38,7 @@ export const queryKeys = {
   calendarRange: (startDate: string, days: number) =>
     ["calendar", "range", startDate, days] as const,
   calendars: ["calendars"],
+  itemLists: (source: "tasks" | "reminders") => ["item-lists", source] as const,
   review: ["review"],
   mcpServers: ["mcp-servers"],
   assistantMcp: ["assistant-mcp"],
@@ -157,6 +159,16 @@ export function useCalendars(enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.calendars,
     queryFn: () => invoke<CalendarListResult>("calendar:listCalendars"),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Google Tasks lists or Apple Reminders lists, for choosing which ones appear. */
+export function useItemLists(source: "tasks" | "reminders", enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.itemLists(source),
+    queryFn: () => invoke<ItemListInfo[]>(`${source}:lists`),
     enabled,
     staleTime: 5 * 60_000,
   });

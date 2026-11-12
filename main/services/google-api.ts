@@ -5,6 +5,7 @@ import type {
   CreateTaskInput,
   GoogleAccess,
   GoogleCalendarInfo,
+  ItemListInfo,
   MailItem,
   SourceCoverage,
   TaskItem,
@@ -207,6 +208,13 @@ async function listTasksWith(query: URLSearchParams): Promise<BoundedList<TaskIt
       loaded: items.length,
     },
   };
+}
+
+export async function listTaskLists(): Promise<ItemListInfo[]> {
+  const listUrl = new URL(`${TASKS}/users/@me/lists`);
+  listUrl.searchParams.set("maxResults", String(GOOGLE_TASK_PAGE_SIZE));
+  const lists = await collectPages<GTaskList>(listUrl, TASK_LIST_CAP);
+  return lists.items.map((list) => ({ id: list.id, title: list.title }));
 }
 
 export function listTasks(): Promise<TaskItem[]> {

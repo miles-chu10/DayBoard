@@ -119,6 +119,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     followUpDays: 3,
   },
   calendar: { range: "next-7-days", visibility: {} },
+  lists: { tasks: {}, reminders: {} },
   privacy: { usageCheckIn: true },
   mcpServer: { enabled: false, allowWrites: false },
   ai: {
@@ -239,10 +240,15 @@ export function normalizeSettings(value: unknown): AppSettings {
   const meetings = record(system.meetings);
   const defaults = DEFAULT_SETTINGS;
 
-  const visibility: Record<string, boolean> = {};
-  for (const [id, visible] of Object.entries(record(calendar.visibility))) {
-    if (typeof visible === "boolean") visibility[id] = visible;
-  }
+  const visibilityMap = (value: unknown): Record<string, boolean> => {
+    const map: Record<string, boolean> = {};
+    for (const [id, visible] of Object.entries(record(value))) {
+      if (typeof visible === "boolean") map[id] = visible;
+    }
+    return map;
+  };
+  const visibility = visibilityMap(calendar.visibility);
+  const lists = record(root.lists);
 
   return {
     general: {
@@ -290,6 +296,10 @@ export function normalizeSettings(value: unknown): AppSettings {
         LEGACY_CALENDAR_DAYS[Number(calendar.daysAhead)] ?? defaults.calendar.range,
       ),
       visibility,
+    },
+    lists: {
+      tasks: visibilityMap(lists.tasks),
+      reminders: visibilityMap(lists.reminders),
     },
     privacy: {
       usageCheckIn: bool(privacy.usageCheckIn, defaults.privacy.usageCheckIn),
@@ -384,8 +394,8 @@ export function normalizeSettings(value: unknown): AppSettings {
 /** Whether a settings change affects which source data the backend fetches. */
 export function settingsAffectData(previous: AppSettings, next: AppSettings): boolean {
   return (
-    JSON.stringify([previous.sources, previous.mail, previous.calendar]) !==
-    JSON.stringify([next.sources, next.mail, next.calendar])
+    JSON.stringify([previous.sources, previous.mail, previous.calendar, previous.lists]) !==
+    JSON.stringify([next.sources, next.mail, next.calendar, next.lists])
   );
 }
 
