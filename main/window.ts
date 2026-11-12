@@ -230,9 +230,9 @@ export function setupApplicationMenu(options: {
           label: "Check for Updates…",
           id: "check-updates",
           click: () => {
-            void openSettingsWindow("updates")
-              .then(() => options.checkForUpdates())
-              .catch((error) => logger.warn("updates", "Could not open updates", error));
+            void options
+              .checkForUpdates()
+              .catch((error) => logger.warn("updates", "Could not check for updates", error));
           },
         },
         { type: "separator" },

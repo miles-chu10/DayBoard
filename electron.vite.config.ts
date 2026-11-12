@@ -138,6 +138,7 @@ export default defineConfig({
           main: fromRoot("main-window.html"),
           settings: fromRoot("settings-window.html"),
           panel: fromRoot("panel-window.html"),
+          update: fromRoot("update-window.html"),
         },
       },
     },

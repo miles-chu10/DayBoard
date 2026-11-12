@@ -111,7 +111,7 @@ if (acquireSingleInstanceLock()) {
       });
       const usageCheckIn = registerUsageCheckIn();
       setupApplicationMenu({
-        checkForUpdates: () => updates!.check(),
+        checkForUpdates: () => updates!.checkNow(),
         openQuickCapture: () => void showPanel("capture"),
         openMenuBarAgenda: () => void showPanel("menubar"),
       });
