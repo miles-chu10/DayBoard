@@ -27,5 +27,10 @@
     "ENVIRONMENT": "REPLACE_WITH_test_OR_live",
     "ACTIVATION_LIMIT": "3",
     "SITE_ORIGIN": "REPLACE_WITH_WEBSITE_HTTPS_ORIGIN",
+    // Optional. With the RESEND_API_KEY secret, emails each buyer their license key. Leave it
+    // out to keep the email off. See "License key email" in README.md.
+    // "MAIL_FROM": "REPLACE_WITH_SENDER_NAME <REPLACE_WITH_ADDRESS_ON_A_RESEND_VERIFIED_DOMAIN>",
   },
+  // Retries license key emails that haven't been sent. It does nothing while the email is off.
+  "triggers": { "crons": ["*/15 * * * *"] },
 }
