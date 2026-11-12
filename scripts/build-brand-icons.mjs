@@ -1,5 +1,6 @@
 // Builds every DayBoard logo file from the geometry below: the SVG masters in brand/, their PNGs,
-// app-icon.png, app-icon.icns, the menu-bar template images and the website icons. Run with:
+// app-icon.png, app-icon.icns, the menu-bar template images, the website icons and the copy of the
+// header icon inside billing/src/assets.ts. Run with:
 //   node scripts/build-brand-icons.mjs
 // It renders in headless Chromium through Playwright (a devDependency), so it needs no macOS tool.
 // Set DAYBOARD_CHROMIUM to a Chromium binary when Playwright's own browser isn't installed.
@@ -95,13 +96,30 @@ const SMALL_ROWS = {
   radius: 22,
   beam: { left: 362, width: 300 },
 };
-function smallMaster() {
+// The squircle fills the 824 px body of the grid; BODY crops the transparent margin away.
+const BODY = "100 100 824 824";
+function smallMaster(viewBox) {
   const art = rows(SMALL_ROWS);
   const shape = squircle();
-  return svg(`<defs>${gradient}</defs>
+  return svg(
+    `<defs>${gradient}</defs>
 <path d="${shape}" fill="url(#tile)"/>
 ${art.base}
-${art.lit}`);
+${art.lit}`,
+    viewBox,
+  );
+}
+
+// The small art on a full-bleed square, for the website header, which rounds the corners in CSS.
+function siteTile() {
+  const art = rows(SMALL_ROWS);
+  return svg(
+    `<defs>${gradient}</defs>
+<rect x="100" y="100" width="824" height="824" fill="url(#tile)"/>
+${art.base}
+${art.lit}`,
+    BODY,
+  );
 }
 
 // Full-bleed square for surfaces that apply their own mask.
@@ -252,9 +270,19 @@ fs.writeFileSync(path.join(tray, "trayTemplate.png"), await png(masters.menuBar,
 fs.writeFileSync(path.join(tray, "trayTemplate@2x.png"), await png(masters.menuBar, 32));
 
 const site = out("website", "assets");
-fs.writeFileSync(path.join(site, "icon-32.png"), await png(masters.small, 32));
-fs.writeFileSync(path.join(site, "icon-96.png"), await png(masters.small, 96));
+fs.writeFileSync(path.join(site, "icon-32.png"), await png(smallMaster(BODY), 32));
+fs.writeFileSync(path.join(site, "icon-96.png"), await png(siteTile(), 96, { opaque: true }));
 fs.writeFileSync(path.join(site, "icon-180.png"), await png(masters.square, 180, { opaque: true }));
 
+// The billing Worker serves its own copy of the website header icon to the buy and receipt pages.
+const billingAssets = out("billing", "src", "assets.ts");
+const encoded = fs.readFileSync(path.join(site, "icon-96.png")).toString("base64");
+fs.writeFileSync(
+  billingAssets,
+  fs
+    .readFileSync(billingAssets, "utf8")
+    .replace(/(const ICON_PNG =\s*")[A-Za-z0-9+/=]+(")/, `$1${encoded}$2`),
+);
+
 await browser.close();
-console.log("Wrote the brand masters, app icon, menu-bar images and website icons.");
+console.log("Wrote the brand masters, app icon, menu-bar images, website icons and billing icon.");

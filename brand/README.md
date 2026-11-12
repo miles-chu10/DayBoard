@@ -13,6 +13,6 @@ The SVGs are plain shapes with no embedded font.
 
 ## Regenerating
 
-Run `node scripts/build-brand-icons.mjs`. The geometry and colors live in that script. It writes the four SVG masters, their PNGs, `app-icon.png`, `app-icon.icns`, the two menu-bar template images and the website's `icon-32.png`, `icon-96.png` and `icon-180.png`, rendering in headless Chromium through Playwright. It needs no macOS tool: the `.icns` container is written directly, with the 16 and 32 px entries from the small master and every larger size from the main master.
+Run `node scripts/build-brand-icons.mjs`. The geometry and colors live in that script. It writes the four SVG masters, their PNGs, `app-icon.png`, `app-icon.icns`, the two menu-bar template images and the website's `icon-32.png`, `icon-96.png` and `icon-180.png`, and the copy of `icon-96.png` that `billing/src/assets.ts` embeds for the buy and receipt pages, rendering in headless Chromium through Playwright. It needs no macOS tool: the `.icns` container is written directly, with the 16 and 32 px entries from the small master and every larger size from the main master. The website's `icon-96.png` is the small art on a full square, because the site header rounds its corners in CSS, and `icon-32.png` is the small master cropped to the squircle so the favicon fills its box.
 
 The Fraunces "D" with three dots was the mark until November 2026.
