@@ -127,13 +127,13 @@ class SourceUnavailable extends Error {}
 async function ensureSource(source: SourceId): Promise<void> {
   const settings = await getSettings();
   if (!settings.sources[source].enabled) {
-    throw new SourceUnavailable(`${SOURCE_NAMES[source]} is turned off in Dayboard settings.`);
+    throw new SourceUnavailable(`${SOURCE_NAMES[source]} is turned off in DayBoard settings.`);
   }
   if (source === "reminders") {
     const access = await getRemindersAccess();
     if (access !== "full-access") {
       throw new SourceUnavailable(
-        "Dayboard doesn't have Reminders access. Grant it from the app's Settings.",
+        "DayBoard doesn't have Reminders access. Grant it from the app's Settings.",
       );
     }
   }
@@ -185,8 +185,10 @@ function run<A>(source: SourceId, body: (args: A) => Promise<ToolResult>) {
       if (error instanceof GoogleAuthError) {
         return failure(
           error.reason === "needs-setup"
-            ? "Google isn't set up in Dayboard. Add the Google account in the app's Settings."
-            : "Dayboard's Google account isn't connected. Reconnect it in the app's Settings.",
+            ? "Google isn't set up in DayBoard. Add the Google account in the app's Settings."
+            : error.reason === "not-granted"
+              ? "DayBoard wasn't given this Google permission. Sign in again in the app's Settings and allow it."
+              : "DayBoard's Google account isn't connected. Reconnect it in the app's Settings.",
         );
       }
       logger.error("mcp", `${source} tool failed`, error);
@@ -196,7 +198,7 @@ function run<A>(source: SourceId, body: (args: A) => Promise<ToolResult>) {
 }
 
 const WRITES_OFF_MESSAGE =
-  'Changes are turned off in Dayboard. Turn on "Allow changes" in Settings → MCP Servers.';
+  'Changes are turned off in DayBoard. Turn on "Allow changes" in Settings → MCP Servers.';
 
 /**
  * Write tools re-check the switch per call, so turning changes off applies to open sessions.
@@ -865,7 +867,7 @@ async function authorizeExternalClient(request: RequestHeaders) {
     // 503, not 403: the key may be fine, so clients shouldn't report it as rejected.
     return {
       status: 503,
-      message: "Dayboard's MCP server is turned off. Turn it on in Settings → MCP Servers.",
+      message: "DayBoard's MCP server is turned off. Turn it on in Settings → MCP Servers.",
     };
   }
   return (await isValidMcpBearer(authorizationHeader(request)))

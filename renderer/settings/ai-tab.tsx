@@ -33,6 +33,7 @@ import {
 } from "../lib/model-choices";
 import { errorMessage, invoke } from "../lib/ipc";
 import { useClaudeModels } from "../lib/ai-models";
+import { AIConsentDialog } from "../components/ai-consent-dialog";
 import { ProviderMark } from "../components/provider-logo";
 import {
   API_KEY_PROVIDERS,
@@ -118,6 +119,41 @@ const PROVIDER_GROUPS: { title: string; providers: readonly AIProvider[] }[] = [
 /** App Review 5.1.2(i): say which third-party AI receives personal data before it is sent. */
 function aiSharingDisclosure(provider: AIProvider): string {
   return `When on, the tasks, email, events and notes each AI feature uses are sent to ${PROVIDER_LABEL[provider]} with your API key, and Assistant messages go to the provider you pick in the composer. Nothing is sent while this is off.`;
+}
+
+/** Shown before AI is turned on: Google's user data policy requires consent before Google data reaches an AI provider. */
+function EnableAIField({ ai, edit }: { ai: AppSettings["ai"]; edit: SettingsEdit }) {
+  const [confirming, setConfirming] = useState(false);
+  const setEnabled = (enabled: boolean) =>
+    edit((draft) => {
+      draft.ai.enabled = enabled;
+    });
+
+  return (
+    <Field
+      label="Enable AI"
+      description={
+        !ai.providerChosen
+          ? "Choose a provider below before enabling AI."
+          : isAppStoreBuild
+            ? aiSharingDisclosure(ai.provider)
+            : "Turn off to hide every AI feature in the dashboard."
+      }
+    >
+      <Switch
+        checked={ai.enabled}
+        disabled={!ai.providerChosen}
+        onCheckedChange={(checked) => (checked ? setConfirming(true) : setEnabled(false))}
+        aria-label="Enable AI"
+      />
+      <AIConsentDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        provider={ai.provider}
+        onConfirm={() => setEnabled(true)}
+      />
+    </Field>
+  );
 }
 
 function ProviderStatusRow({ provider }: { provider: CliProviderId }) {
@@ -395,27 +431,7 @@ export function AITab() {
   return (
     <>
       <FieldSet title="AI Features">
-        <Field
-          label="Enable AI"
-          description={
-            !ai.providerChosen
-              ? "Choose a provider below before enabling AI."
-              : isAppStoreBuild
-                ? aiSharingDisclosure(ai.provider)
-                : "Turn off to hide every AI feature in the dashboard."
-          }
-        >
-          <Switch
-            checked={ai.enabled}
-            disabled={!ai.providerChosen}
-            onCheckedChange={(checked) =>
-              edit((draft) => {
-                draft.ai.enabled = checked;
-              })
-            }
-            aria-label="Enable AI"
-          />
-        </Field>
+        <EnableAIField ai={ai} edit={edit} />
       </FieldSet>
 
       {!ai.providerChosen ? (
