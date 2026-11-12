@@ -12,6 +12,7 @@
     "dev": "electron-vite dev",
     "predev": "npm run build:native",
     "build:native": "node scripts/build-reminders-helper.mjs",
+    "changelog": "tsx scripts/changelog.ts",
     "build": "npm run build:native && electron-vite build",
     "build:beta": "DAYBOARD_LICENSE=off DAYBOARD_REQUIRE_GOOGLE=1 npm run build",
     "postbuild": "node scripts/generate-notices.mjs",

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAppStoreBuild } from "@shared/app-store-build";
-import type { AppUpdateState } from "@shared/app-updates";
-import { Button, Callout, Field, FieldSet, Status } from "../ui";
+import type { AppUpdateState, UpdatePreferences } from "@shared/app-updates";
+import { Button, Callout, Field, FieldSet, Status, Switch } from "../ui";
 import { errorMessage, invoke } from "../lib/ipc";
 
 import { appUpdatesQueryKey as queryKey, useAppUpdates } from "../lib/app-updates";
@@ -19,6 +19,18 @@ export function UpdatesTab() {
     onError: (error) => setActionError(errorMessage(error)),
   });
 
+  const preferences = useQuery({
+    queryKey: ["update-preferences"],
+    queryFn: () => invoke<UpdatePreferences>("updates:preferences"),
+  });
+  const automatic = useMutation({
+    mutationFn: (enabled: boolean) =>
+      invoke<UpdatePreferences>("updates:setAutomaticDownload", enabled),
+    onMutate: () => setActionError(null),
+    onSuccess: (next) => client.setQueryData(["update-preferences"], next),
+    onError: (error) => setActionError(errorMessage(error)),
+  });
+
   const state = query.data;
   const busy =
     action.isPending ||
@@ -29,7 +41,7 @@ export function UpdatesTab() {
       description={
         isAppStoreBuild
           ? "The Mac App Store installs DayBoard updates."
-          : "DayBoard checks for updates and downloads them in the background. An update installs when you restart or quit DayBoard."
+          : "DayBoard checks for updates in the background and shows what's new before installing."
       }
     >
       {query.isError ? (
@@ -46,6 +58,20 @@ export function UpdatesTab() {
           <Field label="Installed version">
             <span>{state.currentVersion}</span>
           </Field>
+          {state.phase === "unavailable" ? null : (
+            <Field
+              label="Download and install updates automatically"
+              description="Updates download in the background and install when you quit DayBoard. When off, DayBoard asks first."
+              orientation="horizontal"
+            >
+              <Switch
+                checked={preferences.data?.automaticDownload ?? false}
+                disabled={!preferences.data || automatic.isPending}
+                onCheckedChange={(checked) => automatic.mutate(checked)}
+                aria-label="Download and install updates automatically"
+              />
+            </Field>
+          )}
           <Field>
             <p role="status" className="text-small text-secondary">
               {state.message}

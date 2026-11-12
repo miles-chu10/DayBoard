@@ -503,3 +503,34 @@ test("restart stays unavailable until Squirrel.Mac has staged the download", asy
   assert.equal((await item.service.install()).phase, "installing");
   assert.equal(item.updater.calls.install, 1);
 });
+
+test("a declined background download leaves the update available and checks again", async () => {
+  const asked = [];
+  const item = fixture({
+    automaticDelayMs: 1,
+    automaticIntervalMs: 2,
+    shouldDownloadAutomatically: async (version) => {
+      asked.push(version);
+      return false;
+    },
+  });
+  const stop = item.service.startAutomatic();
+  await until(() => item.updater.calls.check >= 3);
+  stop();
+  assert.equal(item.updater.calls.download, 0);
+  assert.equal(item.service.status().phase, "available");
+  assert.ok(asked.length >= 2);
+  assert.ok(asked.every((version) => version === "1.3.0-beta.2"));
+});
+
+test("an approved background download proceeds as before", async () => {
+  const item = fixture({
+    automaticDelayMs: 1,
+    automaticIntervalMs: 50,
+    shouldDownloadAutomatically: () => true,
+  });
+  const stop = item.service.startAutomatic();
+  await until(() => item.service.status().phase === "downloaded");
+  stop();
+  assert.equal(item.updater.calls.download, 1);
+});
