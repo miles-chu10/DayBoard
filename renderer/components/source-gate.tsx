@@ -4,7 +4,8 @@ import { Button, Callout, EmptyState } from "@renderer/ui";
 import type { SourceResult } from "@main/shared-types";
 
 import { errorMessage, invoke, openSettings } from "../lib/ipc";
-import { useConnectGoogle, useRequestRemindersAccess } from "../lib/queries";
+import { useRequestRemindersAccess } from "../lib/queries";
+import { GoogleConnect, GoogleReconnectButton } from "./google-sign-in";
 import { RowsSkeleton } from "./section-card";
 
 type UnavailableResult = Exclude<SourceResult<unknown>, { state: "ok" }>;
@@ -39,7 +40,6 @@ export function SourceGate<T>({
 }
 
 function SourceEmptyState({ result, label }: { result: UnavailableResult; label: string }) {
-  const connect = useConnectGoogle();
   const requestAccess = useRequestRemindersAccess();
 
   switch (result.state) {
@@ -67,11 +67,16 @@ function SourceEmptyState({ result, label }: { result: UnavailableResult; label:
           placement="viewport"
           title="Google Isn't Connected"
           description={`Sign in with Google to show your ${label}.`}
-          actions={
-            <Button onClick={() => connect.mutate()}>
-              {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
-            </Button>
-          }
+          actions={<GoogleConnect />}
+        />
+      );
+    case "not-granted":
+      return (
+        <EmptyState
+          placement="viewport"
+          title="Google Permission Needed"
+          description={`DayBoard wasn’t given permission to show your ${label}. Sign in again and tick it on Google’s screen.`}
+          actions={<GoogleReconnectButton />}
         />
       );
     case "no-access":
@@ -79,7 +84,7 @@ function SourceEmptyState({ result, label }: { result: UnavailableResult; label:
         <EmptyState
           placement="viewport"
           title="Allow Reminders Access"
-          description="Dashboard needs permission to show and update your Apple Reminders."
+          description="DayBoard needs permission to show and update your Apple Reminders."
           actions={
             <Button onClick={() => requestAccess.mutate()} disabled={requestAccess.isPending}>
               Allow Access
@@ -90,7 +95,7 @@ function SourceEmptyState({ result, label }: { result: UnavailableResult; label:
         <EmptyState
           placement="viewport"
           title="Reminders Access Is Off"
-          description="Turn on access for Dashboard in System Settings → Privacy & Security → Reminders."
+          description="Turn on access for DayBoard in System Settings → Privacy & Security → Reminders."
           actions={
             <Button onClick={() => void invoke("reminders:openSettings")}>
               Open Privacy Settings
@@ -110,6 +115,7 @@ export function sourceHint(
   if (result.state === "no-access") return `Allow Reminders access to see ${label}.`;
   if (result.state === "needs-setup")
     return `Google sign-in isn't available for ${label} in this build.`;
+  if (result.state === "not-granted") return `Sign in again and allow ${label} on Google’s screen.`;
   return `Sign in with Google to see ${label}.`;
 }
 
@@ -119,5 +125,6 @@ export function sourceStatusShort(result: SourceResult<unknown> | undefined): st
   if (result.state === "no-access") return "Needs access";
   if (result.state === "needs-setup") return "Sign-in unavailable";
   if (result.state === "disabled") return "Turned off";
+  if (result.state === "not-granted") return "Needs permission";
   return "Not signed in";
 }

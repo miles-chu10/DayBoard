@@ -3,6 +3,7 @@ import type {
   CalendarListResult,
   CreateEventInput,
   CreateTaskInput,
+  GoogleAccess,
   GoogleCalendarInfo,
   MailItem,
   SourceCoverage,
@@ -43,12 +44,19 @@ function describeGoogleError(body: string): string {
   return body.slice(0, 200);
 }
 
+function accessForUrl(url: string): GoogleAccess | undefined {
+  if (url.startsWith(TASKS)) return "tasks";
+  if (url.startsWith(GMAIL)) return "mail";
+  if (url.startsWith(CALENDAR)) return "calendar";
+  return undefined;
+}
+
 async function googleFetch<T>(
   url: string,
   init: { method?: string; body?: unknown } = {},
   attempt = 0,
 ): Promise<T> {
-  const token = await getGoogleAccessToken();
+  const token = await getGoogleAccessToken(accessForUrl(url));
   const method = init.method ?? "GET";
   const response = await fetch(url, {
     method,

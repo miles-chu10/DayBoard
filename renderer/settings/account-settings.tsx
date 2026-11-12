@@ -3,11 +3,15 @@ import { Button, Field, FieldSet, Status, toast } from "@renderer/ui";
 import type { AccountsStatus, GoogleAccountStatus, RemindersAccess } from "@main/shared-types";
 
 import { errorMessage, invoke } from "../lib/ipc";
-import { queryKeys, useConnectGoogle, useRequestRemindersAccess } from "../lib/queries";
+import { queryKeys, useRequestRemindersAccess } from "../lib/queries";
+import {
+  GoogleConnect,
+  GoogleReconnectButton,
+  missingAccessText,
+} from "../components/google-sign-in";
 
 export function GoogleSettings({ status }: { status: GoogleAccountStatus | undefined }) {
   const queryClient = useQueryClient();
-  const connect = useConnectGoogle();
 
   const onAccountsChanged = (next: AccountsStatus) =>
     queryClient.setQueryData(queryKeys.accounts, next);
@@ -40,10 +44,16 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
         <Field label="Account" description={status.email ?? "Signed in"}>
           <Status variant="success">Connected</Status>
         </Field>
+        {status.missingAccess.length > 0 ? (
+          <Field
+            label="Permissions"
+            description={`${missingAccessText(status.missingAccess)} Sign in again and tick ${status.missingAccess.length === 1 ? "it" : "them"} on Google’s screen to turn ${status.missingAccess.length === 1 ? "it" : "them"} on.`}
+          >
+            <Status variant="warning">Some are off</Status>
+          </Field>
+        ) : null}
         <Field>
-          <Button onClick={() => connect.mutate()}>
-            {connect.isPending ? "Restart Google sign-in" : "Sign in again"}
-          </Button>
+          <GoogleReconnectButton />
           <Button onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
             Sign out
           </Button>
@@ -68,9 +78,7 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
         <Status variant="neutral">Not signed in</Status>
       </Field>
       <Field>
-        <Button variant="accent" onClick={() => connect.mutate()} disabled={!status.hasCredentials}>
-          {connect.isPending ? "Restart Google sign-in" : "Sign in with Google"}
-        </Button>
+        <GoogleConnect disabled={!status.hasCredentials} />
       </Field>
     </FieldSet>
   );

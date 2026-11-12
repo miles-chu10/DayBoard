@@ -1,17 +1,19 @@
 # DayBoard logo
 
-The logo is a Fraunces serif "D" in paper color (`#f6f2ea`) on ink (`#1d1b17`). Inside the letter sit three dots in the source colors: Calendar green `#22a23f`, Tasks blue `#007aff` and Reminders orange `#d07900`. It uses the website's display font and palette.
+The mark is "Sunbeam": four rows of a board on a dark tile, crossed by a diagonal beam of light. Where the beam falls, each row shows its source color, top to bottom: Tasks blue `#0a84ff`, Calendar green `#30d158`, Reminders orange `#ff9f0a` and Mail red `#ff453a` (the dark-theme source colors in `renderer/theme.css`). The tile runs from `#23262f` to `#0e0f14` and the unlit rows are `#2f3342`.
 
-| File                                                        | Use                                                                                                                                                                          |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dayboard-icon.svg`, `dayboard-icon-1024.png`               | macOS app icon master: a squircle on Apple's 1024 grid (824 px body, 100 px margin, soft shadow). Source of `app-icon.png` and of the 64 px and larger `app-icon.icns` sizes |
-| `dayboard-icon-small.svg`, `dayboard-icon-small-1024.png`   | The same mark with a larger D and dots, for 32 px and smaller: the 16/32 `.icns` sizes, the favicon and the website header icon                                              |
-| `dayboard-icon-square.svg`, `dayboard-icon-square-1024.png` | Full-bleed square for surfaces that apply their own mask: the Apple touch icon, the Glaze app icon, social avatars and the Google OAuth consent-screen logo                  |
+| File                                                        | Use                                                                                                                                                                                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dayboard-icon.svg`, `dayboard-icon-1024.png`               | macOS app icon master: a squircle on Apple's 1024 grid (824 px body, 100 px margin, soft shadow) with the faint beam across the tile. Source of `app-icon.png` and of the 64 px and larger `app-icon.icns` sizes |
+| `dayboard-icon-small.svg`, `dayboard-icon-small-1024.png`   | The same mark with heavier rows and no faint beam, for 32 px and smaller: the 16/32 `.icns` sizes, the favicon and the website header icon                                                                       |
+| `dayboard-icon-square.svg`, `dayboard-icon-square-1024.png` | Full-bleed square for surfaces that apply their own mask: the Apple touch icon, social avatars and the Google OAuth consent-screen logo                                                                          |
+| `dayboard-menubar-color.svg`                                | The menu-bar icon on a 16 px grid: four gray rows, with the beam lighting each in its source color. Source of `main/system-panels/assets/tray*.png`                                                              |
+| `dayboard-menubar.svg`                                      | The one-color glyph on the same grid, with the beam as a diagonal gap, for surfaces that need a single color                                                                                                     |
 
-The SVGs embed Fraunces (SIL Open Font License, `website/assets/fonts/OFL-Fraunces.txt`) so they render without the font installed.
+The SVGs are plain shapes with no embedded font.
 
 ## Regenerating
 
-1. Render an SVG at 1024 × 1024 with a transparent background, for example with headless Chrome: `--headless=new --window-size=1024,1024 --default-background-color=00000000 --screenshot=out.png file:///path/to/icon.html`, where the HTML page contains only the SVG. Chrome writes the PNG but may not exit on its own.
-2. Build `app-icon.icns` with `iconutil -c icns DayBoard.iconset -o app-icon.icns`. Take `icon_16x16`, `icon_16x16@2x` and `icon_32x32` from the small master, and every larger size from the main master (resize with `sips -z`).
-3. Website: `icon-32.png` and `icon-96.png` come from the small master, and `icon-180.png` from the square master.
+Run `node scripts/build-brand-icons.mjs`. The geometry and colors live in that script. It writes the five SVG masters, their PNGs, `app-icon.png`, `app-icon.icns`, the two menu-bar images and the website's `icon-32.png`, `icon-96.png` and `icon-180.png`, and the copy of `icon-96.png` that `billing/src/assets.ts` embeds for the buy and receipt pages, rendering in headless Chromium through Playwright. It needs no macOS tool: the `.icns` container is written directly, with the 16 and 32 px entries from the small master and every larger size from the main master. The website's `icon-96.png` is the small art on a full square, because the site header rounds its corners in CSS, and `icon-32.png` is the small master cropped to the squircle so the favicon fills its box.
+
+The Fraunces "D" with three dots was the mark until November 2026.

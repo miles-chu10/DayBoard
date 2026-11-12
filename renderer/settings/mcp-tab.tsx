@@ -284,8 +284,8 @@ function ExternalMcpSettings() {
 
   return (
     <FieldSet
-      title="Dayboard MCP Server"
-      description="Let Claude Code, Codex, and other MCP clients on this Mac use your Dayboard sources while the app is running. Clients need your access key."
+      title="DayBoard MCP Server"
+      description="Let Claude Code, Codex, and other MCP clients on this Mac use your DayBoard sources while the app is running. Clients need your access key."
     >
       <Field
         label="Allow MCP clients"
@@ -384,8 +384,8 @@ export function McpTab() {
     try {
       const status = await invoke<BuiltInMcpStatus>("mcp:assistantTest");
       setBuiltInStatus(status);
-      if (status.ok) toast.success("Dayboard MCP connected");
-      else toast.error("Dayboard MCP connection failed");
+      if (status.ok) toast.success("DayBoard MCP connected");
+      else toast.error("DayBoard MCP connection failed");
     } catch (error) {
       setBuiltInStatus({ state: "error", ok: false, toolCount: 0 });
       toast.error(errorMessage(error));
@@ -407,7 +407,7 @@ export function McpTab() {
         description="Connect Model Context Protocol servers so the Assistant can use their tools with Claude or ChatGPT."
       >
         <Field
-          label="Dayboard"
+          label="DayBoard"
           description="Built into the Assistant while this app is running. It can read tasks, reminders, inbox, email, calendar, and weekly review data."
         >
           <div className="flex items-center gap-3">
@@ -440,7 +440,7 @@ export function McpTab() {
             label="Use MCP tools in Assistant"
             description={
               featureOn(settings, "assistant")
-                ? "Let the Assistant use Dayboard tools and your enabled servers."
+                ? "Let the Assistant use DayBoard tools and your enabled servers."
                 : "Turn on the Assistant in the AI tab to use these tools."
             }
           >
@@ -471,7 +471,7 @@ export function McpTab() {
         ) : servers.data.length === 0 ? (
           <Field
             label="No custom servers"
-            description="Dayboard tools are already included. Add other services here."
+            description="DayBoard tools are already included. Add other services here."
           />
         ) : (
           servers.data.map((server) => (

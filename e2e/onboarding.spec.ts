@@ -54,6 +54,7 @@ async function standInFreshMac(app: ElectronApplication) {
         connected: google,
         email: google ? "you@example.com" : null,
         clientIdHint: null,
+        missingAccess: [],
       },
       reminders,
     });
@@ -117,6 +118,11 @@ for (const theme of ["light", "dark"] as const) {
       await shot("2-connect");
 
       await dialog.getByRole("button", { name: "Sign in with Google" }).click();
+      // Google sign-in always starts from the data disclosure.
+      const disclosure = page.getByTestId("google-disclosure");
+      await expect(disclosure).toContainText("DayBoard never sends or deletes mail");
+      await disclosure.getByRole("button", { name: "Continue with Google" }).click();
+      await expect(disclosure).toHaveCount(0);
       await expect(dialog.getByText("you@example.com")).toBeVisible();
       await expect(preview).toContainText("Design review");
       await expect(preview.getByText("Connect Google")).toHaveCount(0);
@@ -202,6 +208,13 @@ test("Turn on AI saves the chosen provider and moves on", async () => {
       .getByRole("radio", { name: /Claude/ })
       .click();
     await dialog.getByRole("button", { name: "Turn on AI" }).click();
+    // AI turns on only after the data-sharing consent.
+    const consent = page.getByRole("alertdialog", { name: "Turn on AI features?" });
+    await expect(consent.getByTestId("ai-disclosure")).toContainText(
+      "that feature needs to Claude,",
+    );
+    await consent.getByRole("button", { name: "Turn On AI", exact: true }).click();
+    await expect(consent).toHaveCount(0);
     await expect(dialog.getByRole("heading", { name: "You’re all set" })).toBeVisible();
     await expect
       .poll(() =>

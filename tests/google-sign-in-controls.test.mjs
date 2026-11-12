@@ -27,7 +27,16 @@ const { GoogleSettings } = await loadTs("renderer/settings/account-settings.tsx"
             ? `
         import { createElement } from "react";
         export const Button = ({ children, disabled }) => createElement("button", { disabled }, children);
-        export const Field = ({ children }) => createElement("div", null, children);
+        export const Field = ({ children, description }) => createElement("div", null, description, children);
+        export const cn = (...names) => names.filter(Boolean).join(" ");
+        const Hidden = () => null;
+        export const AlertDialog = Hidden;
+        export const AlertDialogCancel = Hidden;
+        export const AlertDialogContent = Hidden;
+        export const AlertDialogDescription = Hidden;
+        export const AlertDialogFooter = Hidden;
+        export const AlertDialogHeader = Hidden;
+        export const AlertDialogTitle = Hidden;
         export const FieldSet = Field;
         export const Status = Field;
         export const toast = { success() {}, error() {} };`
@@ -40,28 +49,42 @@ const { GoogleSettings } = await loadTs("renderer/settings/account-settings.tsx"
         export const useConnectGoogle = () => ({ isPending: true, mutate() {} });
         export const useRequestRemindersAccess = () => ({});
         export const queryKeys = {};`
-                : `export const invoke = () => {}; export const errorMessage = () => "";`,
+                : `export const invoke = () => {}; export const errorMessage = () => ""; export const openExternal = () => {};`,
       }));
     },
   },
 ]);
 
-for (const connected of [false, true]) {
-  test(`a pending ${connected ? "reconnection" : "sign-in"} can be restarted without waiting for timeout`, () => {
-    const html = renderToStaticMarkup(
-      createElement(GoogleSettings, {
-        status: { connected, hasCredentials: true, email: null, clientIdHint: null },
-      }),
-    );
-    assert.match(html, /<button>Restart Google sign-in<\/button>/);
-  });
-}
+const status = (overrides) => ({
+  connected: false,
+  hasCredentials: true,
+  email: null,
+  clientIdHint: null,
+  missingAccess: [],
+  ...overrides,
+});
+const render = (overrides) =>
+  renderToStaticMarkup(createElement(GoogleSettings, { status: status(overrides) }));
+
+test("a pending reconnection can be restarted without waiting for timeout", () => {
+  assert.match(render({ connected: true }), /<button>Restart Google sign-in<\/button>/);
+});
+
+test("a pending sign-in can be restarted from the Google-branded button", () => {
+  const html = render({});
+  assert.match(html, /<span class="whitespace-nowrap">Sign in with Google<\/span>/);
+  assert.match(html, /Waiting for your browser\. Click to start again\./);
+});
 
 test("unconfigured builds still disable Google sign-in", () => {
-  const html = renderToStaticMarkup(
-    createElement(GoogleSettings, {
-      status: { connected: false, hasCredentials: false, email: null, clientIdHint: null },
-    }),
+  assert.match(render({ hasCredentials: false }), /<button type="button"[^>]* disabled="">/);
+});
+
+test("names the Google permissions the user didn't grant", () => {
+  const html = render({ connected: true, missingAccess: ["mail", "calendar"] });
+  assert.match(
+    html,
+    /Gmail and Google Calendar are off because DayBoard wasn’t given permission\. Sign in again and tick them/,
   );
-  assert.match(html, /<button disabled="">/);
+  assert.doesNotMatch(render({ connected: true }), /wasn’t given permission/);
 });

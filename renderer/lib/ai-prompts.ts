@@ -209,7 +209,7 @@ export function buildAssistantSystem(
     input.permission === "auto"
       ? "The app adds these items for the user automatically, so describe them as proposed until the app confirms."
       : "The user confirms each item before it is created, so never claim you created it.";
-  return `You are the productivity assistant inside the user's Dashboard app for macOS. The current snapshot is supplied just before the latest user request. It contains their Google Tasks, Apple Reminders, Gmail inbox, and Google Calendar. Use it to answer questions, plan their time, and suggest next steps. Be concise and use Markdown.
+  return `You are the productivity assistant inside the user's DayBoard app for macOS. The current snapshot is supplied just before the latest user request. It contains their Google Tasks, Apple Reminders, Gmail inbox, and Google Calendar. Use it to answer questions, plan their time, and suggest next steps. Be concise and use Markdown.
 
 ${
   kinds.length
