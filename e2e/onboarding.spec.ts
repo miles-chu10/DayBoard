@@ -208,6 +208,13 @@ test("Turn on AI saves the chosen provider and moves on", async () => {
       .getByRole("radio", { name: /Claude/ })
       .click();
     await dialog.getByRole("button", { name: "Turn on AI" }).click();
+    // AI turns on only after the data-sharing consent.
+    const consent = page.getByRole("alertdialog", { name: "Turn on AI features?" });
+    await expect(consent.getByTestId("ai-disclosure")).toContainText(
+      "that feature needs to Claude,",
+    );
+    await consent.getByRole("button", { name: "Turn On AI", exact: true }).click();
+    await expect(consent).toHaveCount(0);
     await expect(dialog.getByRole("heading", { name: "You’re all set" })).toBeVisible();
     await expect
       .poll(() =>
