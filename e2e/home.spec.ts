@@ -1,3 +1,5 @@
+import type { DayboardBridge } from "../shared/bridge-protocol";
+import type { AppSettings } from "../main/shared-types";
 import { expect, test, type Page } from "@playwright/test";
 import { launchDemo } from "./fixtures";
 
@@ -91,6 +93,74 @@ test("Home greets, ranks what needs you, suggests tasks from mail and shows the 
     );
     await expect(suggested.getByText("Review launch copy", { exact: true })).toBeVisible();
     await expect(suggested.getByText("Submit the Q4 budget", { exact: true })).toHaveCount(0);
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("Home cards customize, persist, collapse, reset and fit narrow windows", async ({
+  playwright: _playwright,
+}, testInfo) => {
+  const demo = await launchDemo();
+  try {
+    const page = demo.page;
+    const cards = page.locator("[data-home-module]");
+    await expect(cards).toHaveCount(4);
+    await page.screenshot({ path: testInfo.outputPath("home-default.png") });
+    await page.getByRole("button", { name: "Customize", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Drag Needs you", exact: true })
+      .dragTo(page.locator('[data-home-module="suggested"]'));
+    await expect(cards.nth(2)).toHaveAttribute("data-home-module", "waiting");
+    await page.getByRole("button", { name: "Reset layout", exact: true }).click();
+    await page.getByRole("button", { name: "Move Needs you up", exact: true }).click();
+    await expect(cards.nth(2)).toHaveAttribute("data-home-module", "waiting");
+    await page.getByRole("button", { name: "Hide Suggested", exact: true }).click();
+    await page.getByRole("button", { name: "Set Agenda wide", exact: true }).click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Suggested", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Collapse Agenda", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Expand Agenda", exact: true })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Expand Agenda", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Suggested", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Customize", exact: true }).click();
+    await page.screenshot({ path: testInfo.outputPath("home-customize.png") });
+    await page.getByRole("button", { name: "Reset layout", exact: true }).click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(cards.nth(2)).toHaveAttribute("data-home-module", "suggested");
+    await expect(page.getByRole("button", { name: "Collapse Agenda", exact: true })).toBeVisible();
+    await demo.app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.setSize(760, 850),
+    );
+    const windowWidth = await demo.app.evaluate(
+      ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getContentBounds().width,
+    );
+    for (const card of await cards.all()) {
+      const box = await card.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(windowWidth);
+    }
+    await page.screenshot({ path: testInfo.outputPath("home-narrow.png") });
+    await page.evaluate(async () => {
+      const bridge = (globalThis as typeof globalThis & { dayboard: DayboardBridge }).dayboard;
+      const settings = await bridge.ipc.invoke<AppSettings>("settings:get");
+      await bridge.ipc.invoke("settings:update", {
+        ...settings,
+        sources: {
+          ...settings.sources,
+          calendar: { ...settings.sources.calendar, enabled: false },
+        },
+      });
+    });
+    await page.reload();
+    await expect(
+      page.getByText("No meeting card available right now.", { exact: true }),
+    ).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
