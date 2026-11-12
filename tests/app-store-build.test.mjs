@@ -96,7 +96,7 @@ test("the standalone edition keeps subscription providers and stdio MCP servers"
 
 test("the App Store edition never spawns CLIs, a login shell or a preferences reader", async () => {
   const { resolveCli } = await load("main/services/ai/cli-binaries.ts", true);
-  for (const provider of ["claude", "codex", "gemini", "muse"]) {
+  for (const provider of ["claude", "codex", "gemini", "grok", "kimi"]) {
     assert.equal(await resolveCli(provider, true), null);
   }
   const shell = await load("main/services/shell-env.ts", true);

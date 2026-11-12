@@ -56,7 +56,7 @@ const MAIL_ROWS: MailRows[] = ["line", "preview"];
 // The App Store edition can't run the subscription CLIs, so it offers API keys only.
 const PROVIDERS: AIProvider[] = isAppStoreBuild
   ? [...API_PROVIDERS]
-  : ["claude", "codex", "gemini", "muse", ...API_PROVIDERS];
+  : ["claude", "codex", "gemini", "grok", "kimi", ...API_PROVIDERS];
 const LAUNCH_VIEWS: LaunchView[] = [
   "today",
   "agenda",
@@ -132,7 +132,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     codexEffort: "",
     codexServiceTier: "",
     geminiModel: "",
-    museModel: "",
     apiModels: Object.fromEntries(API_PROVIDERS.map((provider) => [provider, ""])) as Record<
       ApiProviderId,
       string
@@ -316,7 +315,6 @@ export function normalizeSettings(value: unknown): AppSettings {
       codexEffort: token(ai.codexEffort),
       codexServiceTier: token(ai.codexServiceTier),
       geminiModel: modelId(ai.geminiModel),
-      museModel: modelId(ai.museModel),
       apiModels: Object.fromEntries(
         API_PROVIDERS.map((provider) => [provider, modelId(record(ai.apiModels)[provider])]),
       ) as Record<ApiProviderId, string>,

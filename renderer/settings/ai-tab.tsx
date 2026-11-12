@@ -46,7 +46,6 @@ import {
   ApiKeysSection,
   ApiModelField,
   GeminiModelField,
-  MuseModelField,
   useApiKeyStatuses,
   useApiModels,
 } from "./provider-accounts";
@@ -108,7 +107,8 @@ const CLI_LABEL: Record<CliProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex CLI",
   gemini: "Antigravity CLI",
-  muse: "Muse Code",
+  grok: "Grok Build CLI",
+  kimi: "Kimi Code CLI",
 };
 
 const PROVIDER_GROUPS: { title: string; providers: readonly AIProvider[] }[] = [
@@ -355,7 +355,7 @@ function CodexOptions({ settings, edit }: { settings: AppSettings; edit: Setting
   );
 }
 
-/** Effort for providers whose model field lives in provider-accounts: the API routes, Gemini, Muse. */
+/** Effort for providers whose model field lives in provider-accounts: the API routes, Gemini, Grok, Kimi. */
 function OtherEffort({
   provider,
   settings,
@@ -471,9 +471,6 @@ export function AITab() {
             {ai.providerChosen && ai.provider === "gemini" ? (
               <GeminiModelField settings={settings} edit={edit} />
             ) : null}
-            {ai.providerChosen && ai.provider === "muse" ? (
-              <MuseModelField settings={settings} edit={edit} />
-            ) : null}
             {ai.providerChosen && isApiKeyProvider(ai.provider) ? (
               <ApiModelField provider={ai.provider} settings={settings} edit={edit} />
             ) : null}
@@ -485,7 +482,7 @@ export function AITab() {
           {SUBSCRIPTION_PROVIDERS.length > 0 ? (
             <FieldSet
               title="Subscription accounts"
-              description="Your Claude, ChatGPT, Google AI, and Meta Muse plans, through their official command-line tools on this Mac. No API keys needed; sign in once in Terminal."
+              description="Your Claude, ChatGPT, Google AI, SuperGrok or X, and Kimi plans, through their official command-line tools on this Mac. No API keys needed; sign in once in Terminal."
             >
               {SUBSCRIPTION_PROVIDERS.map((provider) => (
                 <ProviderStatusRow key={provider} provider={provider} />

@@ -14,7 +14,8 @@ const COMMAND: Record<CliProvider, string> = {
   claude: "claude",
   codex: "codex",
   gemini: "agy",
-  muse: "muse",
+  grok: "grok",
+  kimi: "kimi",
 };
 
 const BINARY_CANDIDATES: Record<CliProvider, string[]> = {
@@ -34,7 +35,21 @@ const BINARY_CANDIDATES: Record<CliProvider, string[]> = {
     ".bun/bin/codex",
   ],
   gemini: [".local/bin/agy", ".gemini/bin/agy", "/opt/homebrew/bin/agy", "/usr/local/bin/agy"],
-  muse: [".local/bin/muse", "/opt/homebrew/bin/muse", "/usr/local/bin/muse"],
+  grok: [
+    ".grok/bin/grok",
+    ".local/bin/grok",
+    "/opt/homebrew/bin/grok",
+    "/usr/local/bin/grok",
+    ".npm-global/bin/grok",
+    ".bun/bin/grok",
+  ],
+  // Kimi Code's own install folder first: the retired Python kimi-cli also installs a `kimi`.
+  kimi: [
+    ".kimi-code/bin/kimi",
+    "/opt/homebrew/bin/kimi",
+    "/usr/local/bin/kimi",
+    ".npm-global/bin/kimi",
+  ],
 };
 
 // ── Binary resolution ──────────────────────────────────────────────────────────────

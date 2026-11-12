@@ -125,11 +125,12 @@ export function describeModel(
       contextWindow: apiModel?.contextWindow ?? null,
     };
   }
-  if (provider === "muse") {
+  if (provider === "grok" || provider === "kimi") {
+    // DayBoard sends no model flag; Grok names the model it ran under the reply.
     return {
       provider,
-      name: ai.museModel ? `Muse · ${ai.museModel}` : "Muse (Muse Code default)",
-      id: ai.museModel || null,
+      name: provider === "grok" ? "Grok (Grok Build default)" : "Kimi (Kimi Code default)",
+      id: null,
       fast: false,
       effort: null,
       contextWindow: null,
@@ -182,11 +183,12 @@ export function modelSystemNote(info: AssistantModelInfo): string {
         claude: "Claude Code (the user's Claude subscription)",
         codex: "the Codex CLI (the user's ChatGPT subscription)",
         gemini: "Google Antigravity (the user's Gemini subscription)",
-        muse: "Meta's Muse Code CLI (the user's Meta account)",
+        grok: "xAI's Grok Build CLI (the user's SuperGrok or X subscription)",
+        kimi: "the Kimi Code CLI (the user's Kimi membership)",
       }[info.provider];
   const exact = info.id
     ? `The exact model ID is "${info.id}".`
-    : info.provider === "claude" || info.provider === "gemini" || info.provider === "muse"
+    : info.provider === "claude" || info.provider === "gemini" || info.provider === "grok"
       ? "The CLI resolves the exact model ID when the request starts; the app shows it under your reply."
       : "The exact model ID isn't published for this provider.";
   return `\n\n# Model\nYou are running as ${info.name} through ${via}. ${exact} Fast mode is ${info.fast ? "ON" : "off"}.${info.effort ? ` Reasoning effort: ${info.effort}.` : ""} When asked which model you are, state exactly this rather than guessing.`;

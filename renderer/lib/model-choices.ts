@@ -84,21 +84,15 @@ export function claudeChoices(resolved: Record<string, string> | undefined): Mod
   });
 }
 
-/** Muse Code models; empty follows the CLI's default. */
-export const MUSE_MODEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "Muse Code default" },
-  { value: "muse-spark-1.3", label: "Muse Spark 1.3" },
-  { value: "muse-spark-1.2", label: "Muse Spark 1.2" },
-];
-
 export const DEFAULT_MODEL_LABEL = {
   codex: "Codex default",
   gemini: "Antigravity default",
-  muse: "Muse Code default",
+  grok: "Grok Build default",
+  kimi: "Kimi Code default",
   api: "Newest available",
 } as const;
 
-const CLI_PROVIDERS: readonly AIProvider[] = ["claude", "codex", "gemini", "muse"];
+const CLI_PROVIDERS: readonly AIProvider[] = ["claude", "codex", "gemini", "grok", "kimi"];
 
 export function claudeSupportsFast(model: ClaudeModel): boolean {
   return model === "opus" || model === "opus[1m]";
@@ -109,7 +103,8 @@ export function savedModel(ai: AppSettings["ai"], provider: AIProvider): string 
   if (provider === "claude") return ai.claudeModel;
   if (provider === "codex") return ai.codexModel;
   if (provider === "gemini") return ai.geminiModel;
-  if (provider === "muse") return ai.museModel;
+  // Grok and Kimi always run their CLI's own default model.
+  if (provider === "grok" || provider === "kimi") return "";
   return ai.apiModels[provider];
 }
 
@@ -177,7 +172,8 @@ export function modelChoices(
       ],
       saved,
     );
-  if (provider === "muse") return withSaved(MUSE_MODEL_OPTIONS, saved);
+  if (provider === "grok" || provider === "kimi")
+    return [{ value: "", label: DEFAULT_MODEL_LABEL[provider] }];
   const newest = lists.api?.[0];
   return withSaved(
     [
@@ -225,7 +221,7 @@ export function applyModelChoice(
     if (known && !model?.tiers.some((tier) => tier.id === ai.codexServiceTier))
       ai.codexServiceTier = "";
   } else if (provider === "gemini") ai.geminiModel = value;
-  else if (provider === "muse") ai.museModel = value;
+  else if (provider === "grok" || provider === "kimi") return;
   else if (!known) ai.apiModels[provider] = value;
   else {
     ai.apiModels[provider] = value;
