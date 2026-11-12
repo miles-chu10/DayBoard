@@ -10,13 +10,13 @@
 # To install somewhere else:
 #   curl -fsSL https://getdayboard.com/install.sh | DAYBOARD_INSTALL_DIR="$HOME/Applications" bash
 #
-# VERSION and DMG_SHA256 name one published release. Update both together when a new beta ships
-# (tests/website-beta-version.test.mjs checks VERSION against the download page).
+# VERSION and DMG_SHA256 name one published release. Update both together when a release ships
+# (tests/website-version.test.mjs checks VERSION against the download page).
 
 set -euo pipefail
 
-VERSION="1.3.0-beta.21"
-DMG_SHA256="0d219fb8f72fdd29c532ecc9e73db18779e20deccc8a576098625b2d729c1ba4"
+VERSION="1.3.0"
+DMG_SHA256="74b3a1f22f946d79f0d70a8bd58f88d5ced639516a67dd38901e35a90eb8664b"
 TEAM_ID="LGJS5APK9X"
 
 DMG_NAME="DayBoard-${VERSION}-arm64.dmg"
