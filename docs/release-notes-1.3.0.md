@@ -116,5 +116,30 @@ Questions: support@getdayboard.com.
 
 ## Release verification
 
-Not yet released. This section is filled in from the signed release run and the published
-assets.
+Published on 2026-11-12 at 06:10 UTC from `fb3861d` by the
+[signed release run](https://github.com/miles-chu10/DayBoard/actions/runs/43164221054), which
+ran the unit, license-service and end-to-end tests before it signed anything. The tag `v1.3.0`
+was pushed at 05:52 UTC. The release is not a prerelease, is GitHub's latest release, is
+immutable and has 7 assets.
+
+Checked on a Mac against the published assets: `SHA256SUMS.txt` matches every file and agrees
+with GitHub's own digests, and `latest-mac.yml` gives this version with the ZIP's and DMG's
+actual SHA-512 and size. The DMG passes `xcrun stapler validate`, and `spctl` accepts it as
+Notarized Developer ID. The apps in the ZIP and the DMG are 1.3.0, pass
+`codesign --verify --deep --strict` and `stapler validate`, and are accepted as Notarized
+Developer ID (team `LGJS5APK9X`). The shipped `app.asar` names the live license service and the
+live product, and no other product.
+
+Update from beta.22: on 2026-11-12 at 06:13 UTC, an installed beta.22 found 1.3.0 through
+Settings → Updates and downloaded it. The downloaded ZIP has the published SHA-256. The update
+installed when DayBoard restarted at 06:30 UTC. The installer finished with status 0, and the
+installed app is 1.3.0 with the same code signature as the app in the published ZIP. The update
+left the settings file untouched, and Google sign-in and the DayBoard Pro license were kept: the
+app opens signed in, with Pro active. On 1.3.0, Settings → Updates → Check for updates reports
+that DayBoard is up to date.
+
+The features were clicked through on 1.3.0-beta.22, which is the same code. Its notes record
+what was checked.
+
+DMG: `DayBoard-1.3.0-arm64.dmg` (138,338,074 bytes). Its published SHA-256 is
+`74b3a1f22f946d79f0d70a8bd58f88d5ced639516a67dd38901e35a90eb8664b`.
