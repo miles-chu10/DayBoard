@@ -32,6 +32,15 @@ in the main window easier to resize, and has a new icon.
   the affected feature says **Google Permission Needed** and asks you to sign in again (#122).
 - **A confirmation before AI turns on.** Settings and the welcome flow ask you to confirm before
   the AI features are switched on (#122).
+- **Choose which task lists appear.** Settings → Sources has a switch for each Google Tasks list
+  and each Apple Reminders list (#129).
+- **Times for Google tasks.** Google does not share a task's time of day, so DayBoard now says
+  **Time not shared by Google** and shows the time from the matching Apple reminder when there is
+  one (#129).
+
+## Fixed
+
+- The button that shows a hidden sidebar again now responds to clicks (#129).
 
 ## Updating
 
