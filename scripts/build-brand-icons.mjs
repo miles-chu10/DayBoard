@@ -1,5 +1,5 @@
 // Builds every DayBoard logo file from the geometry below: the SVG masters in brand/, their PNGs,
-// app-icon.png, app-icon.icns, the menu-bar template images, the website icons and the copy of the
+// app-icon.png, app-icon.icns, the menu-bar images, the website icons and the copy of the
 // header icon inside billing/src/assets.ts. Run with:
 //   node scripts/build-brand-icons.mjs
 // It renders in headless Chromium through Playwright (a devDependency), so it needs no macOS tool.
@@ -140,8 +140,8 @@ ${art.base}
 ${art.lit}`);
 }
 
-// The menu-bar glyph on a 16 px grid: four 2 px rows, 2 px apart, cut by the beam as a gap.
-// Drawn in black; macOS tints template images, so only the alpha channel matters.
+// The one-color glyph on a 16 px grid: four 2 px rows, 2 px apart, cut by the beam as a gap.
+// For surfaces that need the mark in a single color.
 function menuBarMaster() {
   const pieces = [];
   for (const y of [1, 5, 9, 13]) {
@@ -153,6 +153,23 @@ function menuBarMaster() {
     );
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000">\n${pieces.join("\n")}\n</svg>\n`;
+}
+
+// The menu-bar icon the app ships, on the same grid: full rows in a mid gray that reads on light
+// and dark menu bars, with the beam lighting each row in its source color. It is not a template
+// image, so macOS shows it as drawn.
+const MENU_BAR_ROW = "#8a8a90";
+function menuBarColorMaster() {
+  const pieces = [];
+  [1, 5, 9, 13].forEach((y, index) => {
+    const center = (at) => 8 - (at - 8) * SLOPE;
+    const half = 2.6;
+    pieces.push(
+      `<rect x="1" y="${y}" width="14" height="2" rx=".5" fill="${MENU_BAR_ROW}"/>`,
+      `<polygon points="${n(center(y) - half)},${y} ${n(center(y) + half)},${y} ${n(center(y + 2) + half)},${y + 2} ${n(center(y + 2) - half)},${y + 2}" fill="${SOURCES[index]}"/>`,
+    );
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">\n${pieces.join("\n")}\n</svg>\n`;
 }
 
 // --- ICNS -------------------------------------------------------------------------------------
@@ -206,11 +223,13 @@ const masters = {
   small: smallMaster(),
   square: squareMaster(),
   menuBar: menuBarMaster(),
+  menuBarColor: menuBarColorMaster(),
 };
 fs.writeFileSync(out("brand", "dayboard-icon.svg"), masters.main);
 fs.writeFileSync(out("brand", "dayboard-icon-small.svg"), masters.small);
 fs.writeFileSync(out("brand", "dayboard-icon-square.svg"), masters.square);
 fs.writeFileSync(out("brand", "dayboard-menubar.svg"), masters.menuBar);
+fs.writeFileSync(out("brand", "dayboard-menubar-color.svg"), masters.menuBarColor);
 
 const browser = await chromium.launch({ executablePath: process.env.DAYBOARD_CHROMIUM });
 const page = await browser.newPage({ deviceScaleFactor: 1 });
@@ -266,8 +285,8 @@ fs.writeFileSync(
 );
 
 const tray = out("main", "system-panels", "assets");
-fs.writeFileSync(path.join(tray, "trayTemplate.png"), await png(masters.menuBar, 16));
-fs.writeFileSync(path.join(tray, "trayTemplate@2x.png"), await png(masters.menuBar, 32));
+fs.writeFileSync(path.join(tray, "tray.png"), await png(masters.menuBarColor, 16));
+fs.writeFileSync(path.join(tray, "tray@2x.png"), await png(masters.menuBarColor, 32));
 
 const site = out("website", "assets");
 fs.writeFileSync(path.join(site, "icon-32.png"), await png(smallMaster(BODY), 32));
