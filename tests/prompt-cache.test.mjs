@@ -151,7 +151,7 @@ async function load(
             (args) => ({ path: args.path, namespace: "cli-fixture" }),
           );
           api.onLoad({ filter: /.*/, namespace: "cli-fixture" }, () => ({
-            contents: `export const getToolEnv=async()=>({}); export const toStringEnv=x=>x; export const resolveCli=async()=>null; export const getSettings=async()=>({}); export const listCodexModels=async()=>[]; export const claudeModelArgs=()=>[]; export const codexModelArgs=()=>[];`,
+            contents: `export const getToolEnv=async()=>({}); export const toStringEnv=x=>x; export const resolveCli=async()=>null; export const getSettings=async()=>({}); export const listCodexModels=async()=>[]; export const claudeModelArgs=()=>[]; export const codexModelArgs=()=>[]; export const KIMI_MEMBERSHIP_MODEL="kimi-code/kimi-for-coding";`,
             loader: "js",
           }));
         }
@@ -1550,11 +1550,12 @@ test("one-shot CLI usage records the configured model id and the model the CLI r
   const gemini = await run("gemini", { geminiModel: "gemini-configured" });
   assert.equal(gemini.requestedModelId, "gemini-configured");
   assert.equal(gemini.modelId, "gemini-resolved");
-  // Grok and Kimi get no model flag, so nothing is claimed as requested; Grok reports what ran.
+  // Grok gets no model flag, so nothing is claimed as requested; Grok reports what ran.
+  // Kimi is pinned to the membership model.
   const grok = await run("grok", {});
   assert.equal(grok.requestedModelId, null);
   assert.equal(grok.modelId, "grok-resolved");
-  assert.equal((await run("kimi", {})).requestedModelId, null);
+  assert.equal((await run("kimi", {})).requestedModelId, "kimi-code/kimi-for-coding");
   assert.equal(
     (await run("codex", { codexModel: "codex-configured" })).requestedModelId,
     "codex-configured",
@@ -1686,6 +1687,8 @@ test("Grok Build streaming-json and Kimi Code stream-json become text, tools, mo
   ])
     cli.handleKimiLine(JSON.stringify(event), kimi, options);
   assert.equal(kimi.text, "Checking.\n\nYou have two meetings.");
+  assert.equal(seen.models.at(-1), "kimi-code/kimi-for-coding");
+  assert.equal(seen.models.filter((id) => id.startsWith("kimi")).length, 1);
   assert.deepEqual(
     seen.tools.slice(-2).map((tool) => [tool.id, tool.status]),
     [

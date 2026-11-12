@@ -88,7 +88,7 @@ export const DEFAULT_MODEL_LABEL = {
   codex: "Codex default",
   gemini: "Antigravity default",
   grok: "Grok Build default",
-  kimi: "Kimi Code default",
+  kimi: "Kimi for Coding",
   api: "Newest available",
 } as const;
 
@@ -103,7 +103,7 @@ export function savedModel(ai: AppSettings["ai"], provider: AIProvider): string 
   if (provider === "claude") return ai.claudeModel;
   if (provider === "codex") return ai.codexModel;
   if (provider === "gemini") return ai.geminiModel;
-  // Grok and Kimi always run their CLI's own default model.
+  // Grok runs its CLI default; Kimi is pinned to the membership model.
   if (provider === "grok" || provider === "kimi") return "";
   return ai.apiModels[provider];
 }

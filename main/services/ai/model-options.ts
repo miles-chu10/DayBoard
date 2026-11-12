@@ -10,6 +10,9 @@ import { claudeModelName } from "../../../shared/claude-model-name.js";
 import { isApiProvider } from "./api-keys.js";
 import { API_LABEL } from "./api-providers.js";
 
+/** The membership model `kimi login` sets up. Pinned so a `default_model` that points at a third-party API key is never used. */
+export const KIMI_MEMBERSHIP_MODEL = "kimi-code/kimi-for-coding";
+
 export function claudeModelArgs(ai: AppSettings["ai"]): string[] {
   const args: string[] = [];
   if (ai.claudeModel !== "default") args.push("--model", ai.claudeModel);
@@ -125,11 +128,22 @@ export function describeModel(
       contextWindow: apiModel?.contextWindow ?? null,
     };
   }
-  if (provider === "grok" || provider === "kimi") {
+  if (provider === "kimi") {
+    // Pinned to the membership model so a third-party default_model is never billed instead.
+    return {
+      provider,
+      name: "Kimi for Coding (Kimi membership)",
+      id: KIMI_MEMBERSHIP_MODEL,
+      fast: false,
+      effort: null,
+      contextWindow: null,
+    };
+  }
+  if (provider === "grok") {
     // DayBoard sends no model flag; Grok names the model it ran under the reply.
     return {
       provider,
-      name: provider === "grok" ? "Grok (Grok Build default)" : "Kimi (Kimi Code default)",
+      name: "Grok (Grok Build default)",
       id: null,
       fast: false,
       effort: null,

@@ -18,7 +18,7 @@ import { getToolEnv, toStringEnv } from "../shell-env.js";
 
 import { resolveCli } from "./cli-binaries.js";
 import { listCodexModels } from "./codex-models.js";
-import { claudeModelArgs, codexModelArgs } from "./model-options.js";
+import { KIMI_MEMBERSHIP_MODEL, claudeModelArgs, codexModelArgs } from "./model-options.js";
 import { withAssistantEffort } from "./assistant-effort.js";
 
 export { resolveCli } from "./cli-binaries.js";
@@ -853,6 +853,7 @@ function handleKimiLine(line: string, state: ParseState, options: CliRunOptions)
   if (!event) return;
   if (event.role === "assistant") {
     if (typeof event.content === "string" && event.content) {
+      if (!state.text) options.onModel?.(KIMI_MEMBERSHIP_MODEL);
       separateMessages(state, options);
       emitText(state, options, event.content);
     }
@@ -885,7 +886,16 @@ async function runKimi(options: CliRunOptions): Promise<string> {
     const outcome = await runDirect({
       label: LABEL.kimi,
       bin,
-      args: ["--agent-file", agentFile, "--output-format", "stream-json", "-p", options.prompt],
+      args: [
+        "--agent-file",
+        agentFile,
+        "-m",
+        KIMI_MEMBERSHIP_MODEL,
+        "--output-format",
+        "stream-json",
+        "-p",
+        options.prompt,
+      ],
       stdin: "",
       env: await getToolEnv(STRIPPED_ENV.kimi),
       cwd,

@@ -97,7 +97,7 @@ test("each provider lists its default first, then its models, then a saved unlis
   assert.equal(modelChoices("gemini", settings(), {})[0].label, "Antigravity default");
   assert.deepEqual(values("grok", settings()), [""]);
   assert.equal(modelChoices("grok", settings(), {})[0].label, "Grok Build default");
-  assert.equal(modelChoices("kimi", settings(), {})[0].label, "Kimi Code default");
+  assert.equal(modelChoices("kimi", settings(), {})[0].label, "Kimi for Coding");
   assert.deepEqual(values("claude"), [
     "default",
     "fable",
