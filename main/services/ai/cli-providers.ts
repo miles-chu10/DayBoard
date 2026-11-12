@@ -18,7 +18,7 @@ import { getToolEnv, toStringEnv } from "../shell-env.js";
 
 import { resolveCli } from "./cli-binaries.js";
 import { listCodexModels } from "./codex-models.js";
-import { KIMI_MEMBERSHIP_MODEL, claudeModelArgs, codexModelArgs } from "./model-options.js";
+import { claudeModelArgs, codexModelArgs } from "./model-options.js";
 import { withAssistantEffort } from "./assistant-effort.js";
 
 export { resolveCli } from "./cli-binaries.js";
@@ -59,7 +59,6 @@ const LABEL: Record<CliProvider, string> = {
   codex: "Codex",
   gemini: "Antigravity",
   grok: "Grok Build",
-  kimi: "Kimi Code",
 };
 
 const MISSING_MESSAGE: Record<CliProvider, string> = {
@@ -70,7 +69,6 @@ const MISSING_MESSAGE: Record<CliProvider, string> = {
   gemini:
     "Google's Antigravity CLI (agy) isn't installed. Install Antigravity from antigravity.google, then run `agy` in Terminal to sign in with your Google account.",
   grok: "xAI's Grok Build CLI isn't installed. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash`, then run `grok login` in Terminal to sign in with your SuperGrok or X account.",
-  kimi: "Kimi Code CLI isn't installed. Install it with `curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash`, then run `kimi login` in Terminal to sign in with your Kimi account.",
 };
 
 const LOGIN_MESSAGE: Record<CliProvider, string> = {
@@ -81,7 +79,6 @@ const LOGIN_MESSAGE: Record<CliProvider, string> = {
   gemini:
     "Antigravity isn't signed in. Run `agy` in Terminal and sign in with your Google account, then try again.",
   grok: "Grok isn't signed in. Run `grok login` in Terminal and sign in with your SuperGrok or X account, then try again.",
-  kimi: "Kimi Code isn't signed in. Run `kimi login` in Terminal and approve the code with your Kimi account, then try again.",
 };
 
 // Subscription mode: API-key variables would silently override the user's subscription login.
@@ -97,7 +94,6 @@ const STRIPPED_ENV: Record<CliProvider, string[]> = {
   codex: ["OPENAI_API_KEY", "OPENAI_BASE_URL", "CODEX_API_KEY"],
   gemini: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"],
   grok: ["XAI_API_KEY", "GROK_MODELS_BASE_URL"],
-  kimi: ["KIMI_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL_NAME", "KIMI_MODEL_API_KEY"],
 };
 
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -134,7 +130,6 @@ function looksLikeLoginError(text: string): boolean {
     "/login",
     "codex login",
     "grok login",
-    "kimi login",
     "not signed in",
     "invalid api key",
     "authentication_error",
@@ -845,79 +840,6 @@ async function runGrok(options: CliRunOptions): Promise<string> {
   return state.text;
 }
 
-// ── Kimi Code (Kimi membership) ───────────────────────────────────────────────────
-
-/** `kimi -p --output-format stream-json` prints one chat message per line: assistant, tool, meta. */
-function handleKimiLine(line: string, state: ParseState, options: CliRunOptions) {
-  const event = parseJsonLine(line);
-  if (!event) return;
-  if (event.role === "assistant") {
-    if (typeof event.content === "string" && event.content) {
-      if (!state.text) options.onModel?.(KIMI_MEMBERSHIP_MODEL);
-      separateMessages(state, options);
-      emitText(state, options, event.content);
-    }
-    if (Array.isArray(event.tool_calls))
-      for (const call of event.tool_calls)
-        if (isRecord(call) && typeof call.id === "string")
-          options.onTool({
-            id: call.id,
-            name: isRecord(call.function) ? String(call.function.name ?? "") : undefined,
-            status: "running",
-          });
-  } else if (event.role === "tool" && typeof event.tool_call_id === "string") {
-    options.onTool({ id: event.tool_call_id, status: "success" });
-  }
-}
-
-async function runKimi(options: CliRunOptions): Promise<string> {
-  const bin = await resolveCli("kimi");
-  if (!bin) throw new Error(MISSING_MESSAGE.kimi);
-  const cwd = await workDir();
-  // The agent file carries DayBoard's instructions and removes every tool, so Kimi only answers.
-  const agentFile = path.join(os.tmpdir(), `dayboard-kimi-${randomBytes(8).toString("hex")}.md`);
-  await fs.writeFile(
-    agentFile,
-    `---\nname: dayboard\ndescription: Answers DayBoard requests from the provided context\ntools: []\n---\n\n${options.system}\n`,
-    { mode: 0o600 },
-  );
-  const state = createState();
-  try {
-    const outcome = await runDirect({
-      label: LABEL.kimi,
-      bin,
-      args: [
-        "--agent-file",
-        agentFile,
-        "-m",
-        KIMI_MEMBERSHIP_MODEL,
-        "--output-format",
-        "stream-json",
-        "-p",
-        options.prompt,
-      ],
-      stdin: "",
-      env: await getToolEnv(STRIPPED_ENV.kimi),
-      cwd,
-      timeoutMs: options.timeoutMs,
-      signal: options.signal,
-      onLine: (line) => handleKimiLine(line, state, options),
-    });
-    const error = state.text
-      ? null
-      : outcome.code !== 0
-        ? outcome.output || "Kimi Code failed."
-        : null;
-    if (error)
-      throw new Error(
-        looksLikeLoginError(error) ? LOGIN_MESSAGE.kimi : redact(error).slice(0, 1200),
-      );
-    return state.text;
-  } finally {
-    await fs.rm(agentFile, { force: true });
-  }
-}
-
 export function runCliCompletion(options: CliRunOptions): Promise<string> {
   return options.provider === "claude"
     ? runClaude(options)
@@ -925,9 +847,7 @@ export function runCliCompletion(options: CliRunOptions): Promise<string> {
       ? runGemini(options)
       : options.provider === "grok"
         ? runGrok(options)
-        : options.provider === "kimi"
-          ? runKimi(options)
-          : runCodex(options);
+        : runCodex(options);
 }
 
 function runVersion(bin: string): Promise<string> {

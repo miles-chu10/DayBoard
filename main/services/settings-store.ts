@@ -56,7 +56,7 @@ const MAIL_ROWS: MailRows[] = ["line", "preview"];
 // The App Store edition can't run the subscription CLIs, so it offers API keys only.
 const PROVIDERS: AIProvider[] = isAppStoreBuild
   ? [...API_PROVIDERS]
-  : ["claude", "codex", "gemini", "grok", "kimi", ...API_PROVIDERS];
+  : ["claude", "codex", "gemini", "grok", ...API_PROVIDERS];
 const LAUNCH_VIEWS: LaunchView[] = [
   "today",
   "agenda",

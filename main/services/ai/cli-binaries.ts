@@ -15,7 +15,6 @@ const COMMAND: Record<CliProvider, string> = {
   codex: "codex",
   gemini: "agy",
   grok: "grok",
-  kimi: "kimi",
 };
 
 const BINARY_CANDIDATES: Record<CliProvider, string[]> = {
@@ -42,13 +41,6 @@ const BINARY_CANDIDATES: Record<CliProvider, string[]> = {
     "/usr/local/bin/grok",
     ".npm-global/bin/grok",
     ".bun/bin/grok",
-  ],
-  // Kimi Code's own install folder first: the retired Python kimi-cli also installs a `kimi`.
-  kimi: [
-    ".kimi-code/bin/kimi",
-    "/opt/homebrew/bin/kimi",
-    "/usr/local/bin/kimi",
-    ".npm-global/bin/kimi",
   ],
 };
 

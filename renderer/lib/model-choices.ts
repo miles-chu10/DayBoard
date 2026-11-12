@@ -88,11 +88,10 @@ export const DEFAULT_MODEL_LABEL = {
   codex: "Codex default",
   gemini: "Antigravity default",
   grok: "Grok Build default",
-  kimi: "Kimi for Coding",
   api: "Newest available",
 } as const;
 
-const CLI_PROVIDERS: readonly AIProvider[] = ["claude", "codex", "gemini", "grok", "kimi"];
+const CLI_PROVIDERS: readonly AIProvider[] = ["claude", "codex", "gemini", "grok"];
 
 export function claudeSupportsFast(model: ClaudeModel): boolean {
   return model === "opus" || model === "opus[1m]";
@@ -103,8 +102,8 @@ export function savedModel(ai: AppSettings["ai"], provider: AIProvider): string 
   if (provider === "claude") return ai.claudeModel;
   if (provider === "codex") return ai.codexModel;
   if (provider === "gemini") return ai.geminiModel;
-  // Grok runs its CLI default; Kimi is pinned to the membership model.
-  if (provider === "grok" || provider === "kimi") return "";
+  // Grok always runs its CLI's own default model.
+  if (provider === "grok") return "";
   return ai.apiModels[provider];
 }
 
@@ -172,8 +171,7 @@ export function modelChoices(
       ],
       saved,
     );
-  if (provider === "grok" || provider === "kimi")
-    return [{ value: "", label: DEFAULT_MODEL_LABEL[provider] }];
+  if (provider === "grok") return [{ value: "", label: DEFAULT_MODEL_LABEL[provider] }];
   const newest = lists.api?.[0];
   return withSaved(
     [
@@ -221,7 +219,7 @@ export function applyModelChoice(
     if (known && !model?.tiers.some((tier) => tier.id === ai.codexServiceTier))
       ai.codexServiceTier = "";
   } else if (provider === "gemini") ai.geminiModel = value;
-  else if (provider === "grok" || provider === "kimi") return;
+  else if (provider === "grok") return;
   else if (!known) ai.apiModels[provider] = value;
   else {
     ai.apiModels[provider] = value;

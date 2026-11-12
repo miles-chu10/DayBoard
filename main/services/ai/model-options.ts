@@ -10,9 +10,6 @@ import { claudeModelName } from "../../../shared/claude-model-name.js";
 import { isApiProvider } from "./api-keys.js";
 import { API_LABEL } from "./api-providers.js";
 
-/** The membership model `kimi login` sets up. Pinned so a `default_model` that points at a third-party API key is never used. */
-export const KIMI_MEMBERSHIP_MODEL = "kimi-code/kimi-for-coding";
-
 export function claudeModelArgs(ai: AppSettings["ai"]): string[] {
   const args: string[] = [];
   if (ai.claudeModel !== "default") args.push("--model", ai.claudeModel);
@@ -128,17 +125,6 @@ export function describeModel(
       contextWindow: apiModel?.contextWindow ?? null,
     };
   }
-  if (provider === "kimi") {
-    // Pinned to the membership model so a third-party default_model is never billed instead.
-    return {
-      provider,
-      name: "Kimi for Coding (Kimi membership)",
-      id: KIMI_MEMBERSHIP_MODEL,
-      fast: false,
-      effort: null,
-      contextWindow: null,
-    };
-  }
   if (provider === "grok") {
     // DayBoard sends no model flag; Grok names the model it ran under the reply.
     return {
@@ -198,7 +184,6 @@ export function modelSystemNote(info: AssistantModelInfo): string {
         codex: "the Codex CLI (the user's ChatGPT subscription)",
         gemini: "Google Antigravity (the user's Gemini subscription)",
         grok: "xAI's Grok Build CLI (the user's SuperGrok or X subscription)",
-        kimi: "the Kimi Code CLI (the user's Kimi membership)",
       }[info.provider];
   const exact = info.id
     ? `The exact model ID is "${info.id}".`

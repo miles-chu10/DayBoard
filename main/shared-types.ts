@@ -12,11 +12,11 @@ export type RemindersAccess =
 export type SourceId = "tasks" | "reminders" | "mail" | "calendar";
 export type SourceColor = "blue" | "green" | "orange" | "red" | "purple" | "magenta" | "yellow";
 /**
- * claude/codex/gemini/grok/kimi: subscriptions through Claude Code, Codex, Antigravity (agy),
- * xAI's Grok Build and Kimi Code · the rest: pay-per-use API keys.
+ * claude/codex/gemini/grok: subscriptions through Claude Code, Codex, Antigravity (agy),
+ * xAI's Grok Build · the rest: pay-per-use API keys.
  */
 export type AIProvider = CliProviderId | ApiProviderId;
-export type CliProviderId = "claude" | "codex" | "gemini" | "grok" | "kimi";
+export type CliProviderId = "claude" | "codex" | "gemini" | "grok";
 export type ApiProviderId =
   | "openai"
   | "anthropic"

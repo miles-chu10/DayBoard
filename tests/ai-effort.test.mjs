@@ -161,7 +161,6 @@ test("effort levels follow the route and model table, including dated snapshots"
     "openrouter",
     "gemini",
     "grok",
-    "kimi",
     "glaze",
   ])
     assert.deepEqual(levels(provider, "gpt-6-sol"), [], provider);
@@ -235,7 +234,6 @@ test("model labels pair the model with the effort DayBoard requests, or say who 
   for (const [provider, model] of [
     ["gemini", ""],
     ["grok", ""],
-    ["kimi", ""],
     ["openai", "gpt-5.5"],
     ["codex", "gone"],
   ])

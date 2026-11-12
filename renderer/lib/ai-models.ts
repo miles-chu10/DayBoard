@@ -128,7 +128,7 @@ function modelOnly(
       contextWindow: null,
       id: ai.geminiModel,
     };
-  if (provider === "grok" || provider === "kimi")
+  if (provider === "grok")
     return { label: DEFAULT_MODEL_LABEL[provider], fast: false, contextWindow: null, id: "" };
   if (isApiKeyProvider(provider)) {
     const chosen = ai.apiModels[provider];

@@ -142,7 +142,7 @@ async function load(
         }
         if (exposeCli) {
           api.onLoad({ filter: /cli-providers\.ts$/ }, async (args) => ({
-            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, handleGrokLine, handleKimiLine, grokArgs, createState};`,
+            contents: `${await readFile(args.path, "utf8")}\nexport {handleCodexLine, handleClaudeLine, handleGeminiLine, handleGrokLine, grokArgs, createState};`,
             loader: "ts",
             resolveDir: root + "main/services/ai",
           }));
@@ -151,7 +151,7 @@ async function load(
             (args) => ({ path: args.path, namespace: "cli-fixture" }),
           );
           api.onLoad({ filter: /.*/, namespace: "cli-fixture" }, () => ({
-            contents: `export const getToolEnv=async()=>({}); export const toStringEnv=x=>x; export const resolveCli=async()=>null; export const getSettings=async()=>({}); export const listCodexModels=async()=>[]; export const claudeModelArgs=()=>[]; export const codexModelArgs=()=>[]; export const KIMI_MEMBERSHIP_MODEL="kimi-code/kimi-for-coding";`,
+            contents: `export const getToolEnv=async()=>({}); export const toStringEnv=x=>x; export const resolveCli=async()=>null; export const getSettings=async()=>({}); export const listCodexModels=async()=>[]; export const claudeModelArgs=()=>[]; export const codexModelArgs=()=>[];`,
             loader: "js",
           }));
         }
@@ -1551,11 +1551,9 @@ test("one-shot CLI usage records the configured model id and the model the CLI r
   assert.equal(gemini.requestedModelId, "gemini-configured");
   assert.equal(gemini.modelId, "gemini-resolved");
   // Grok gets no model flag, so nothing is claimed as requested; Grok reports what ran.
-  // Kimi is pinned to the membership model.
   const grok = await run("grok", {});
   assert.equal(grok.requestedModelId, null);
   assert.equal(grok.modelId, "grok-resolved");
-  assert.equal((await run("kimi", {})).requestedModelId, "kimi-code/kimi-for-coding");
   assert.equal(
     (await run("codex", { codexModel: "codex-configured" })).requestedModelId,
     "codex-configured",
@@ -1632,7 +1630,7 @@ test("Claude-format CLI usage keeps a null input total but reports the known inp
     [5, 5, 5, 5, 5],
   );
 });
-test("Grok Build streaming-json and Kimi Code stream-json become text, tools, model and usage", async () => {
+test("Grok Build streaming-json becomes text, tools, model and usage", async () => {
   const cli = await load("main/services/ai/cli-providers.ts", { exposeCli: true });
   const seen = { text: "", tools: [], models: [], usage: [] };
   const options = {
@@ -1672,30 +1670,6 @@ test("Grok Build streaming-json and Kimi Code stream-json become text, tools, mo
   const failed = cli.createState();
   cli.handleGrokLine(JSON.stringify({ type: "error", message: "Not signed in" }), failed, options);
   assert.equal(failed.error, "Not signed in");
-
-  seen.text = "";
-  const kimi = cli.createState();
-  for (const event of [
-    {
-      role: "assistant",
-      content: "Checking.",
-      tool_calls: [{ type: "function", id: "t1", function: { name: "Read", arguments: "{}" } }],
-    },
-    { role: "tool", tool_call_id: "t1", content: "..." },
-    { role: "meta", type: "turn.step.retrying" },
-    { role: "assistant", content: "You have two meetings." },
-  ])
-    cli.handleKimiLine(JSON.stringify(event), kimi, options);
-  assert.equal(kimi.text, "Checking.\n\nYou have two meetings.");
-  assert.equal(seen.models.at(-1), "kimi-code/kimi-for-coding");
-  assert.equal(seen.models.filter((id) => id.startsWith("kimi")).length, 1);
-  assert.deepEqual(
-    seen.tools.slice(-2).map((tool) => [tool.id, tool.status]),
-    [
-      ["t1", "running"],
-      ["t1", "success"],
-    ],
-  );
 });
 test("Grok runs answer-only, with its MCP meta-tools removed and MCP calls denied", async () => {
   const cli = await load("main/services/ai/cli-providers.ts", { exposeCli: true });

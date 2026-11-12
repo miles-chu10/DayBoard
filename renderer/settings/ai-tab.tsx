@@ -108,7 +108,6 @@ const CLI_LABEL: Record<CliProviderId, string> = {
   codex: "Codex CLI",
   gemini: "Antigravity CLI",
   grok: "Grok Build CLI",
-  kimi: "Kimi Code CLI",
 };
 
 const PROVIDER_GROUPS: { title: string; providers: readonly AIProvider[] }[] = [
@@ -355,7 +354,7 @@ function CodexOptions({ settings, edit }: { settings: AppSettings; edit: Setting
   );
 }
 
-/** Effort for providers whose model field lives in provider-accounts: the API routes, Gemini, Grok, Kimi. */
+/** Effort for providers whose model field lives in provider-accounts: the API routes, Gemini, Grok. */
 function OtherEffort({
   provider,
   settings,
@@ -482,7 +481,7 @@ export function AITab() {
           {SUBSCRIPTION_PROVIDERS.length > 0 ? (
             <FieldSet
               title="Subscription accounts"
-              description="Your Claude, ChatGPT, Google AI, SuperGrok or X, and Kimi plans, through their official command-line tools on this Mac. No API keys needed; sign in once in Terminal."
+              description="Your Claude, ChatGPT, Google AI, and SuperGrok or X plans, through their official command-line tools on this Mac. No API keys needed; sign in once in Terminal."
             >
               {SUBSCRIPTION_PROVIDERS.map((provider) => (
                 <ProviderStatusRow key={provider} provider={provider} />
