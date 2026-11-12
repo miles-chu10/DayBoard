@@ -19,3 +19,20 @@ export interface AppUpdateState {
   progressPercent: number | null;
   error: string | null;
 }
+
+export interface UpdatePreferences {
+  /** Download updates in the background and install them on quit, without asking first. */
+  automaticDownload: boolean;
+  /** A version the person chose to skip; background checks don't offer it again. */
+  skippedVersion: string | null;
+}
+
+/**
+ * What the update window shows. "prompt" offers one version with its release notes; "progress" is
+ * the compact window for Check for Updates… and Install and Relaunch.
+ */
+export interface UpdateWindowState {
+  mode: "prompt" | "progress";
+  version: string | null;
+  preferences: UpdatePreferences;
+}

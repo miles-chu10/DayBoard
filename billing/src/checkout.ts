@@ -1,7 +1,10 @@
 import type Stripe from "stripe";
 import { ORDER_ACCESS_DAYS, siteOrigin, type Config, type Env } from "./config.ts";
 import { decrypt, hash, randomToken } from "./crypto.ts";
+import { assets } from "./assets.ts";
 import { error, json, limit, readJson, sameOrigin, securityHeaders } from "./http.ts";
+import { licenseEmailStatus } from "./license-email.ts";
+import { mailer } from "./mail.ts";
 import {
   DEFAULT_SITE_ORIGIN,
   busyPage,
@@ -52,7 +55,7 @@ function html(markup: string, headers: HeadersInit = {}, status = 200): Response
       ...securityHeaders,
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy":
-        "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       ...headers,
     },
   });
@@ -62,6 +65,18 @@ function script(code: string): Response {
     headers: {
       ...securityHeaders,
       "Content-Type": "text/javascript; charset=utf-8",
+      "Content-Security-Policy": "default-src 'none'",
+    },
+  });
+}
+// The pages' typeface and icon. They never change between deploys of one version, so browsers may
+// keep them for a day; everything else this Worker serves stays uncached.
+function asset({ type, body }: (typeof assets)[string]): Response {
+  return new Response(body(), {
+    headers: {
+      ...securityHeaders,
+      "Cache-Control": "public, max-age=86400",
+      "Content-Type": type,
       "Content-Security-Policy": "default-src 'none'",
     },
   });
@@ -76,7 +91,11 @@ function orderIdFromBody(value: unknown): string | null {
     : null;
 }
 function pageContext(env: Env, cfg: Config): PageContext {
-  return { site: siteOrigin(env) ?? DEFAULT_SITE_ORIGIN, activationLimit: cfg.activationLimit };
+  return {
+    site: siteOrigin(env) ?? DEFAULT_SITE_ORIGIN,
+    activationLimit: cfg.activationLimit,
+    emailsKey: mailer(env) !== null,
+  };
 }
 function receiptUrl(cfg: Config, orderId: string): string {
   return `${cfg.origin}/receipt?order=${orderId}`;
@@ -90,7 +109,8 @@ export async function checkout(
 ): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/buy") {
-    if (!(await limit(request, env, "checkout:buy", 30))) return html(busyPage, {}, 429);
+    if (!(await limit(request, env, "checkout:buy", 30)))
+      return html(busyPage(pageContext(env, cfg)), {}, 429);
     const orderId = randomToken(24);
     const token = randomToken();
     return html(buyPage(orderId, pageContext(env, cfg)), {
@@ -99,6 +119,7 @@ export async function checkout(
   }
   if (request.method === "GET" && url.pathname === "/receipt")
     return html(receiptPage(pageContext(env, cfg)));
+  if (request.method === "GET" && assets[url.pathname]) return asset(assets[url.pathname]);
   if (request.method === "GET" && url.pathname === "/buy.js") return script(buyScript);
   if (request.method === "GET" && url.pathname === "/receipt.js") return script(receiptScript);
   if (url.pathname === "/v1/checkout" && request.method === "POST") {
@@ -194,7 +215,11 @@ export async function checkout(
       .bind(order.id, cfg.origin, cfg.productId, cfg.environment)
       .first<{ key_ciphertext: string; key_iv: string; revoked: number }>();
     if (!row || row.revoked) return error(409, "revoked");
-    return json({ licenseKey: await decrypt(row.key_ciphertext, row.key_iv, env.ENCRYPTION_KEY) });
+    const email = await licenseEmailStatus(env, order.id);
+    return json({
+      licenseKey: await decrypt(row.key_ciphertext, row.key_iv, env.ENCRYPTION_KEY),
+      ...(email ? { email } : {}),
+    });
   }
   return error(404, "not_found");
 }

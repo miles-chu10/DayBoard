@@ -11,10 +11,12 @@ export interface Env {
   ENCRYPTION_KEY: string;
   HASH_SECRET: string;
   SITE_ORIGIN?: string;
-  SIGNUP_EMAIL?: SendEmail;
-  SIGNUP_NOTIFY_TO?: string;
   /** Optional bearer token for the /v1/admin/ routes. Unset or shorter than 32 characters: 503. */
   ADMIN_TOKEN?: string;
+  /** Optional Resend API key. With MAIL_FROM, it turns on the license key email. */
+  RESEND_API_KEY?: string;
+  /** Optional sender of the license key email: an address, or `Name <address>`. */
+  MAIL_FROM?: string;
 }
 
 export interface Config {

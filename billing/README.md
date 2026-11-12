@@ -1,6 +1,6 @@
 # DayBoard billing service
 
-This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics, and its only email is the optional owner notification about new waitlist signups.
+This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics. Its only email is the optional license key email to buyers ([below](#license-key-email)).
 
 ## Local verification
 
@@ -19,21 +19,14 @@ Tests call a fake Stripe transport with the **real Stripe SDK webhook verifier**
 
 For a visual-only preview, run `node --import tsx scripts/preview-billing.mjs` from the repository root. Its page banner identifies a disposable UI fixture; it never contacts Stripe or opens account/license storage. The real payment and authorization behavior is exercised separately by the tests above.
 
-## Waitlist signups
+## Waitlist (closed)
 
-`POST /v1/waitlist` stores addresses from the website's waitlist forms in the `beta_signups` table, which keeps its original internal name (`migrations/0002_beta_signups.sql` and `migrations/0004_waitlist_cohort.sql`). `POST /v1/beta-signup` is a legacy alias for pages cached before the rename: the same handler, rows, duplicate check and rate-limit bucket, so it can't create a second entry or double anyone's attempts. Signups work before any Stripe setup. They need only the D1 binding, `SERVICE_ORIGIN`, `HASH_SECRET`, and `SITE_ORIGIN`: the website's exact HTTPS origin. Browsers can call the endpoints only from that origin (CORS). If the binding, `HASH_SECRET` or `SITE_ORIGIN` is missing, they answer `503 signup_unconfigured`; a request addressed to any origin other than `SERVICE_ORIGIN` gets `403 origin_mismatch`.
+The website waitlist closed with the official 1.3.0 release on 2026-11-12. `POST /v1/waitlist` and its legacy alias `/v1/beta-signup` now answer `410 {"error": "waitlist_closed"}` to every request, before any configuration check. They read nothing from the request, write nothing to D1, count no rate limit and send no email. `SIGNUP_EMAIL` and `SIGNUP_NOTIFY_TO` are no longer read; a deployment that still has them is unaffected.
 
-- The request body is `{"email": "...", "company": ""}` as JSON, 1 KB at most. Addresses are trimmed and lowercased. Plus addressing is kept, so `name+tag@` and `name@` are separate entries. Older clients may leave out `company`, but when it's present it must be a string.
-- New and already-listed addresses get the same `200 {"ok": true}`, so the form can't reveal who signed up. A filled `company` field (hidden from people) is treated as a bot: it gets the same answer and nothing is stored.
-- Invalid addresses get `400 invalid_email`, and malformed bodies `400 invalid_body`. More than five attempts per minute from one IP address, counted across both routes, get `429 rate_limited`.
-- `{"ok": true}` is sent only after D1 confirms the write. A database failure, including a result that doesn't confirm the write, gets `503 service_unavailable` with the CORS header, so the page can offer a retry. Failures are logged with a generic message only, never the address or the raw error.
-- Each row holds `email`, `created_at`, `cohort` and `classification`. The service writes only the address and time, so every new row is `waitlist` / `unreviewed`, whatever the request contains. Migration 0004 labeled the reviewed first cohort, the rows created at or before `1791139887001` (2026-10-04 18:51:27 UTC), as `early_access` / `reviewed`. It labels the reserved test address `dayboard-verify+notify@example.com` as `likely_test` wherever a database holds it, and never inserts it. None of these values records an invitation, an access grant or proof that someone owns the address.
+The earlier signups stay in the `beta_signups` table, which keeps its original internal name (`migrations/0002_beta_signups.sql` and `migrations/0004_waitlist_cohort.sql`). Deleting them is a separate decision that needs the owner's explicit OK and a backup first.
+
+- Each row holds `email`, `created_at`, `cohort` and `classification`. Migration 0004 labeled the reviewed first cohort, the rows created at or before `1791139887001` (2026-10-04 18:51:27 UTC), as `early_access` / `reviewed`; later rows are `waitlist` / `unreviewed`. It labels the reserved test address `dayboard-verify+notify@example.com` as `likely_test` wherever a database holds it. None of these values records an invitation, an access grant or proof that someone owns the address.
 - Migration 0005 adds `email_suppressions`, for addresses that asked not to be emailed, and two views that leave them out: `dayboard_mailing_recipients` (one row per address that isn't `likely_test` or suppressed) and `waitlist_signups` (the list newest first, with the signup time in UTC and its age). A suppression stores the address trimmed and lowercased, the request and recording times, the reason `unsubscribe` and a reference to where the request came from. The Worker never reads or writes it.
-- With the optional `SIGNUP_EMAIL` binding and `SIGNUP_NOTIFY_TO` (an address verified in the zone's Email Routing), it emails that address once per new row from `signups@<site host>`, with the subject "New DayBoard waitlist signup". The email goes out after the reply, so new and listed addresses answer equally fast. Duplicates and hidden-field submissions send nothing, and a failed email neither fails nor repeats the signup.
-
-These protections have limits. CORS keeps other websites' pages out, but scripts can send any `Origin` header. The rate limit counts per IP address, so someone with many addresses (an IPv6 range, for example) gets more attempts, and the hidden field stops only simple bots. There's no CAPTCHA, and nothing confirms that an address belongs to the person who entered it. Add Cloudflare edge rules if abuse appears.
-
-For a signup-only deployment, start from `wrangler.signup.example.jsonc` (copy it to the git-ignored `wrangler.jsonc`) and follow `docs/launch/website-deploy.md`. The live service follows that document's "Existing deployment: waitlist rollout" section.
 
 From `billing/`, review the list without test rows or count it by cohort:
 
@@ -76,7 +69,8 @@ Copy `wrangler.example.jsonc` to `wrangler.jsonc` (git-ignored) in the intended 
 | `PRICE_CURRENCY`   | Lowercase three-letter currency of that price                             |
 | `ENVIRONMENT`      | `test` or `live`; must match the Stripe secret and all Stripe objects     |
 | `ACTIVATION_LIMIT` | Merchant-chosen decimal device cap, 1–99                                  |
-| `SITE_ORIGIN`      | Exact HTTPS origin of the website allowed to post waitlist signups        |
+| `SITE_ORIGIN`      | Exact HTTPS origin of the website, for the pricing and refund links       |
+| `MAIL_FROM`        | Optional. Sender of the [license key email](#license-key-email)           |
 
 The buy and receipt pages link to `/pricing` and `/refund` on `SITE_ORIGIN` (on `https://getdayboard.com` when it isn't set) and show `ACTIVATION_LIMIT` as the Mac cap. The price and refund copy ($5 once, 14 days) and the support address `support@getdayboard.com` are fixed text in `src/pages.ts`; change them there if the policy changes.
 
@@ -89,6 +83,7 @@ These are **server secrets**, never public Worker variables, build constants, re
 | `ENCRYPTION_KEY`        | 32 random bytes encoded as unpadded base64url; retain for the life of issued licenses                                                                            |
 | `HASH_SECRET`           | At least 32 characters of independent random secret material; retain for key and order lookups                                                                   |
 | `ADMIN_TOKEN`           | Optional. At least 32 random characters, unique to this Worker; enables the complimentary-license admin routes. Unset, they answer `503`                         |
+| `RESEND_API_KEY`        | Optional. Resend API key with sending access only, beginning with `re_`; with `MAIL_FROM`, turns on the [license key email](#license-key-email)                  |
 
 The service fails closed with `503 service_unconfigured` if the required binding, price, mode, cap, database, or secrets are missing. A public desktop build must use this **same** origin, product ID, and test/live environment. There are no merchant IDs in the repository.
 
@@ -108,14 +103,51 @@ The Worker never accepts a Checkout Session ID as claim authorization. Each `GET
 
 Exact checkout HTTP shapes:
 
-| Request                                   | Body/query                                   | Authorization and result                                                                                                                                |
-| ----------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /buy`                                | none                                         | Sets the per-order cookie and returns the purchase page; no Stripe Session yet                                                                          |
-| `POST /v1/checkout`                       | JSON `{ "orderId": "<32 base64url chars>" }` | Exact Origin plus matching per-order cookie; creates/reuses that order and Stripe Session. Retrying after a lost response returns the same Session URL. |
-| `GET /v1/checkout/status?order=<orderId>` | query                                        | Matching per-order cookie; returns `{ "state": "pending"                                                                                                | "ready" | "failed" | "revoked" }` |
-| `POST /v1/checkout/claim`                 | JSON `{ "orderId": "<32 base64url chars>" }` | Exact Origin plus matching per-order cookie; only a paid, unrevoked order returns `{ "licenseKey": "DAYB_..." }`                                        |
+| Request                                   | Body/query                                   | Authorization and result                                                                                                                                                             |
+| ----------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /buy`                                | none                                         | Sets the per-order cookie and returns the purchase page; no Stripe Session yet                                                                                                       |
+| `POST /v1/checkout`                       | JSON `{ "orderId": "<32 base64url chars>" }` | Exact Origin plus matching per-order cookie; creates/reuses that order and Stripe Session. Retrying after a lost response returns the same Session URL.                              |
+| `GET /v1/checkout/status?order=<orderId>` | query                                        | Matching per-order cookie; returns `{ "state": "pending"                                                                                                                             | "ready" | "failed" | "revoked" }` |
+| `POST /v1/checkout/claim`                 | JSON `{ "orderId": "<32 base64url chars>" }` | Exact Origin plus matching per-order cookie; only a paid, unrevoked order returns `{ "licenseKey": "DAYB_..." }`, plus `"email": "pending"` or `"sent"` when the key is also emailed |
 
 The ID selects an order but grants no authority by itself. Failed or expired receipts offer `/buy` to create a new order while retaining access to the older receipt until its cookie expires. Public license requests and checkout routes are size- and rate-limited using HMAC-hashed IP buckets, without raw IP or key logging. Configure Cloudflare's edge abuse controls for launch traffic.
+
+## License key email
+
+When `RESEND_API_KEY` and `MAIL_FROM` are both set, the service emails each buyer their license key through [Resend](https://resend.com) as soon as the key is issued. Without them the email is off, and checkout, the receipt page and license checks work exactly as they do without it. Complimentary keys are never emailed.
+
+- **When.** Right after the paid webhook stores the key, the moment the receipt page can show it. The email goes out after the webhook's reply, so Stripe never waits on Resend. A slow or failed send never fails the webhook, the receipt page or a license check.
+- **To whom.** The address the buyer gave Stripe Checkout (`customer_details.email` on the Checkout Session). Each attempt reads it from Stripe. It is never written to D1 and never logged: a failure logs only a status code and Resend's error name. Workers traces record the subrequest URL `https://api.resend.com/emails`, which holds no address, and no request body. Resend keeps its own copy of each message, address and key included, for its log retention period (30 days on the free plan as of 2026-11-09).
+- **What.** Subject "Your DayBoard Pro license key", as plain text and HTML: the key, the receipt page's activation steps, the Mac cap and the refund link. `Reply-To` is `support@getdayboard.com`. The request asks for no tags or attachments. Open and click tracking are Resend domain settings that are off by default; leave them off.
+- **Once.** `license_emails` (migration 0008) holds one row per emailed order with its state, attempt count and times. An attempt first claims the row, so repeated or parallel webhooks send one email. Every attempt for a queued email carries the same Resend idempotency key, `dayboard-license/<order id>/<queued_at>`, and an identical request, so a reply lost after Resend accepted the email can't produce a second copy within Resend's 24-hour key window.
+- **Retries.** A Cron Trigger every 15 minutes retries `pending` emails, at most five orders a run, until 23 hours after the email was queued. Then the row becomes `failed`, including on webhook redelivery. This stops retries before Resend forgets its idempotency key after 24 hours, so a lost reply cannot cause a duplicate outside that window. Resend's free plan allows 100 emails a day and answers `429 daily_quota_exceeded` beyond that; a quota reset outside the retry window requires approved support recovery instead of an automatic resend. An order refunded or disputed before its email went out becomes `skipped`, and so does a Checkout Session without a usable address.
+- **Pages.** `/buy` says the key is also emailed only while the email is configured. The receipt page shows "We're also emailing this key…" only for an order whose row is `pending` or `sent`.
+
+`MAIL_FROM` is an address or `Name <address>` on a domain verified in Resend, for example `DayBoard <license@getdayboard.com>`. If only one of the two settings is present, or `MAIL_FROM` isn't a valid sender, the email stays off and each paid order logs `License email is off: RESEND_API_KEY or MAIL_FROM is missing or invalid`.
+
+Setup, from Miles's Mac (not performed here):
+
+1. In Resend, add the sending domain and create exactly the DNS records its Records tab lists. They sit on subdomains (such as `send` and `resend._domainkey`), so the root domain's Email Routing records stay as they are. Add a `_dmarc` TXT record if the domain has none; Resend suggests starting with `v=DMARC1; p=none;`. Wait until Resend shows the domain as verified.
+2. Create a Resend API key with sending access only, limited to that domain. Save it in 1Password and set it with `npx wrangler secret put RESEND_API_KEY`. Use a separate key for the test Worker.
+3. Back up D1, then apply `migrations/0008_license_emails.sql` with `npx wrangler d1 migrations apply <database> --remote`. It only adds the `license_emails` table and its index.
+4. In `wrangler.jsonc`, add `MAIL_FROM` to `vars` and `"triggers": { "crons": ["*/15 * * * *"] }` as in `wrangler.example.jsonc`. Build, then deploy.
+5. On the test Worker, make a Stripe test-mode purchase. Check that the email arrives, that its key matches the receipt page, and that the order's row is `sent`.
+
+Code deployed before the migration is applied still takes payments and issues keys: the email can't be queued, which logs `License email could not be queued`, and nothing else changes. Deploy the website's privacy and pricing pages together with the email, because they describe it.
+
+Count emails by state from `billing/` (the table holds no addresses):
+
+```sh
+npx wrangler d1 execute <database> --remote --command "SELECT state, COUNT(*) AS n, MAX(attempts) AS most_attempts FROM license_emails GROUP BY state"
+```
+
+To send a buyer another copy, for a lost key or an order from before the email was on, first verify the payment as [Durable states and recovery](#durable-states-and-recovery) describes. Take the order ID from the Checkout Session's `client_reference_id` and queue the email again:
+
+```sh
+npx wrangler d1 execute <database> --remote --command "INSERT OR REPLACE INTO license_emails (order_id, state, queued_at, next_at) VALUES ('<order id>', 'pending', unixepoch() * 1000, 0)"
+```
+
+The next scheduled run, within 15 minutes, sends the key to the address on that Checkout Session. It can't go to an address someone gives you, and a refunded or disputed order gets `skipped` instead.
 
 ## Complimentary licenses
 
@@ -186,6 +218,7 @@ For a customer who has lost the order cookie and key:
 
 1. Ask for their Stripe receipt and a purchase identifier through the approved support channel. Do not ask for card numbers or a license key in public messages.
 2. An authorized operator verifies the payment in the correct Stripe account and mode, confirms the exact product/price and the matching D1 order/payment record, and checks that the payment has no refund or dispute tombstone.
-3. With approved access to D1 and `ENCRYPTION_KEY`, recover the **existing** encrypted license key for that order. Deliver it through the verified customer's approved private channel. Do not mint another license, expose it in a URL/log, or send it from an unconfigured email integration. Audit the support action without storing the plaintext key.
+3. If the [license key email](#license-key-email) is on, queue the order's email again with the statement in that section. The service sends the **existing** key to the address on the Checkout Session, and no operator handles the plaintext key. Tell the customer to check that inbox.
+4. Otherwise, or if the customer can no longer read that inbox, use approved access to D1 and `ENCRYPTION_KEY` to recover the **existing** encrypted license key for that order, and deliver it through the verified customer's approved private channel. Do not mint another license, expose the key in a URL or log, or send it from an unconfigured email integration. Audit the support action without storing the plaintext key.
 
-The database retains order capability hashes for seven-day browser claims and encrypted licenses/payment tombstones for purchase support and revocation. Set a data retention policy before launch; do not delete tombstones or active license material while official builds depend on them. Back up D1 and both crypto secrets before schema changes. No production data exists in this checkout.
+The database retains order capability hashes for seven-day browser claims, encrypted licenses/payment tombstones for purchase support and revocation, and the license email's send state without any address. Set a data retention policy before launch; do not delete tombstones or active license material while official builds depend on them. Back up D1 and both crypto secrets before schema changes. No production data exists in this checkout.

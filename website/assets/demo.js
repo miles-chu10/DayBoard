@@ -16,6 +16,8 @@ function startDemo(root) {
   let selectedEvent = null;
   let noteMode = "write";
   let assistantOpen = false;
+  let calendarOpen = false;
+  let peekOffset = 0;
   let renderedView = null;
   const history = ["Home"];
   let historyIndex = 0;
@@ -42,6 +44,9 @@ function startDemo(root) {
     Archive: "M3 4h18v4H3V4Zm2 4v12h14V8M10 12h4",
     Snooze: "M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
     Lines: "M5 7h14M5 12h14M5 17h9",
+    CalendarDays:
+      "M8 2v4m8-4v4M4 5h16v16H4V5Zm0 5h16M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01",
+    Expand: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",
   };
   const logos = {
     Calendar: "assets/app-logos/google-calendar.svg",
@@ -146,12 +151,14 @@ function startDemo(root) {
   const layout = el("div", "demo-layout");
   const nav = el("nav", "demo-navigation");
   nav.setAttribute("aria-label", "Demo views");
+  nav.id = "demo-navigation";
   const sidebarTop = el("div", "demo-sidebar-top");
   const lights = el("span", "demo-window-dots");
   lights.setAttribute("aria-hidden", "true");
   lights.append(el("i"), el("i"), el("i"));
-  const sidebarToggle = el("span", "demo-chrome-glyph");
-  sidebarToggle.append(icon("Sidebar"));
+  const sidebarToggle = button("", () => setSidebar(false), "demo-icon-button", "Sidebar");
+  sidebarToggle.setAttribute("aria-label", "Hide sidebar");
+  sidebarToggle.setAttribute("aria-controls", "demo-navigation");
   const newItem = button("", () => newTask(), "demo-circle-button", "Plus");
   newItem.setAttribute("aria-label", "New sample task");
   sidebarTop.append(lights, sidebarToggle, newItem);
@@ -166,6 +173,23 @@ function startDemo(root) {
   const forward = button("", () => step(1), "demo-circle-button is-quiet", "Forward");
   forward.setAttribute("aria-label", "Forward");
   const viewTitle = el("strong", "demo-toolbar-title", "Home");
+  // With the sidebar hidden, the traffic lights and its toggle move into the toolbar, as in the app.
+  const toolbarLead = el("div", "demo-toolbar-lead");
+  const leadDots = el("span", "demo-window-dots");
+  leadDots.setAttribute("aria-hidden", "true");
+  leadDots.append(el("i"), el("i"), el("i"));
+  const showSidebar = button("", () => setSidebar(true), "demo-icon-button", "Sidebar");
+  showSidebar.setAttribute("aria-label", "Show sidebar");
+  showSidebar.setAttribute("aria-controls", "demo-navigation");
+  toolbarLead.append(leadDots, showSidebar);
+  toolbarLead.hidden = true;
+  const calendarButton = button(
+    "",
+    () => setCalendar(!calendarOpen),
+    "demo-circle-button",
+    "CalendarDays",
+  );
+  calendarButton.setAttribute("aria-controls", "demo-calendar-pane");
   const ask = button("Ask", () => setAssistant(!assistantOpen), "demo-pill-button", "Ask");
   ask.setAttribute("aria-label", "Open sample Assistant");
   ask.setAttribute("aria-expanded", "false");
@@ -173,18 +197,136 @@ function startDemo(root) {
   const add = button("", () => newTask(), "demo-circle-button", "Plus");
   add.setAttribute("aria-label", "Add a sample task");
   const actions = el("div", "demo-toolbar-actions");
-  actions.append(ask, add);
-  toolbar.append(back, forward, viewTitle, actions);
+  actions.append(calendarButton, ask, add);
+  toolbar.append(toolbarLead, back, forward, viewTitle, actions);
   const content = el("div", "demo-content");
   content.tabIndex = -1;
   const assistant = el("aside", "demo-assistant");
   assistant.id = "demo-assistant";
   assistant.setAttribute("aria-label", "Sample Assistant");
   assistant.hidden = true;
+  const calendarPane = el("aside", "demo-calendar-pane");
+  calendarPane.id = "demo-calendar-pane";
+  calendarPane.setAttribute("aria-label", "Calendar beside this page");
+  calendarPane.hidden = true;
   const main = el("div", "demo-main");
   main.append(toolbar, content);
-  workspace.append(main, assistant);
-  layout.append(nav, workspace);
+
+  // ── Resizable, collapsible sidebars (sizes and open state are remembered in this browser) ──
+  const SIZES = {
+    nav: { key: "sidebar-width", fallback: 220, min: 180, max: 320, variable: "--demo-nav-width" },
+    pane: { key: "pane-width", fallback: 320, min: 260, max: 440, variable: "--demo-pane-width" },
+  };
+  const MAIN_MIN = 360;
+  const store = (() => {
+    try {
+      return globalThis.localStorage ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  function readPref(key) {
+    try {
+      return store?.getItem(`dayboard-demo:${key}`) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  function writePref(key, value) {
+    try {
+      store?.setItem(`dayboard-demo:${key}`, String(value));
+    } catch {
+      // Blocked storage only means the layout isn't remembered.
+    }
+  }
+  const widths = {};
+  for (const [name, size] of Object.entries(SIZES)) {
+    const stored = Number(readPref(size.key));
+    widths[name] = Number.isFinite(stored) && stored > 0 ? stored : size.fallback;
+  }
+
+  function maxWidth(name) {
+    const size = SIZES[name];
+    const total = layout.clientWidth;
+    if (!total) return size.max;
+    const other =
+      name === "nav"
+        ? assistantOpen || calendarOpen
+          ? widths.pane
+          : 0
+        : nav.hidden
+          ? 0
+          : widths.nav;
+    return Math.max(size.min, Math.min(size.max, total - other - MAIN_MIN));
+  }
+
+  function setWidth(name, value, persist) {
+    const size = SIZES[name];
+    widths[name] = Math.round(Math.min(maxWidth(name), Math.max(size.min, value)));
+    layout.style?.setProperty(size.variable, `${widths[name]}px`);
+    handles[name].setAttribute("aria-valuenow", String(widths[name]));
+    handles[name].setAttribute("aria-valuemax", String(Math.round(maxWidth(name))));
+    if (persist) writePref(size.key, widths[name]);
+  }
+
+  // A separator like the app's: drag, arrow keys (Shift for bigger steps), Home/End, and
+  // double-click to return to the default width.
+  function resizeHandle(name, label, controls, direction) {
+    const size = SIZES[name];
+    const handle = el("div", "demo-resize");
+    handle.tabIndex = 0;
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", "vertical");
+    handle.setAttribute("aria-label", label);
+    handle.setAttribute("aria-controls", controls);
+    handle.setAttribute("aria-valuemin", String(size.min));
+    handle.setAttribute("title", `${label}. Double-click to reset.`);
+    let startX = 0;
+    let startWidth = 0;
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      startX = event.clientX;
+      startWidth = widths[name];
+      handle.setPointerCapture?.(event.pointerId);
+      handle.classList?.add("is-dragging");
+      handle.focus({ preventScroll: true });
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (!handle.hasPointerCapture?.(event.pointerId)) return;
+      setWidth(name, startWidth + (event.clientX - startX) * direction, false);
+    });
+    const finish = (event) => {
+      if (!handle.hasPointerCapture?.(event.pointerId)) return;
+      handle.releasePointerCapture(event.pointerId);
+      handle.classList?.remove("is-dragging");
+      setWidth(name, widths[name], true);
+    };
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+    handle.addEventListener("dblclick", () => setWidth(name, size.fallback, true));
+    handle.addEventListener("keydown", (event) => {
+      const step = event.shiftKey ? 40 : 10;
+      const next = {
+        ArrowLeft: widths[name] - step * direction,
+        ArrowRight: widths[name] + step * direction,
+        Home: size.min,
+        End: maxWidth(name),
+      }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      setWidth(name, next, true);
+    });
+    return handle;
+  }
+  const handles = {
+    nav: resizeHandle("nav", "Resize sidebar", "demo-navigation", 1),
+    pane: resizeHandle("pane", "Resize side panel", "demo-calendar-pane demo-assistant", -1),
+  };
+  handles.pane.hidden = true;
+
+  workspace.append(main, handles.pane, assistant, calendarPane);
+  layout.append(nav, handles.nav, workspace);
   windowNode.append(layout);
 
   const feedback = el("div", "demo-feedback");
@@ -896,10 +1038,12 @@ function startDemo(root) {
 
   function setAssistant(isOpen, restoreFocus = true) {
     assistantOpen = isOpen;
+    if (isOpen && calendarOpen) setCalendar(false, false, false);
     assistant.hidden = !isOpen;
     workspace.dataset.assistant = isOpen ? "open" : "closed";
     ask.setAttribute("aria-expanded", String(isOpen));
     ask.setAttribute("aria-label", isOpen ? "Close sample Assistant" : "Open sample Assistant");
+    syncPane();
     renderSidebar();
     if (!isOpen) {
       if (restoreFocus) ask.focus();
@@ -925,6 +1069,156 @@ function startDemo(root) {
       answer,
     );
     close.focus();
+  }
+
+  // ── Calendar beside the page (the app's day peek) ─────
+  const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
+  const dateAt = (offset) =>
+    new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+
+  // The calendar and the Assistant share the right side, one at a time, as in the app. The
+  // calendar's open state is remembered; on Calendar itself the panel steps aside.
+  function syncPane() {
+    const onCalendar = view === "Calendar";
+    calendarButton.hidden = onCalendar;
+    calendarPane.hidden = !calendarOpen || onCalendar;
+    handles.pane.hidden = assistant.hidden && calendarPane.hidden;
+    calendarButton.setAttribute("aria-pressed", String(calendarOpen));
+    calendarButton.setAttribute(
+      "aria-label",
+      calendarOpen ? "Hide the calendar beside this page" : "Show the calendar beside this page",
+    );
+    calendarButton.className = `demo-circle-button${calendarOpen ? " is-active" : ""}`;
+  }
+
+  function setCalendar(isOpen, persist = true, restoreFocus = true) {
+    calendarOpen = isOpen;
+    if (persist) writePref("calendar", isOpen ? "open" : "closed");
+    if (isOpen && assistantOpen) setAssistant(false, false);
+    if (isOpen) peekOffset = 0;
+    syncPane();
+    renderPeek();
+    if (!isOpen && restoreFocus && !calendarButton.hidden) calendarButton.focus();
+  }
+
+  function setSidebar(isOpen) {
+    nav.hidden = !isOpen;
+    handles.nav.hidden = !isOpen;
+    toolbarLead.hidden = isOpen;
+    writePref("sidebar", isOpen ? "open" : "closed");
+    (isOpen ? sidebarToggle : showSidebar).focus();
+  }
+
+  function peekTask(item) {
+    const row = el("div", `demo-peek-task${item.done ? " is-done" : ""}`);
+    const label = el("label", "demo-task-check");
+    const checkbox = el("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = item.done;
+    checkbox.dataset.key = `peek-${item.id}`;
+    checkbox.setAttribute("aria-label", item.title);
+    checkbox.addEventListener("change", () =>
+      change(
+        { type: "toggle-task", id: item.id },
+        item.done ? "Task reopened in the demo." : "Task completed in the demo.",
+        `peek-${item.id}`,
+      ),
+    );
+    const text = el("span", "demo-peek-task-text");
+    text.append(el("span", "demo-task-title", item.title));
+    const due = dueLabel(item);
+    if (due) text.append(el("span", `demo-due${item.day === 0 ? " is-today" : ""}`, due));
+    label.append(checkbox, text);
+    row.append(label);
+    return row;
+  }
+
+  function renderPeek() {
+    if (calendarPane.hidden) {
+      calendarPane.replaceChildren();
+      return;
+    }
+    const selected = dateAt(peekOffset);
+    const heading = el("div", "demo-peek-heading");
+    const title = el(
+      "h4",
+      "",
+      selected.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }),
+    );
+    if (peekOffset === 0) title.append(el("small", "", "Today"));
+    const weekStep = (delta) => () => {
+      peekOffset += delta;
+      renderPeek();
+    };
+    const previousWeek = button("", weekStep(-7), "demo-icon-button", "Back");
+    previousWeek.setAttribute("aria-label", "Previous week");
+    const nextWeek = button("", weekStep(7), "demo-icon-button", "Forward");
+    nextWeek.setAttribute("aria-label", "Next week");
+    const openCalendar = button(
+      "",
+      () => go("Calendar", { key: "nav-Calendar" }),
+      "demo-icon-button",
+      "Expand",
+    );
+    openCalendar.setAttribute("aria-label", "Open Calendar");
+    const close = button("", () => setCalendar(false), "demo-icon-button", "Close");
+    close.setAttribute("aria-label", "Close the calendar panel");
+    heading.append(title, previousWeek, nextWeek, openCalendar, close);
+
+    const week = el("div", "demo-peek-week");
+    week.setAttribute("role", "group");
+    week.setAttribute("aria-label", "Days");
+    const start = peekOffset - selected.getDay();
+    for (let offset = start; offset < start + 7; offset++) {
+      const date = dateAt(offset);
+      const day = button(
+        "",
+        () => {
+          peekOffset = offset;
+          renderPeek();
+          focusKey(`peek-day-${offset}`);
+        },
+        `demo-peek-day${offset === 0 ? " is-today" : ""}`,
+      );
+      day.dataset.key = `peek-day-${offset}`;
+      day.setAttribute("aria-pressed", String(offset === peekOffset));
+      day.setAttribute(
+        "aria-label",
+        date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
+      );
+      day.append(el("span", "", WEEKDAY[date.getDay()]), el("b", "", String(date.getDate())));
+      week.append(day);
+    }
+
+    const events = demoMeetings
+      .filter((item) => item.day === peekOffset)
+      .sort((a, b) => (a.allDay ? -1 : b.allDay ? 1 : minutes(a.time) - minutes(b.time)));
+    const todos = state.tasks.filter((item) => !item.done && item.day === peekOffset);
+    const list = el("div", "demo-peek-list");
+    for (const meeting of events) {
+      const row = button(
+        "",
+        () => go("Calendar", { event: meeting.id, key: meeting.id }),
+        `demo-peek-event is-${calendarTone[meeting.calendar]}`,
+      );
+      row.setAttribute(
+        "aria-label",
+        `${meeting.title}, ${meeting.allDay ? "all day" : `${meeting.time} to ${meeting.end}`}`,
+      );
+      row.append(
+        el("strong", "", meeting.title),
+        el("small", "", meeting.allDay ? "All day" : meeting.time),
+      );
+      list.append(row);
+    }
+    list.append(...todos.map(peekTask));
+    if (!events.length && !todos.length)
+      list.append(el("p", "demo-empty", "Nothing scheduled or due."));
+    calendarPane.replaceChildren(heading, week, list);
   }
 
   // ── Sidebar ───────────────────────────────────────────
@@ -1005,6 +1299,8 @@ function startDemo(root) {
       Reminders: () => renderTodos("Reminders"),
       Notes: renderNotes,
     })[view]();
+    syncPane();
+    renderPeek();
     content.scrollTop = scroll;
     renderedView = view;
     undo.hidden = !previous;
@@ -1016,6 +1312,19 @@ function startDemo(root) {
       setAssistant(false);
     }
   });
+  setWidth("nav", widths.nav, false);
+  setWidth("pane", widths.pane, false);
+  if (readPref("sidebar") === "closed") {
+    nav.hidden = true;
+    handles.nav.hidden = true;
+    toolbarLead.hidden = false;
+  }
+  // The calendar opens beside Home only where it fits next to the page (narrower windows show it
+  // over the page, so it waits for a click there). First visit: open on a wide window, as in the
+  // app's screenshots; after that the visitor's last choice wins.
+  const fits = (width) => Boolean(globalThis.matchMedia?.(`(min-width: ${width}px)`).matches);
+  const storedCalendar = readPref("calendar");
+  calendarOpen = fits(1101) && (storedCalendar === null ? fits(1180) : storedCalendar === "open");
   render();
   root.hidden = false;
 }

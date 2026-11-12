@@ -17,7 +17,7 @@ function menuItems(html) {
 
 test("every page has the same Product and Resources menus", () => {
   const reference = menuItems(readFileSync(new URL("index.html", dir), "utf8"));
-  assert.equal(reference.length, 14);
+  assert.equal(reference.length, 15);
   for (const page of pages) {
     const html = readFileSync(new URL(page, dir), "utf8");
     assert.deepEqual(menuItems(html), reference, page);

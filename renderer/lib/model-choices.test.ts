@@ -51,7 +51,6 @@ function settings(overrides: Partial<AppSettings["ai"]> = {}): AppSettings["ai"]
     codexEffort: "",
     codexServiceTier: "",
     geminiModel: "",
-    museModel: "",
     apiModels: {
       openai: "",
       anthropic: "",
@@ -96,7 +95,8 @@ test("each provider lists its default first, then its models, then a saved unlis
     "gemini-3-pro",
   ]);
   assert.equal(modelChoices("gemini", settings(), {})[0].label, "Antigravity default");
-  assert.equal(modelChoices("muse", settings(), {})[0].label, "Muse Code default");
+  assert.deepEqual(values("grok", settings()), [""]);
+  assert.equal(modelChoices("grok", settings(), {})[0].label, "Grok Build default");
   assert.deepEqual(values("claude"), [
     "default",
     "fable",

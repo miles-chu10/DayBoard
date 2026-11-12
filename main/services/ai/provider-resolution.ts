@@ -7,7 +7,7 @@ export async function resolveConfiguredProvider(preferred: AIProvider): Promise<
   if (isApiProvider(preferred)) {
     return (await getApiKey(preferred)) ? preferred : null;
   }
-  const cliProviders: readonly CliProviderId[] = ["claude", "codex", "gemini", "muse"];
+  const cliProviders: readonly CliProviderId[] = ["claude", "codex", "gemini", "grok"];
   if (!cliProviders.includes(preferred as CliProviderId)) return null;
   // An executable is only an installation check; the request itself verifies authentication.
   return (await resolveCli(preferred as CliProviderId)) ? preferred : null;

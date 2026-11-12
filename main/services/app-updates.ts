@@ -26,6 +26,11 @@ export interface AppUpdatesOptions {
   prepareForInstall: () => Promise<void>;
   resumeAfterInstallFailure: () => void;
   onChange?: (state: AppUpdateState) => void;
+  /**
+   * Decides whether a background check downloads the update it found. Returning false leaves the
+   * update available, for the update window to offer. Defaults to downloading.
+   */
+  shouldDownloadAutomatically?: (version: string) => boolean | Promise<boolean>;
   checkTimeoutMs?: number;
   downloadTimeoutMs?: number;
   automaticDelayMs?: number;
@@ -310,9 +315,20 @@ export function createAppUpdates(options: AppUpdatesOptions) {
     const schedule = (delay: number) => {
       if (!stopped) timer = setTimeout(() => void cycle(), delay);
     };
+    // A declined update is checked again next time, so a newer release can replace it.
+    let declined = false;
     async function cycle() {
-      if (state.phase !== "available") await check();
-      if (!stopped && state.phase === "available") await download();
+      if (state.phase !== "available" || declined) await check();
+      declined = false;
+      if (!stopped && state.phase === "available" && state.availableVersion) {
+        const allowed = options.shouldDownloadAutomatically
+          ? await Promise.resolve(
+              options.shouldDownloadAutomatically(state.availableVersion),
+            ).catch(() => false)
+          : true;
+        if (!allowed) declined = true;
+        else if (!stopped && state.phase === "available") await download();
+      }
       schedule(options.automaticIntervalMs ?? 6 * 60 * 60_000);
     }
     schedule(options.automaticDelayMs ?? 30_000);

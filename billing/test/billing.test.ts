@@ -734,6 +734,119 @@ test("served browser scripts parse as JavaScript", () => {
 
 const supportLink = /<a href="mailto:support@getdayboard\.com">support@getdayboard\.com<\/a>/;
 
+// Runs the served receipt script against a minimal page: the claim succeeds, then the buyer
+// clicks Copy license. `clipboard` is what navigator.clipboard.writeText does in that browser.
+async function receiptCopy(clipboard: () => Promise<void>, execCommand: () => boolean) {
+  const order = "A".repeat(32);
+  const ids = ["title", "message", "wait", "license", "key", "copy", "copied", "emailed"];
+  const nodes = Object.fromEntries(
+    ids.map((id) => [id, { id, textContent: "", hidden: true } as Record<string, unknown>]),
+  );
+  nodes.download = { id: "download" };
+  nodes.message.textContent = "Your payment may take a moment to confirm.";
+  let selected: unknown = null;
+  const page = {
+    title: "",
+    getElementById: (id: string) => nodes[id],
+    createRange: () => ({ selectNodeContents: (node: unknown) => (selected = node) }),
+    execCommand,
+  };
+  const fetched = async (url: string) =>
+    new Response(
+      JSON.stringify(
+        url.startsWith("/v1/checkout/status")
+          ? { state: "ready" }
+          : { licenseKey: "DAYB_fixture", email: "sent" },
+      ),
+    );
+  new Function("document", "location", "fetch", "navigator", "getSelection", receiptScript)(
+    page,
+    { href: `${origin}/receipt?order=${order}` },
+    fetched,
+    { clipboard: { writeText: clipboard } },
+    () => ({ removeAllRanges() {}, addRange() {} }),
+  );
+  for (let turn = 0; turn < 20 && nodes.license.hidden; turn++)
+    await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(nodes.license.hidden, false);
+  assert.equal(nodes.wait.hidden, true);
+  await (nodes.copy.onclick as () => Promise<void>)();
+  return { nodes, selected: () => selected };
+}
+
+test("a blocked copy selects the key and says so beside the buttons, not in the status line", async () => {
+  const blocked = await receiptCopy(
+    () => Promise.reject(new Error("blocked")),
+    () => false,
+  );
+  assert.equal(
+    blocked.nodes.copied.textContent,
+    "This browser blocked copying. Your key is selected: press ⌘C to copy it, or use Download license.",
+  );
+  assert.equal(blocked.selected(), blocked.nodes.key);
+  // The status line above the key keeps the order's state; the old message pointed "above".
+  assert.equal(blocked.nodes.message.textContent, "Payment confirmed. Your license key is below.");
+  assert.doesNotMatch(receiptScript, /Copy is unavailable|license above/);
+
+  // The older copy command still works where the Clipboard API is refused.
+  const legacy = await receiptCopy(
+    () => Promise.reject(new Error("blocked")),
+    () => true,
+  );
+  assert.equal(legacy.nodes.copied.textContent, "License copied.");
+
+  const copiedKeys: string[] = [];
+  const allowed = await receiptCopy(
+    async (...args: unknown[]) => void copiedKeys.push(String(args[0])),
+    () => false,
+  );
+  assert.deepEqual(copiedKeys, ["DAYB_fixture"]);
+  assert.equal(allowed.nodes.copied.textContent, "License copied.");
+  assert.equal(allowed.nodes.copy.textContent, "Copied");
+  assert.equal(allowed.selected(), null);
+
+  const html = await (await setup().call("/receipt")).text();
+  assert.match(
+    html,
+    /Download license<\/button><\/div><p id="copied" role="status" aria-live="polite"><\/p>/,
+  );
+});
+
+test("pages take their typeface and icon from this Worker and nothing from other origins", async () => {
+  const f = setup();
+  for (const path of ["/buy", "/receipt"]) {
+    const page = await f.call(path);
+    assert.match(
+      page.headers.get("Content-Security-Policy")!,
+      /^default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self';/,
+    );
+    const html = await page.text();
+    assert.match(html, /src:url\("\/fonts\/hanken-grotesk\.woff2"\) format\("woff2"\)/);
+    assert.match(html, /<img src="\/icon\.png" alt="" width="34" height="34">DayBoard<\/a>/);
+    assert.doesNotMatch(
+      html,
+      /url\((?!"\/fonts\/)|@import|<link(?! rel="icon" href="\/icon\.png">)/,
+    );
+  }
+  for (const [path, type, signature] of [
+    ["/fonts/hanken-grotesk.woff2", "font/woff2", "wOF2"],
+    ["/icon.png", "image/png", "\x89PNG"],
+  ] as const) {
+    const asset = await f.call(path);
+    assert.equal(asset.status, 200, path);
+    assert.equal(asset.headers.get("Content-Type"), type);
+    assert.equal(asset.headers.get("Cache-Control"), "public, max-age=86400");
+    assert.equal(asset.headers.get("X-Content-Type-Options"), "nosniff");
+    assert.equal(asset.headers.get("Set-Cookie"), null);
+    const body = Buffer.from(await asset.arrayBuffer());
+    assert.equal(body.subarray(0, 4).toString("latin1"), signature);
+    // The same bytes the website serves.
+    const source = path === "/icon.png" ? "website/assets/icon-96.png" : `website/assets${path}`;
+    assert.ok(body.equals(await readFile(new URL(`../../${source}`, import.meta.url))), path);
+  }
+  assert.equal((await f.call("/fonts/other.woff2")).status, 404);
+});
+
 test("buy page states the offer, terms and support before checkout", async () => {
   const f = setup();
   f.env.ACTIVATION_LIMIT = "3";

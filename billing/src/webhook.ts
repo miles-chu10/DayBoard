@@ -1,7 +1,10 @@
 import Stripe from "stripe";
+import type { WaitUntil } from "./beta.ts";
 import type { Config, Env } from "./config.ts";
 import { mintLicense } from "./crypto.ts";
 import { error, json, readBoundedText } from "./http.ts";
+import { deliverLicenseEmail, queueLicenseEmail } from "./license-email.ts";
+import type { Send } from "./mail.ts";
 
 function id(value: string | { id: string } | null | undefined): string | null {
   return typeof value === "string" ? value : (value?.id ?? null);
@@ -13,13 +16,14 @@ async function recordEvent(env: Env, event: Stripe.Event): Promise<void> {
     .bind(event.id, event.type, Date.now())
     .run();
 }
+/** Issues the order's key. Returns the order and its checkout address when the key is ready. */
 async function paid(
   event: Stripe.Event,
   env: Env,
   cfg: Config,
   stripe: Stripe,
   sessionId: string,
-): Promise<void> {
+): Promise<{ orderId: string; address: unknown } | null> {
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   if (
     session.livemode !== (cfg.environment === "live") ||
@@ -102,6 +106,9 @@ async function paid(
     .bind(order.id)
     .first<{ state: string }>();
   if (row?.state !== "ready" && row?.state !== "revoked") throw new Error("issuance_not_durable");
+  return row.state === "ready"
+    ? { orderId: order.id, address: session.customer_details?.email }
+    : null;
 }
 async function completedUnpaid(
   event: Stripe.Event,
@@ -194,6 +201,8 @@ export async function webhook(
   env: Env,
   cfg: Config,
   stripe: Stripe,
+  send: Send,
+  ctx?: WaitUntil,
 ): Promise<Response> {
   if (request.method !== "POST") return error(405, "method_not_allowed");
   if (Number(request.headers.get("Content-Length") ?? 0) > 131072)
@@ -229,8 +238,17 @@ export async function webhook(
       if (
         event.type !== "checkout.session.completed" ||
         !(await completedUnpaid(event, env, cfg, stripe, raw.id))
-      )
-        await paid(event, env, cfg, stripe, raw.id);
+      ) {
+        const issued = await paid(event, env, cfg, stripe, raw.id);
+        // The key is durable from here on. The email is extra: queueing it never throws, and it
+        // is sent after the reply when possible, so Stripe isn't kept waiting on the provider.
+        const mail = issued && (await queueLicenseEmail(env, issued.orderId));
+        if (issued && mail) {
+          const sent = deliverLicenseEmail(env, cfg, mail, send, issued.orderId, issued.address);
+          if (ctx) ctx.waitUntil(sent);
+          else await sent;
+        }
+      }
     } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
       await refundOrDispute(event, env, cfg, stripe);
     } else if (

@@ -7,6 +7,7 @@ export const ASSISTANT_PROVIDERS = [
   "claude",
   "codex",
   "gemini",
+  "grok",
   "muse",
   "openai",
   "anthropic",

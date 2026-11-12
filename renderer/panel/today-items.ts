@@ -9,6 +9,8 @@ export interface TodayItem {
    * anytime to-do. */
   time: string | null;
   source: "calendar" | "tasks" | "reminders";
+  /** An event that has already ended today; it stays listed, styled as past. */
+  past?: boolean;
 }
 
 const MAX_ITEMS = 8;
@@ -18,9 +20,15 @@ function clockTime(hhmm: string): string {
   return formatTimeOfDay(new Date(2000, 0, 1, hours, minutes).toISOString());
 }
 
+function capItems(items: TodayItem[]): TodayItem[] {
+  let todos = 0;
+  return items.filter((item) => item.kind === "event" || ++todos <= MAX_ITEMS);
+}
+
 /**
- * What's left today, for the menu-bar panel: timed items not yet over, then anytime to-dos. Open
- * overdue to-dos come separately, oldest first, for the panel's collapsible overdue row.
+ * Today in the menu-bar panel: timed items in order (events that already ended stay, marked past),
+ * then anytime to-dos. Every event today is listed; to-dos stop at the cap.
+ * Open overdue to-dos come separately, oldest first, for the panel's collapsible overdue row.
  */
 export function todayItems(
   agenda: Agenda,
@@ -30,13 +38,14 @@ export function todayItems(
   const items: TodayItem[] = [];
   for (const entry of today?.timed ?? []) {
     if (entry.kind === "event") {
-      if (new Date(entry.event.end).getTime() <= now.getTime()) continue;
+      const past = new Date(entry.event.end).getTime() <= now.getTime();
       items.push({
         key: entry.key,
         kind: "event",
         title: entry.event.title,
         time: formatTimeOfDay(entry.event.start),
         source: "calendar",
+        ...(past ? { past } : {}),
       });
     } else if (!entry.todo.completed) {
       items.push({
@@ -62,6 +71,6 @@ export function todayItems(
       time: todo.dueDate ? relativeDue(todo.dueDate, todo.dueTime, now).label : null,
       source: todo.source,
     })),
-    items: items.slice(0, MAX_ITEMS),
+    items: capItems(items),
   };
 }

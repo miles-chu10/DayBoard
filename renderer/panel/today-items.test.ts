@@ -58,7 +58,7 @@ function agenda(
   };
 }
 
-test("lists today's remaining events then due to-dos", () => {
+test("keeps today's ended events, marked past, in order with the rest", () => {
   const result = todayItems(
     agenda({
       timed: [
@@ -74,14 +74,19 @@ test("lists today's remaining events then due to-dos", () => {
   assert.deepEqual(
     result.items.map((item) => [item.key, item.kind, item.source]),
     [
+      ["e1", "event", "calendar"],
       ["e2", "event", "calendar"],
       ["t1", "todo", "reminders"],
       ["e3", "event", "calendar"],
       ["t2", "todo", "reminders"],
     ],
   );
-  assert.equal(result.items[1].time, "3:00 PM");
-  assert.equal(result.items[3].time, null);
+  assert.deepEqual(
+    result.items.map((item) => item.past ?? false),
+    [true, false, false, false, false],
+  );
+  assert.equal(result.items[2].time, "3:00 PM");
+  assert.equal(result.items[4].time, null);
 });
 
 test("counts and lists open overdue to-dos with how late they are", () => {
@@ -117,4 +122,45 @@ test("caps the overdue list at eight but counts every overdue to-do", () => {
 test("caps the list at eight", () => {
   const anytime = Array.from({ length: 12 }, (_, index) => todo(`t${index}`));
   assert.equal(todayItems(agenda({ anytime }), now).items.length, 8);
+});
+
+test("an event ending exactly now counts as past; a running one does not", () => {
+  const result = todayItems(
+    agenda({
+      timed: [
+        { kind: "event", key: "ended", event: event("1", at(11), at(12)) },
+        { kind: "event", key: "running", event: event("2", at(11, 30), at(12, 30)) },
+      ],
+    }),
+    now,
+  );
+  assert.deepEqual(
+    result.items.map((item) => [item.key, item.past ?? false]),
+    [
+      ["ended", true],
+      ["running", false],
+    ],
+  );
+});
+
+test("lists every event today, past or not, and caps only the to-dos", () => {
+  const timed = Array.from({ length: 6 }, (_, index) => ({
+    kind: "event" as const,
+    key: `e${index}`,
+    event: event(`e${index}`, at(index * 2 + 8), at(index * 2 + 8, 30)),
+  }));
+  const anytime = Array.from({ length: 10 }, (_, index) => todo(`t${index}`));
+  const items = todayItems(agenda({ timed, anytime }), now).items;
+  assert.deepEqual(
+    items.filter((item) => item.kind === "event").map((item) => [item.key, item.past ?? false]),
+    [
+      ["e0", true],
+      ["e1", true],
+      ["e2", false],
+      ["e3", false],
+      ["e4", false],
+      ["e5", false],
+    ],
+  );
+  assert.equal(items.filter((item) => item.kind === "todo").length, 8);
 });

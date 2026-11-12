@@ -1,3 +1,5 @@
+// The waitlist closed on 2026-11-12: /v1/waitlist and /v1/beta-signup now answer 410, so the
+// signup checks below fail by design. Kept for reference until it is rewritten; see billing/README.md.
 // Post-deploy check for the website and its waitlist API. It signs up one synthetic address through
 // /v1/waitlist, repeats it through the legacy /v1/beta-signup alias, and ends by printing the D1
 // commands that confirm and delete that row.
@@ -9,7 +11,7 @@ const USAGE =
 const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
 const PAGES = [
   "/",
-  "/waitlist.html",
+  "/download.html",
   "/beta.html",
   "/docs.html",
   "/support.html",
@@ -438,24 +440,12 @@ async function checkPages() {
   }
   const value = (key) =>
     new RegExp(`["']?${key}["']?\\s*:\\s*(["'\`])(.*?)\\1`).exec(config)?.[2] ?? "";
-  const signupUrl = value("waitlistUrl");
-  check(
-    "site.js waitlistUrl",
-    signupUrl === ENDPOINT,
-    signupUrl === ENDPOINT
-      ? signupUrl
-      : signupUrl
-        ? `"${signupUrl}", expected ${ENDPOINT}`
-        : `empty, expected ${ENDPOINT}; the forms stay closed`,
-  );
   const contact = value("contactEmail");
   const contactOk = /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(contact);
   check(
     "site.js contactEmail",
     contactOk,
-    contactOk
-      ? contact
-      : `${contact ? `"${contact}" is not an address` : "empty"}; the forms stay closed until it is set`,
+    contactOk ? contact : `${contact ? `"${contact}" is not an address` : "empty"}`,
   );
 }
 

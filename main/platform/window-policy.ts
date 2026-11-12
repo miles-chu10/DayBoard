@@ -1,7 +1,12 @@
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const ENTRIES = new Set(["main-window.html", "settings-window.html", "panel-window.html"]);
+const ENTRIES = new Set([
+  "main-window.html",
+  "settings-window.html",
+  "panel-window.html",
+  "update-window.html",
+]);
 
 export function windowEntryUrl(
   htmlFileName: string,

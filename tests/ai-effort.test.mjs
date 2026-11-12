@@ -160,7 +160,7 @@ test("effort levels follow the route and model table, including dated snapshots"
     "groq",
     "openrouter",
     "gemini",
-    "muse",
+    "grok",
     "glaze",
   ])
     assert.deepEqual(levels(provider, "gpt-6-sol"), [], provider);
@@ -233,7 +233,7 @@ test("model labels pair the model with the effort DayBoard requests, or say who 
   // Routes without an effort control add nothing rather than a guessed level.
   for (const [provider, model] of [
     ["gemini", ""],
-    ["muse", ""],
+    ["grok", ""],
     ["openai", "gpt-5.5"],
     ["codex", "gone"],
   ])
@@ -310,7 +310,6 @@ function aiSettings(overrides = {}) {
     codexEffort: "",
     codexServiceTier: "",
     geminiModel: "",
-    museModel: "",
     apiModels: { openai: "", anthropic: "", google: "", xai: "" },
     assistantEffort: {},
     useMcpInAssistant: false,

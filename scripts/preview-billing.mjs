@@ -1,6 +1,7 @@
 // UI-only disposable preview. The actual Worker/D1/payment contracts are tested separately.
 // This server never contacts Stripe, accepts card details, or touches license/account storage.
 import { createServer } from "node:http";
+import { assets } from "../billing/src/assets.ts";
 import {
   DEFAULT_SITE_ORIGIN,
   buyPage,
@@ -11,7 +12,7 @@ import {
 
 const orderId = "F".repeat(32);
 const fixtureKey = `DAYB_${"F".repeat(43)}`;
-const context = { site: DEFAULT_SITE_ORIGIN, activationLimit: 3 };
+const context = { site: DEFAULT_SITE_ORIGIN, activationLimit: 3, emailsKey: true };
 let polls = 0;
 const banner =
   '<aside style="padding:12px;text-align:center;background:#30394a;color:white;font:14px system-ui">Local UI fixture · no payments or real licenses</aside>';
@@ -26,6 +27,9 @@ const server = createServer(async (request, response) => {
     response.end(
       markup(url.pathname === "/buy" ? buyPage(orderId, context) : receiptPage(context)),
     );
+  } else if (assets[url.pathname]) {
+    response.setHeader("Content-Type", assets[url.pathname].type);
+    response.end(assets[url.pathname].body());
   } else if (url.pathname === "/buy.js" || url.pathname === "/receipt.js") {
     response.setHeader("Content-Type", "text/javascript; charset=utf-8");
     response.end(url.pathname === "/buy.js" ? buyScript : receiptScript);
@@ -60,7 +64,7 @@ const server = createServer(async (request, response) => {
       url.pathname === "/v1/checkout/claim" &&
       body?.orderId === orderId
     ) {
-      response.end(JSON.stringify({ licenseKey: fixtureKey }));
+      response.end(JSON.stringify({ licenseKey: fixtureKey, email: "sent" }));
     } else response.writeHead(404).end("{}");
   }
 });

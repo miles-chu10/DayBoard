@@ -128,13 +128,8 @@ function modelOnly(
       contextWindow: null,
       id: ai.geminiModel,
     };
-  if (provider === "muse")
-    return {
-      label: ai.museModel || DEFAULT_MODEL_LABEL.muse,
-      fast: false,
-      contextWindow: null,
-      id: ai.museModel,
-    };
+  if (provider === "grok")
+    return { label: DEFAULT_MODEL_LABEL[provider], fast: false, contextWindow: null, id: "" };
   if (isApiKeyProvider(provider)) {
     const chosen = ai.apiModels[provider];
     const model =

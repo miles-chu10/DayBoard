@@ -38,17 +38,24 @@ function ItemRow({ item, wideTime = false }: { item: TodayItem; wideTime?: boole
       className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
       onClick={() => void openMain(item.kind === "event" ? "/calendar" : "/agenda")}
     >
-      <SourceDot source={item.source} />
+      <SourceDot source={item.source} className={item.past ? "opacity-50" : undefined} />
       <Text
         as="span"
         variant="small"
-        color="secondary"
+        color={item.past ? "tertiary" : "secondary"}
         className={`${wideTime ? "w-20" : "w-16"} shrink-0 tabular-nums`}
         truncate
       >
         {item.time ?? "Anytime"}
       </Text>
-      <Text as="span" variant="regular" truncate title={item.title}>
+      <Text
+        as="span"
+        variant="regular"
+        color={item.past ? "tertiary" : undefined}
+        truncate
+        title={item.title}
+        data-past={item.past ? "" : undefined}
+      >
         {item.title}
       </Text>
     </button>
