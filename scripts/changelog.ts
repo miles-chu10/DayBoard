@@ -153,6 +153,10 @@ export function buildChangelogPage(options: {
   );
   replace(/(<link rel="canonical" href=")[^"]*(")/, "$1https://getdayboard.com/changelog$2");
   replace(/ aria-current="page"/, "");
+  replace(
+    /(<a class="nav-link" href="changelog\.html")(>Changelog<\/a>)/,
+    '$1 aria-current="page"$2',
+  );
   replace(/<main id="main">[\s\S]*<\/main>/, main);
   return page;
 }
