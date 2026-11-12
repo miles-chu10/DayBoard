@@ -25,12 +25,18 @@ import type {
   MailItem,
 } from "@main/shared-types";
 
-import { getAvailableSlots, findRelatedTodos } from "../lib/agenda";
+import { getAvailableSlots, findRelatedTodos, findTimedTwin } from "../lib/agenda";
 import { formatClock, formatMailDate, shortDate } from "../lib/dates";
 import { errorMessage, openExternal } from "../lib/ipc";
-import { useAccounts, useAgendaState, useCalendarRange, useToggleTodo } from "../lib/queries";
+import {
+  useAccounts,
+  useAgendaState,
+  useCalendarRange,
+  useReminders,
+  useToggleTodo,
+} from "../lib/queries";
 import { featureOn, sourceOn, useSettings } from "../lib/settings";
-import { linkedGroupKeys, type Todo } from "../lib/todos";
+import { buildTodos, linkedGroupKeys, type Todo } from "../lib/todos";
 import { useAgendaClock } from "../lib/use-agenda-clock";
 import { SOURCE_META } from "../lib/sources";
 import { DetailPanel } from "./detail-panel";
@@ -195,6 +201,20 @@ export function AgendaDetailDialog({
       .filter(({ link }) => link?.status !== "dismissed");
     return [...accepted, ...suggestions];
   }, [agenda.data?.duplicateLinks, todo, todos]);
+  // The Google Tasks API keeps only the date of a deadline, even when Google Calendar shows a time.
+  const googleTimeUnknown = todo.source === "tasks" && Boolean(todo.dueDate) && !todo.dueTime;
+  const reminders = useReminders();
+  const timedTwin = useMemo(() => {
+    const twin = googleTimeUnknown
+      ? findTimedTwin(todo, buildTodos(undefined, reminders.data))
+      : undefined;
+    return twin
+      ? {
+          candidate: twin,
+          accepted: linkedGroupKeys(agenda.data?.duplicateLinks, todo.key).includes(twin.key),
+        }
+      : undefined;
+  }, [agenda.data?.duplicateLinks, googleTimeUnknown, reminders.data, todo]);
   const slots = useMemo(
     () =>
       getAvailableSlots(
@@ -310,9 +330,26 @@ export function AgendaDetailDialog({
         >
           <Text>
             {todo.dueDate
-              ? `${shortDate(todo.dueDate)}${todo.dueTime ? ` · ${formatClock(todo.dueTime)}` : " · Anytime"}`
+              ? `${shortDate(todo.dueDate)}${
+                  todo.dueTime
+                    ? ` · ${formatClock(todo.dueTime)}`
+                    : googleTimeUnknown
+                      ? " · Time not shared by Google"
+                      : " · Anytime"
+                }`
               : "No deadline"}
           </Text>
+          {googleTimeUnknown ? (
+            <Text variant="small" color="secondary">
+              {timedTwin?.candidate?.dueTime
+                ? `Google Tasks doesn't share task times with other apps. ${
+                    timedTwin.accepted ? "The linked" : "The matching"
+                  } Apple reminder is at ${formatClock(timedTwin.candidate.dueTime)}${
+                    timedTwin.accepted ? "." : "; link them to show that time."
+                  }`
+                : "Google Tasks doesn't share task times with other apps, so a time set in Google Calendar can't show here."}
+            </Text>
+          ) : null}
         </Field>
         <Field label="Provider" orientation="vertical">
           <span className="flex items-center gap-2">

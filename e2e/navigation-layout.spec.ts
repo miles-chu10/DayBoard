@@ -180,3 +180,47 @@ test("window history and sidebar remain usable through keyboard navigation and d
     await demo.close();
   }
 });
+
+test("the hidden sidebar's toggle stays clickable above every page header", async () => {
+  const demo = await launchDemo();
+  try {
+    await demo.page.keyboard.press("Control+Meta+S");
+    const show = demo.page.getByRole("button", { name: "Show Sidebar", exact: true });
+    await expect(show).toBeVisible();
+    const after = await show.boundingBox();
+    // macOS takes clicks inside app-region: drag for moving the window, and Chromium applies those
+    // rectangles in document order. The page header must not cover the hidden sidebar's toggle.
+    for (const digit of [3, 1, 2, 4, 5]) {
+      await demo.page.keyboard.press(`Control+Digit${digit}`);
+      const view = (await demo.page.locator("[data-page-header] h1").first().textContent()) ?? "";
+      if (digit === 3)
+        await expect(demo.page.locator("[data-page-header] h1").first()).toHaveText("Calendar");
+      const center = { x: after!.x + after!.width / 2, y: after!.y + after!.height / 2 };
+      const region = await demo.page.evaluate(({ x, y }) => {
+        const { document, getComputedStyle } = globalThis as unknown as {
+          document: { querySelectorAll(selector: string): ArrayLike<HitElement> };
+          getComputedStyle(element: HitElement): { getPropertyValue(name: string): string };
+        };
+        type HitElement = {
+          getBoundingClientRect(): { left: number; right: number; top: number; bottom: number };
+        };
+        let last = "none";
+        for (const element of Array.from(document.querySelectorAll("*"))) {
+          const value = getComputedStyle(element).getPropertyValue("app-region");
+          if (value !== "drag" && value !== "no-drag") continue;
+          const rect = element.getBoundingClientRect();
+          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) last = value;
+        }
+        return last;
+      }, center);
+      expect(region, `${view}: Show Sidebar must not sit under a drag region`).toBe("no-drag");
+    }
+    await show.click();
+    await expect(
+      demo.page.getByRole("button", { name: "Hide Sidebar", exact: true }),
+    ).toBeVisible();
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});

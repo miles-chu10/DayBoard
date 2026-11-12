@@ -1,6 +1,11 @@
 import { reminders, systemPreferences } from "../platform/index.js";
 
-import type { CreateReminderInput, ReminderItem, RemindersAccess } from "../shared-types.js";
+import type {
+  CreateReminderInput,
+  ItemListInfo,
+  ReminderItem,
+  RemindersAccess,
+} from "../shared-types.js";
 import type { UpdateReminderInput } from "../../shared/item-edits.js";
 
 type NativeReminder = Awaited<ReturnType<typeof reminders.getReminders>>["reminders"][number];
@@ -52,6 +57,7 @@ function toItem(
   return {
     identity,
     ref: reminder.ref.value,
+    listId: reminder.calendarId,
     listTitle: listTitles.get(reminder.calendarId) ?? "Reminders",
     title: reminder.title.trim() || "(Untitled)",
     notes: reminder.notes?.trim() || null,
@@ -100,6 +106,13 @@ async function listWith(options: { completed: boolean; limit: number }): Promise
     rememberIdentity(resolved.ref, resolved.identity);
     return resolved;
   });
+}
+
+export async function listReminderLists(): Promise<ItemListInfo[]> {
+  const calendars = await reminders.getCalendars();
+  return calendars
+    .filter((calendar) => calendar.entityTypes.includes("reminder"))
+    .map((calendar) => ({ id: calendar.id, title: calendar.title, color: calendar.color }));
 }
 
 export function listReminders(): Promise<ReminderItem[]> {

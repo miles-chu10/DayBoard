@@ -14,6 +14,7 @@ import type {
   UsageDay,
   CalendarEventItem,
   CalendarListResult,
+  ItemListInfo,
   MailItem,
   ReminderItem,
   ReviewData,
@@ -336,6 +337,21 @@ export function demoTasks(): SourceResult<TaskItem> {
   ]);
 }
 
+export function demoTaskLists(): ItemListInfo[] {
+  return [
+    { id: "work", title: "Work" },
+    { id: "personal", title: "Personal" },
+  ];
+}
+
+export function demoReminderLists(): ItemListInfo[] {
+  return [
+    { id: "reminders", title: "Reminders", color: "#1badf8" },
+    { id: "family", title: "Family", color: "#ff9500" },
+    { id: "errands", title: "Errands", color: "#34c759" },
+  ];
+}
+
 export function demoReminders(): SourceResult<ReminderItem> {
   const reminder = (
     ref: string,
@@ -348,6 +364,7 @@ export function demoReminders(): SourceResult<ReminderItem> {
     ref,
     identity: `demo-${ref}`,
     recurring: false,
+    listId: listTitle.toLowerCase(),
     listTitle,
     title,
     notes: null,

@@ -15,6 +15,7 @@ import {
   listEventsBetween,
   listInbox,
   listTasksWithCoverage,
+  listTaskLists,
   listEventsWithCoverage,
   listEventsBetweenWithCoverage,
   modifyMessage,
@@ -34,6 +35,7 @@ import {
   getRemindersAccess,
   listCompletedReminders,
   listReminders,
+  listReminderLists,
   openRemindersPrivacySettings,
   requestRemindersAccess,
   setReminderCompleted,
@@ -69,6 +71,8 @@ import {
   demoMailBody,
   demoRelatedMail,
   demoReminders,
+  demoReminderLists,
+  demoTaskLists,
   demoReview,
   demoTasks,
   isDemoMode,
@@ -81,6 +85,7 @@ import type {
   AgendaState,
   AccountsStatus,
   CalendarListResult,
+  ItemListInfo,
   ReminderItem,
   ReviewData,
   SourceResult,
@@ -315,6 +320,21 @@ async function remindersList<T>(load: () => Promise<T[]>): Promise<SourceResult<
       loaded: items.length,
       ...(items.length >= 200 ? { reason: "item-cap" as const } : {}),
     },
+  };
+}
+
+/** Drops items in lists the user hid in Settings. Writes and agenda reconciliation still see them. */
+function visibleLists<T extends { listId?: string }>(
+  result: SourceResult<T>,
+  visibility: Record<string, boolean>,
+): SourceResult<T> {
+  if (result.state !== "ok") return result;
+  const items = result.items.filter((item) => !item.listId || visibility[item.listId] !== false);
+  if (items.length === result.items.length) return result;
+  return {
+    ...result,
+    items,
+    ...(result.coverage ? { coverage: { ...result.coverage, loaded: items.length } } : {}),
   };
 }
 
@@ -560,9 +580,23 @@ export function registerProductivityHandlers(): void {
   });
 
   // Google Tasks
-  ipcMain.handle("tasks:list", () =>
-    isDemoMode() ? demoTasks() : googleBoundedList("tasks:list", listTasksWithCoverage),
-  );
+  ipcMain.handle("tasks:list", async () => {
+    const result = isDemoMode()
+      ? demoTasks()
+      : await googleBoundedList("tasks:list", listTasksWithCoverage);
+    return visibleLists(result, (await getSettings()).lists.tasks);
+  });
+
+  ipcMain.handle("tasks:lists", async (): Promise<ItemListInfo[]> => {
+    if (isDemoMode()) return demoTaskLists();
+    try {
+      return await listTaskLists();
+    } catch (error) {
+      if (error instanceof GoogleAuthError) return [];
+      logger.error("productivity", "tasks:lists failed", error);
+      throw error;
+    }
+  });
 
   ipcMain.handle("tasks:setCompleted", async (_event, payload: unknown) => {
     const channel = "tasks:setCompleted";
@@ -594,11 +628,18 @@ export function registerProductivityHandlers(): void {
 
   // Apple Reminders
   ipcMain.handle("reminders:list", async () => {
-    if (isDemoMode()) return demoReminders();
+    const visibility = (await getSettings()).lists.reminders;
+    if (isDemoMode()) return visibleLists(demoReminders(), visibility);
     const scope = await agendaScope();
     const result = await remindersList(listReminders);
     if (result.state === "ok") await reconcileReminderAgendaState(result.items, [], scope);
-    return result;
+    return visibleLists(result, visibility);
+  });
+
+  ipcMain.handle("reminders:lists", async (): Promise<ItemListInfo[]> => {
+    if (isDemoMode()) return demoReminderLists();
+    if ((await getRemindersAccess()) !== "full-access") return [];
+    return listReminderLists();
   });
 
   ipcMain.handle("reminders:requestAccess", async () => {
