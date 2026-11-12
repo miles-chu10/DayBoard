@@ -1,6 +1,6 @@
-# DayBoard 1.3.1 — See what's new before you update
+# DayBoard 1.3.2 — See what's new before you update
 
-DayBoard 1.3.1 brings back a Software Update window that shows each version's release notes
+DayBoard 1.3.2 brings back a Software Update window that shows each version's release notes
 before it installs. It also keeps the day's earlier meetings in the menu bar, makes the columns
 in the main window easier to resize, and has a new icon.
 
@@ -44,9 +44,9 @@ in the main window easier to resize, and has a new icon.
 
 ## Updating
 
-- **From 1.3.0,** DayBoard updates itself to 1.3.1 the way it did before: it downloads the update
+- **From 1.3.0,** DayBoard updates itself to 1.3.2 the way it did before: it downloads the update
   in the background and shows **Restart to update** in the toolbar. The new update window is part
-  of 1.3.1, so you'll see it from the next update on.
+  of 1.3.2, so you'll see it from the next update on.
 - Your data, sign-ins, trial and license stay where they are.
 
 Apple Silicon, macOS 14+. AI and MCP remain optional.
