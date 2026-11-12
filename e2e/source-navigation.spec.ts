@@ -44,6 +44,9 @@ test("Sidebar distinguishes loading, unavailable, saved, partial and empty sourc
   try {
     const page = demo.page;
     const calendar = navigation(page, "Calendar");
+    // Reloading while the first load is still in flight aborts the reload (net::ERR_ABORTED).
+    await page.waitForLoadState("load");
+    await expect(calendar).toBeVisible();
     await demo.app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("calendar:list");
       ipcMain.handle(

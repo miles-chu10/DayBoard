@@ -139,7 +139,7 @@ test("Settings opens separately, saves preferences and survives a full relaunch"
   }
 });
 
-test("native update menu opens Settings and preview update actions stay unavailable", async () => {
+test("native update menu opens the update window and preview update actions stay unavailable", async () => {
   const demo = await launchDemo();
   try {
     await expect(demo.page.getByRole("button", { name: /^Agenda\b/ }).first()).toBeVisible();
@@ -149,29 +149,30 @@ test("native update menu opens Settings and preview update actions stay unavaila
       item.click();
     });
     await expect
-      .poll(() => demo.app.windows().find((page) => /settings-window/.test(page.url())))
+      .poll(() => demo.app.windows().find((page) => /update-window/.test(page.url())))
       .toBeTruthy();
-    const settings = demo.app.windows().find((page) => /settings-window/.test(page.url()))!;
-    await expect(settings.getByRole("tab", { name: "Updates", exact: true })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await expect(settings.getByRole("status")).toContainText(
-      "Updates are available only in official DayBoard downloads.",
-    );
+    const update = demo.app.windows().find((page) => /update-window/.test(page.url()))!;
+    await expect(update.getByRole("status")).toHaveText("Updates aren’t available");
     await expect(
-      settings.getByRole("button", {
-        name: /Check for updates|Download update|Install and restart/,
+      update.getByText("Updates are available only in official DayBoard downloads."),
+    ).toBeVisible();
+    await expect(
+      update.getByRole("button", {
+        name: /Check for updates|Download|Install/,
       }),
     ).toHaveCount(0);
     for (const action of ["status", "check", "download", "install"]) {
       expect(
-        await settings.evaluate(
+        await update.evaluate(
           (name) => (globalThis as AppGlobal).dayboard.ipc.invoke(`updates:${name}`),
           action,
         ),
       ).toMatchObject({ phase: "unavailable" });
     }
+    await update.getByRole("button", { name: "OK", exact: true }).click();
+    await expect
+      .poll(() => demo.app.windows().some((page) => /update-window/.test(page.url())))
+      .toBe(false);
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
