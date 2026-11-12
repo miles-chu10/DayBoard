@@ -73,6 +73,8 @@ export const PROVIDER_LABEL: Record<AssistantProvider, string> = {
   claude: "Claude",
   codex: "ChatGPT",
   gemini: "Gemini",
+  grok: "Grok",
+  // Retired: labels Assistant replies sent through Meta's Muse Code before it was removed.
   muse: "Muse",
   openai: "OpenAI API",
   anthropic: "Anthropic API",
@@ -88,7 +90,7 @@ export const PROVIDER_LABEL: Record<AssistantProvider, string> = {
 /** Empty in the App Store edition, whose sandbox can't run the subscription CLIs. */
 export const SUBSCRIPTION_PROVIDERS: readonly CliProviderId[] = isAppStoreBuild
   ? []
-  : ["claude", "codex", "gemini", "muse"];
+  : ["claude", "codex", "gemini", "grok"];
 export const API_KEY_PROVIDERS = [
   "openai",
   "anthropic",
@@ -104,16 +106,16 @@ export function isApiKeyProvider(provider: AIProvider): provider is ApiProviderI
   return (API_KEY_PROVIDERS as readonly AIProvider[]).includes(provider);
 }
 
-/** Antigravity and Muse run without per-request MCP configuration. */
+/** Antigravity and Grok run without per-request MCP configuration. */
 export function providerUsesMcp(provider: AIProvider): boolean {
-  return provider !== "gemini" && provider !== "muse";
+  return provider !== "gemini" && provider !== "grok";
 }
 
 export const PROVIDER_DETAIL: Record<AIProvider, string> = {
   claude: "Uses your Claude subscription through Claude Code.",
   codex: "Uses your ChatGPT subscription through the Codex CLI.",
   gemini: "Uses your Google AI subscription through the Antigravity CLI (agy).",
-  muse: "Uses your Meta account (Muse) through the Muse Code CLI.",
+  grok: "Uses your SuperGrok or X subscription through xAI's Grok Build CLI.",
   openai: "Pay per use with your OpenAI API key.",
   anthropic: "Pay per use with your Anthropic API key.",
   google: "Pay per use with your Gemini API key from Google AI Studio.",

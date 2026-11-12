@@ -58,7 +58,7 @@ const LABEL: Record<CliProvider, string> = {
   claude: "Claude Code",
   codex: "Codex",
   gemini: "Antigravity",
-  muse: "Muse Code",
+  grok: "Grok Build",
 };
 
 const MISSING_MESSAGE: Record<CliProvider, string> = {
@@ -68,7 +68,7 @@ const MISSING_MESSAGE: Record<CliProvider, string> = {
     "Codex CLI isn't installed. Install it with `npm i -g @openai/codex`, then run `codex login` in Terminal.",
   gemini:
     "Google's Antigravity CLI (agy) isn't installed. Install Antigravity from antigravity.google, then run `agy` in Terminal to sign in with your Google account.",
-  muse: "Meta's Muse Code CLI isn't installed. Install it with `curl -fsSL https://dev.meta.ai/install.sh | bash`, then run `muse login` in Terminal.",
+  grok: "xAI's Grok Build CLI isn't installed. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash`, then run `grok login` in Terminal to sign in with your SuperGrok or X account.",
 };
 
 const LOGIN_MESSAGE: Record<CliProvider, string> = {
@@ -78,7 +78,7 @@ const LOGIN_MESSAGE: Record<CliProvider, string> = {
     "Codex isn't signed in. Run `codex login` in Terminal and choose Sign in with ChatGPT, then try again.",
   gemini:
     "Antigravity isn't signed in. Run `agy` in Terminal and sign in with your Google account, then try again.",
-  muse: "Muse isn't signed in. Run `muse login` in Terminal and approve the code with your Meta account, then try again.",
+  grok: "Grok isn't signed in. Run `grok login` in Terminal and sign in with your SuperGrok or X account, then try again.",
 };
 
 // Subscription mode: API-key variables would silently override the user's subscription login.
@@ -93,7 +93,7 @@ const STRIPPED_ENV: Record<CliProvider, string[]> = {
   ],
   codex: ["OPENAI_API_KEY", "OPENAI_BASE_URL", "CODEX_API_KEY"],
   gemini: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"],
-  muse: ["META_API_KEY", "MODEL_API_KEY"],
+  grok: ["XAI_API_KEY", "GROK_MODELS_BASE_URL"],
 };
 
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -129,7 +129,7 @@ function looksLikeLoginError(text: string): boolean {
     "please run /login",
     "/login",
     "codex login",
-    "muse login",
+    "grok login",
     "not signed in",
     "invalid api key",
     "authentication_error",
@@ -752,119 +752,92 @@ export async function listGeminiModels(): Promise<string[]> {
   ].slice(0, 40);
 }
 
-// ── Muse Code (Meta account) ──────────────────────────────────────────────────────────────
+// ── Grok Build (SuperGrok / X subscription) ───────────────────────────────────────
 
-interface MuseState extends ParseState {
-  kinds: Map<string, string>;
-  streamed: Set<string>;
-}
-
-function museParams(event: Record<string, unknown>): Record<string, unknown> {
-  return isRecord(event.params) ? event.params : event;
-}
-
-/** `muse exec --json` emits MSP view notifications: `item/*`, `turn/completed`, `session/*`. */
-function handleMuseLine(line: string, state: MuseState, options: CliRunOptions) {
+/** `grok -p --output-format streaming-json` emits `type`-tagged events: `text`, `tool_call`, `end`, `error`. */
+function handleGrokLine(line: string, state: ParseState, options: CliRunOptions) {
   const event = parseJsonLine(line);
   if (!event) return;
-  const method = String(event.method ?? event.type ?? "");
-  const params = museParams(event);
-  if (method === "session/modelChanged" && typeof params.modelId === "string") {
-    options.onModel?.(params.modelId);
-  } else if (method === "item/delta" && typeof params.delta === "string") {
-    const id = String(params.itemId ?? "");
-    if ((params.field ?? "text") !== "text" || state.kinds.get(id) !== "agentMessage") return;
-    if (!state.streamed.has(id)) separateMessages(state, options);
-    state.streamed.add(id);
+  if (event.type === "text" && typeof event.data === "string") {
     state.sawDelta = true;
-    emitText(state, options, params.delta);
-  } else if (method.startsWith("item/") && isRecord(params.item)) {
-    const item = params.item;
-    const id = String(item.itemId ?? "");
-    const kind = String(item.kind ?? "");
-    state.kinds.set(id, kind);
-    if (kind === "toolCall") {
-      const status = String(item.status ?? "");
-      options.onTool({
-        id,
-        name: typeof item.tool === "string" ? item.tool : undefined,
-        status: status === "inProgress" ? "running" : status === "completed" ? "success" : "error",
-      });
-    } else if (
-      kind === "agentMessage" &&
-      method === "item/completed" &&
-      !state.streamed.has(id) &&
-      typeof item.text === "string"
-    ) {
-      separateMessages(state, options);
-      state.streamed.add(id);
-      emitText(state, options, item.text);
+    emitText(state, options, event.data);
+  } else if (
+    (event.type === "tool_call" || event.type === "tool_call_update") &&
+    typeof event.toolCallId === "string"
+  ) {
+    const status = String(event.status ?? "");
+    options.onTool({
+      id: event.toolCallId,
+      name: typeof event.toolName === "string" ? event.toolName : undefined,
+      status: status === "completed" ? "success" : status === "failed" ? "error" : "running",
+    });
+  } else if (event.type === "end") {
+    // modelUsage is keyed by the exact model IDs that served the run.
+    const [model] = isRecord(event.modelUsage) ? Object.keys(event.modelUsage) : [];
+    if (model) options.onModel?.(model);
+    if (isRecord(event.usage)) {
+      const { knownInputTokens, ...counts } = claudeFormatUsage(event.usage);
+      options.onUsage?.({ ...counts, displayInputTokens: knownInputTokens ?? undefined });
     }
-  } else if (method === "turn/completed") {
-    if (isRecord(params.usage)) {
-      options.onUsage?.({
-        inputTokens: knownTokenCount(params.usage.inputTokens),
-        outputTokens: knownTokenCount(params.usage.outputTokens),
-      });
-    }
-    if (isRecord(params.error) && typeof params.error.message === "string")
-      state.error = params.error.message;
-  } else if (typeof event.error === "string") {
-    state.error = event.error;
+  } else if (event.type === "error") {
+    state.error = typeof event.message === "string" ? event.message : "Grok failed.";
   }
 }
 
-async function runMuse(options: CliRunOptions): Promise<string> {
-  const bin = await resolveCli("muse");
-  if (!bin) throw new Error(MISSING_MESSAGE.muse);
-  const settings = await getSettings();
-  const cwd = await workDir();
-  const promptFile = path.join(os.tmpdir(), `dayboard-muse-${randomBytes(8).toString("hex")}.md`);
-  await fs.writeFile(promptFile, `${options.system}\n\n---\n\n${options.prompt}`, {
-    mode: 0o600,
-  });
-  // Answer-only: no file writes, no web tools, and no personal skills from other folders.
-  const args = [
-    "exec",
-    "--json",
-    "--prompt-file",
-    promptFile,
-    "--disable-write",
-    "--disable-web-tools",
-    "--no-foreign-personal-context",
-    "--user-input-auto-resolve",
-    "--max-model-steps",
-    "12",
+/**
+ * Answer-only: one harmless built-in tool, no shell, edits, web, subagents, plans or memory.
+ * `--tools` keeps Grok's MCP meta-tools, which reach every MCP server in the user's Grok config,
+ * so those are removed and every MCP call is denied as well.
+ */
+function grokArgs(cwd: string, system: string, prompt: string): string[] {
+  return [
+    "--no-auto-update",
+    "--output-format",
+    "streaming-json",
+    "--cwd",
+    cwd,
+    "--tools",
+    "todo_write",
+    "--disallowed-tools",
+    "search_tool,use_tool",
+    "--deny",
+    "MCPTool(*)",
+    "--no-subagents",
+    "--no-plan",
+    "--no-memory",
+    "--disable-web-search",
+    "--max-turns",
+    "4",
+    "--system-prompt-override",
+    system,
+    "-p",
+    prompt,
   ];
-  if (settings.ai.museModel) args.push("--model", settings.ai.museModel);
-  const state: MuseState = {
-    ...createState(),
-    kinds: new Map(),
-    streamed: new Set(),
-  };
-  try {
-    const outcome = await runDirect({
-      label: LABEL.muse,
-      bin,
-      args,
-      stdin: "",
-      env: await getToolEnv(STRIPPED_ENV.muse),
-      cwd,
-      timeoutMs: options.timeoutMs,
-      signal: options.signal,
-      onLine: (line) => handleMuseLine(line, state, options),
-    });
-    const error = state.text
-      ? null
-      : (state.error ?? (outcome.code !== 0 ? outcome.output || "Muse failed." : null));
-    if (error)
-      throw new Error(
-        looksLikeLoginError(error) ? LOGIN_MESSAGE.muse : redact(error).slice(0, 1200),
-      );
-    return state.text;
-  } finally {
-    await fs.rm(promptFile, { force: true });
-  }
+}
+
+async function runGrok(options: CliRunOptions): Promise<string> {
+  const bin = await resolveCli("grok");
+  if (!bin) throw new Error(MISSING_MESSAGE.grok);
+  const cwd = await workDir();
+  const args = grokArgs(cwd, options.system, options.prompt);
+  const state = createState();
+  const outcome = await runDirect({
+    label: LABEL.grok,
+    bin,
+    args,
+    stdin: "",
+    env: await getToolEnv(STRIPPED_ENV.grok),
+    cwd,
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+    onLine: (line) => handleGrokLine(line, state, options),
+  });
+  const error = state.text
+    ? null
+    : (state.error ?? (outcome.code !== 0 ? outcome.output || "Grok failed." : null));
+  if (error)
+    throw new Error(looksLikeLoginError(error) ? LOGIN_MESSAGE.grok : redact(error).slice(0, 1200));
+  return state.text;
 }
 
 export function runCliCompletion(options: CliRunOptions): Promise<string> {
@@ -872,8 +845,8 @@ export function runCliCompletion(options: CliRunOptions): Promise<string> {
     ? runClaude(options)
     : options.provider === "gemini"
       ? runGemini(options)
-      : options.provider === "muse"
-        ? runMuse(options)
+      : options.provider === "grok"
+        ? runGrok(options)
         : runCodex(options);
 }
 

@@ -12,11 +12,11 @@ export type RemindersAccess =
 export type SourceId = "tasks" | "reminders" | "mail" | "calendar";
 export type SourceColor = "blue" | "green" | "orange" | "red" | "purple" | "magenta" | "yellow";
 /**
- * claude/codex/gemini/muse: subscriptions through Claude Code, Codex,
- * Antigravity (agy), and Meta's Muse Code · the rest: pay-per-use API keys.
+ * claude/codex/gemini/grok: subscriptions through Claude Code, Codex, Antigravity (agy),
+ * xAI's Grok Build · the rest: pay-per-use API keys.
  */
 export type AIProvider = CliProviderId | ApiProviderId;
-export type CliProviderId = "claude" | "codex" | "gemini" | "muse";
+export type CliProviderId = "claude" | "codex" | "gemini" | "grok";
 export type ApiProviderId =
   | "openai"
   | "anthropic"
@@ -131,8 +131,6 @@ export interface AppSettings {
     codexServiceTier: string;
     /** Antigravity model name; empty uses its default. */
     geminiModel: string;
-    /** Muse Code model ID; empty uses Muse's default. */
-    museModel: string;
     /** Model ID per API-key provider; empty picks the newest listed model. */
     apiModels: Record<ApiProviderId, string>;
     /** One-click features' reasoning effort per API-key provider; missing is the model default. */
