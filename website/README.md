@@ -1,6 +1,6 @@
 # DayBoard website
 
-Static, dependency-free pages for DayBoard: a landing page and `waitlist.html` with the waitlist signup, `beta.html` with the install steps (the page keeps its address from the beta), a guide, support and license pages. There is no build step; the `website/` folder is deployed as-is by the Worker in `website-worker/` to https://getdayboard.com.
+Static, dependency-free pages for DayBoard: a landing page, `download.html`, `pricing.html`, `beta.html` with the install steps (the page keeps its address from the beta), a guide, support and license pages. There is no build step; the `website/` folder is deployed as-is by the Worker in `website-worker/` to https://getdayboard.com.
 
 ## Preview
 
@@ -12,24 +12,13 @@ python3 -m http.server 8765 --directory website --bind 127.0.0.1
 
 Open `http://127.0.0.1:8765/`. Stop the server with Ctrl-C. Pages follow the visitor's light or dark setting, and the screenshots switch with it. This server ignores `_headers` and `404.html`; the deployed site applies them.
 
-## Waitlist signup
+## Waitlist (closed)
 
-The forms post to the DayBoard service's `POST /v1/waitlist` endpoint (see `billing/README.md`). Joining is an expression of interest: invitations go out in small groups with no set dates, so the copy must not promise access, a date or a download. `waitlist.html` is the waitlist's own page. `beta.html` keeps the install help for people who were already invited, and its old `#join` anchor now points to the waitlist. Pages cached before the change post to `/v1/beta-signup`, which the service keeps as an alias with the same storage, duplicate check and rate limit.
+The waitlist closed when DayBoard 1.3.0 shipped. `waitlist.html` and the signup forms are gone, and `_redirects` sends `/waitlist` and `/waitlist.html` to `/download` so old links keep working. The service's `POST /v1/waitlist` endpoint and its stored addresses are unchanged (see `billing/README.md`); `privacy.html` says how to have an address deleted.
 
-At launch, set both values in `assets/site.js`:
+## Site settings
 
-```js
-const SITE_CONFIG = Object.freeze({
-  waitlistUrl: "https://api.<domain>/v1/waitlist",
-  contactEmail: "<private address for removal requests>",
-});
-```
-
-The form controls ship disabled, and the script enables them only when `waitlistUrl` is a valid HTTPS URL **and** `contactEmail` is set, so no one can sign up before there's a way to ask for removal. Until then the forms show "The waitlist opens soon" and send nothing. `contactEmail` also fills every `a[data-contact]` link (the privacy, support, beta and waitlist pages).
-
-A form says "You're on the waitlist." only when the service answers with a 2xx status and the JSON `{"ok": true}`. Anything else, such as an HTML page with status 200, an error, a network failure or no answer within 15 seconds (the request is then aborted), shows a message and re-enables the form with the address kept, so the visitor can try again. `tests/website-signup.test.mjs` runs the real script against a stand-in page to check these cases.
-
-Browsers accept the endpoint only when the service's `SITE_ORIGIN` setting matches this site's exact origin. The form sends the email address and an empty hidden field; see `billing/README.md` for what the service's protections do and don't cover.
+`contactEmail` in `assets/site.js` fills every `a[data-contact]` link (the privacy, support and install pages).
 
 ## Pricing, refunds and download
 
@@ -41,20 +30,20 @@ Buy buttons (`a[data-buy]`) ship hidden, and `[data-buy-pending]` notes say chec
 
 ## Publishing
 
-Follow `docs/launch/website-deploy.md`. It deploys the signup endpoint, sets `SITE_CONFIG`, makes each `og:image` absolute, publishes this folder with the site Worker in `website-worker/` and verifies the result. On the live getdayboard.com deployment, follow its "Existing deployment: waitlist rollout" section instead: the database change and the API go out before this folder. Before publishing:
+Follow `docs/launch/website-deploy.md`. It deploys the signup endpoint, sets `SITE_CONFIG`, makes each `og:image` absolute, publishes this folder with the site Worker in `website-worker/` and verifies the result. Before publishing:
 
 - Review `privacy.html` (a draft, not legal advice); Google's verification needs it linked from the consent screen.
 - Check that the copy still matches the shipped app, especially the requirements and install steps on `beta.html`.
 
 ## Download buttons and the Terminal installer
 
-The homepage's main action is **Download for Mac**, a direct link to the current release's DMG, in the hero, the Getting started section and the closing section. The header button on every page goes to `download.html`. The waitlist form sits in the homepage's closing section (`#join`) and on `waitlist.html`; it exists for people who need their Google account invited.
+The homepage's main action is **Download for Mac**, a direct link to the current release's DMG, in the hero, the Getting started section and the closing section. The header button on every page goes to `download.html`.
 
 `install.sh` is the script behind `curl -fsSL https://getdayboard.com/install.sh | bash`. It pins one release by `VERSION` and `DMG_SHA256`, downloads that DMG from the GitHub release over HTTPS, and refuses to install unless the SHA-256 matches, the DMG and the app are signed by Developer ID team `LGJS5APK9X`, and Gatekeeper (`spctl`) assesses both as `Notarized Developer ID`. It checks these itself because a file fetched with curl carries no quarantine flag, so macOS would not check it on first launch. It copies the app next to the destination, checks that copy, then swaps it in; it never uses sudo, stops if DayBoard is open, and `DAYBOARD_INSTALL_DIR` installs somewhere other than `/Applications`. It uses only Apple's tools from a fixed `PATH`, and nothing runs until the last line has arrived. `tests/website-install-script.test.mjs` runs it against stand-in tools for the install, replace and every refusal. Run it once on a real Mac after changing it (`DAYBOARD_INSTALL_DIR="$(mktemp -d)" bash website/install.sh` leaves the installed app alone). `_headers` serves it as plain text with `no-cache`.
 
 ## Header menus
 
-Every page shares one header: a Product menu (three columns of feature links), a Resources menu (guide, install help, support, FAQ, GitHub), plain Pricing and Waitlist links, and a Download button. Below 1024px the header shows the `details.mobile-menu` list instead, grouped the same way. `assets/navigation.js` opens a menu on click, on hover with a mouse, and closes it on Escape (focus returns to the button), an outside click or when focus leaves; without JavaScript the panels open on hover and focus. The markup is repeated in each page, so change all of them together; `tests/website-nav.test.mjs` checks they match.
+Every page shares one header: a Product menu (three columns of feature links), a Resources menu (guide, install help, support, FAQ, GitHub), a plain Pricing link, and a Download button. Below 1024px the header shows the `details.mobile-menu` list instead, grouped the same way. `assets/navigation.js` opens a menu on click, on hover with a mouse, and closes it on Escape (focus returns to the button), an outside click or when focus leaves; without JavaScript the panels open on hover and focus. The markup is repeated in each page, so change all of them together; `tests/website-nav.test.mjs` checks they match.
 
 ## Cloudflare files
 
@@ -65,13 +54,14 @@ Every page shares one header: a Product menu (three columns of feature links), a
   ```
 
 - `404.html` is what the site serves, with status 404, for unknown paths (`not_found_handling` in `website-worker/wrangler.jsonc`). It uses root-absolute URLs (`/assets/site.css`) because it's served at any depth.
-- `robots.txt` is the crawler policy and points to `sitemap.xml`. Each page has a `<link rel="canonical">` with its extensionless address (`/waitlist`, not `/waitlist.html`). When you add a page, add it to `sitemap.xml` and give it a canonical link.
+- `_redirects` holds the site's redirects for retired pages (`/waitlist` to `/download`).
+- `robots.txt` is the crawler policy and points to `sitemap.xml`. Each page has a `<link rel="canonical">` with its extensionless address (`/download`, not `/download.html`). When you add a page, add it to `sitemap.xml` and give it a canonical link.
 
 ## Assets
 
 - `assets/screens/` contains copies of `docs/screenshots/`, captured by `npm run screenshots` from the isolated fictional demo. The beta 17 refresh captures a 1280×820 content window at 2× scale, producing 2560×1640 images. Copy matching light and dark images after recapturing, and keep the HTML image dimensions and social preview metadata in sync.
 - The homepage hero is the interactive sample in `assets/demo.js`, `assets/demo-state.js` and `assets/demo.css`. It mirrors the app's demo mode (`main/services/demo-data.ts`) and current Home layout, uses the app's own color tokens for light and dark, and keeps every change in memory for that tab. Visitors without JavaScript see `light-home.png` and `dark-home.png` instead (a `<noscript>` figure). The social preview uses the light Home image. When the app's Home, sidebar or demo data changes, update the sample to match. The Assistant feature uses `light-ask.png` and `dark-ask.png` to show the docked panel beside Home. The calendar, task, reminder and mail gallery images come from the same capture. Visible captions and alt text identify fictional demo data and sample AI responses.
-- The beta and waitlist pages use the current `assets/screens/light-agenda.png` for their social previews. The older Agenda previews and launch video are retained as historical assets but are no longer the homepage hero. The older `assets/og-image.png` says "Free public beta" and must not be referenced by waitlist pages.
+- The install guide uses the current `assets/screens/light-agenda.png` for its social preview. The older Agenda previews and launch video are retained as historical assets but are no longer the homepage hero. The older `assets/og-image.png` says "Free public beta" and must not be referenced.
 - `assets/icon-32.png` and `assets/icon-96.png` are the small-size logo, and `assets/icon-180.png` (Apple touch icon) is the full-bleed square logo. Sources and regeneration steps are in `brand/README.md`.
 - `assets/fonts/` holds self-hosted Fraunces and Hanken Grotesk under the SIL Open Font License; their license texts sit beside them. No page loads third-party resources.
 

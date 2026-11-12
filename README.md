@@ -31,8 +31,8 @@ Markdown notes.
 > DayBoard updates itself from GitHub releases. Existing beta 12 and later installations download
 > updates in the background and install on restart or quit. See
 > [what changed in beta 18](docs/release-notes-1.3.0-beta.18.md).
-> Google sign-in may be limited to invited accounts. Join the
-> [waitlist](https://getdayboard.com/waitlist) for invited onboarding.
+> Google hasn't verified DayBoard yet, so Google shows an "unverified app" warning when you
+> connect and limits how many accounts can connect.
 
 ## What you can do
 
@@ -195,7 +195,7 @@ pull requests and pushes to `main`. Native app and packaged-build checks run on 
 | [`shared/`](shared/)                                            | Shared types and IPC protocol.                          |
 | [`tests/`](tests/) and [`e2e/`](e2e/)                           | Offline fixtures and isolated Electron tests.           |
 | [`billing/`](billing/)                                          | Separate Stripe Checkout and license service.           |
-| [`website/`](website/) and [`website-worker/`](website-worker/) | Product site, waitlist signup UI, and site hosting.     |
+| [`website/`](website/) and [`website-worker/`](website-worker/) | Product site and site hosting.                          |
 | [`brand/`](brand/)                                              | App icon sources and regeneration instructions.         |
 
 ### Demo and test isolation
