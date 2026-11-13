@@ -71,6 +71,19 @@ async function launchIsolated(profile?: string, demoMode = true): Promise<DemoAp
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   await page.waitForLoadState("domcontentloaded");
+  // The window's shortcuts are attached in effects once the root view has mounted. On a slow
+  // runner a key sent before that goes nowhere, so wait for the mount and one more frame.
+  await page.locator("[data-window-content]").waitFor({ state: "attached", timeout: 30_000 });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const view = globalThis as unknown as {
+          requestAnimationFrame(callback: () => void): void;
+          setTimeout(callback: () => void, delay: number): void;
+        };
+        view.requestAnimationFrame(() => view.setTimeout(resolve, 0));
+      }),
+  );
   return {
     app,
     page,

@@ -269,7 +269,12 @@ async function launcher(t, behavior = "accept") {
         },
         firstWindow: async () => {
           state.windows++;
-          return { on() {}, waitForLoadState: async () => {} };
+          return {
+            on() {},
+            waitForLoadState: async () => {},
+            locator: () => ({ waitFor: async () => {} }),
+            evaluate: async () => {},
+          };
         },
       };
     },
