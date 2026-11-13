@@ -15,9 +15,11 @@ import { MeetingNotes } from "./meeting-notes";
 function UpNextMeeting({
   upNext,
   compact,
+  labelled,
 }: {
   upNext: UpNext<CalendarEventItem>;
   compact: boolean;
+  labelled: boolean;
 }) {
   const settings = useSettings().data;
   const { event, joinUrl } = upNext;
@@ -27,7 +29,7 @@ function UpNextMeeting({
 
   return (
     <section
-      aria-label="Up next meeting"
+      aria-label={labelled ? "Up next meeting" : undefined}
       className="flex flex-col gap-2 rounded-lg border border-separator bg-well px-3 py-2.5"
     >
       <div className="flex items-start gap-3">
@@ -83,9 +85,12 @@ function UpNextMeeting({
 export function MeetingCard({
   surface,
   emptyState = null,
+  labelled = true,
 }: {
   surface: "agenda" | "menubar";
   emptyState?: ReactNode;
+  /** False inside a card that already names the region, so it isn't announced twice. */
+  labelled?: boolean;
 }) {
   const settings = useSettings().data;
   const now = useAgendaClock();
@@ -102,6 +107,7 @@ export function MeetingCard({
           key={`${upNext.event.calendarId}/${upNext.event.id}`}
           upNext={upNext}
           compact={surface === "menubar"}
+          labelled={labelled}
         />
       ) : null}
       {ended ? (
