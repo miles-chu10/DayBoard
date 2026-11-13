@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronDown, ChevronUp, ListTodo, Plus, Settings, Sun } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Button,
   Callout,
@@ -18,6 +19,7 @@ import {
   Text,
 } from "@renderer/ui";
 
+import { formatAccelerator } from "@shared/accelerator";
 import { availableKinds } from "@shared/capture";
 
 import { MeetingCard } from "../components/meeting-card";
@@ -35,6 +37,7 @@ import {
   useCalendarRange,
   useItemLists,
   useMail,
+  queryKeys,
   useReminders,
   useTasks,
 } from "../lib/queries";
@@ -46,6 +49,8 @@ import { useAgendaClock } from "../lib/use-agenda-clock";
 import { panelAiCapture, type CaptureRecordView } from "./capture-panel-state";
 import { chooseTarget, targetOptions } from "./capture-target";
 import { afterRejection } from "./menubar-capture";
+import { MenuBarTasks } from "./menubar-tasks";
+import { taskGroups } from "./task-groups";
 import {
   hidePanel,
   showPanel,
@@ -54,6 +59,13 @@ import {
   usePanelShown,
 } from "./panel-ipc";
 import { upcomingItems, todayItems, type TodayItem } from "./today-items";
+
+type MenuBarView = "today" | "upcoming" | "tasks";
+const VIEW_TITLE: Record<MenuBarView, string> = {
+  today: "Today",
+  upcoming: "Upcoming",
+  tasks: "All tasks",
+};
 
 const OVERDUE_OPEN_KEY = "menubar:overdueOpen:v1";
 const COLLAPSED_DAYS_KEY = "menubar:collapsedEventDays:v1";
@@ -300,7 +312,10 @@ export function MenuBarPanel() {
   const now = useAgendaClock();
   const today = todayISO();
   const calendar = useCalendarRange(today, 7);
-  const [view, setView] = useState<"today" | "upcoming">("today");
+  const [view, setView] = useState<MenuBarView>("today");
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [shortcutsShown, setShortcutsShown] = useState(false);
   const tasks = useTasks();
   const reminders = useReminders();
   const planning = useAgendaState();
@@ -403,6 +418,52 @@ export function MenuBarPanel() {
     setSavedDestination(key);
     writeStored(DESTINATION_KEY, key);
   };
+  const groups = taskGroups(todos, now);
+  const openCount = groups.reduce((count, group) => count + group.rows.length, 0);
+
+  // Re-reads every source the panel shows; the backend's own caches answer for what it fetched.
+  function sync() {
+    for (const queryKey of [
+      queryKeys.tasks,
+      queryKeys.reminders,
+      queryKeys.calendar,
+      queryKeys.mail,
+      queryKeys.agenda,
+      queryKeys.itemLists("tasks"),
+      queryKeys.itemLists("reminders"),
+    ])
+      void queryClient.invalidateQueries({ queryKey });
+  }
+  const quit = () => void invoke("panel:quit");
+  const quickCaptureKeys = settings?.system.quickCapture.enabled
+    ? formatAccelerator(settings.system.quickCapture.hotkey)
+    : null;
+
+  // The panel holds key focus without activating DayBoard, so the app menu's key equivalents
+  // never reach it; the gear menu's shortcuts are handled here instead.
+  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (event.defaultPrevented || event.isComposing) return;
+    const key = event.key.toLowerCase();
+    const action =
+      key === "r"
+        ? sync
+        : key === ","
+          ? () => void openSettings()
+          : key === "o"
+            ? () => void openMain("/")
+            : key === "q"
+              ? quit
+              : null;
+    if (!action) return;
+    event.preventDefault();
+    action();
+  });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => onShortcut(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
   const addPlaceholder = !destination
     ? "Connect a list to add here…"
     : destination.target
@@ -448,11 +509,12 @@ export function MenuBarPanel() {
       <div className="flex shrink-0 items-baseline justify-between gap-2">
         <div>
           <Text as="h1" variant="large-strong">
-            {view === "today" ? "Today" : "Upcoming"}
+            {VIEW_TITLE[view]}
           </Text>
           <Text as="p" variant="small" color="secondary">
-            {longToday()}
-            {overdueCount ? ` · ${overdueCount} overdue` : ""}
+            {view === "tasks"
+              ? `${openCount} open${overdueCount ? ` · ${overdueCount} overdue` : ""}`
+              : `${longToday()}${overdueCount ? ` · ${overdueCount} overdue` : ""}`}
           </Text>
         </div>
         <Button size="small" variant="transparent" onClick={() => void openMain("/")}>
@@ -465,6 +527,7 @@ export function MenuBarPanel() {
         <div className="flex min-w-0 flex-1 items-center rounded-md bg-control-subtle pl-2 focus-within:outline-2 focus-within:outline-accent">
           <Plus className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
           <Input
+            ref={inputRef}
             aria-label={ai.available ? "Add or ask" : "Quick add"}
             className="flex-1 border-0 bg-transparent focus-visible:outline-none"
             placeholder={addPlaceholder}
@@ -542,7 +605,22 @@ export function MenuBarPanel() {
             Some sources are unavailable. Open DayBoard to check connections.
           </Text>
         ) : null}
-        {view === "today" ? (
+        {view === "tasks" ? (
+          groups.length ? (
+            <MenuBarTasks
+              groups={groups}
+              canAddTo={(key) => destinations.some((option) => option.key === key)}
+              onAddTo={(key) => {
+                chooseDestination(key);
+                inputRef.current?.focus();
+              }}
+            />
+          ) : (
+            <Text as="p" variant="small" color="secondary" className="px-2">
+              {scheduleLoading ? "" : "No open tasks in available lists."}
+            </Text>
+          )
+        ) : view === "today" ? (
           <>
             <MeetingCard surface="menubar" />
 
@@ -673,6 +751,7 @@ export function MenuBarPanel() {
           [
             { id: "today", label: "Today", Icon: Sun },
             { id: "upcoming", label: "Upcoming", Icon: CalendarDays },
+            { id: "tasks", label: "All tasks", Icon: ListTodo },
           ] as const
         ).map(({ id, label, Icon }) => (
           <Button
@@ -688,26 +767,78 @@ export function MenuBarPanel() {
             <Icon aria-hidden="true" />
           </Button>
         ))}
-        <Button
-          variant="transparent"
-          iconOnly
-          className="justify-self-center text-secondary"
-          aria-label="Open agenda"
-          title="Open Agenda in DayBoard"
-          onClick={() => void openMain("/agenda")}
-        >
-          <ListTodo aria-hidden="true" />
-        </Button>
-        <Button
-          variant="transparent"
-          iconOnly
-          className="justify-self-center text-secondary"
-          aria-label="Open settings"
-          title="Settings"
-          onClick={() => void openSettings()}
-        >
-          <Settings aria-hidden="true" />
-        </Button>
+        <DropdownMenu onOpenChange={(open) => open && setShortcutsShown(false)}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="transparent"
+              iconOnly
+              className="justify-self-center text-secondary data-[state=open]:text-accent"
+              aria-label="DayBoard menu"
+              title="DayBoard menu"
+            >
+              <Settings aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          {/* Shortcuts replace the menu's items in place: a side submenu would leave the panel. */}
+          <DropdownMenuContent side="top" align="end" className="min-w-52">
+            {shortcutsShown ? (
+              <>
+                <DropdownMenuLabel>Keyboard shortcuts</DropdownMenuLabel>
+                {[
+                  ...(quickCaptureKeys ? [["Quick Capture", quickCaptureKeys]] : []),
+                  ["Add", "↩"],
+                  ["Close panel", "Esc"],
+                  ["Sync", "⌘R"],
+                  ["Settings", "⌘,"],
+                  ["Open Main Window", "⌘O"],
+                  ["Quit DayBoard", "⌘Q"],
+                ].map(([label, keys]) => (
+                  <DropdownMenuItem
+                    key={label}
+                    accelerator={keys}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setShortcutsShown(false);
+                  }}
+                >
+                  Back
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem accelerator="⌘R" onSelect={sync}>
+                  Sync
+                </DropdownMenuItem>
+                <DropdownMenuItem accelerator="⌘," onSelect={() => void openSettings()}>
+                  Settings…
+                </DropdownMenuItem>
+                <DropdownMenuItem accelerator="⌘O" onSelect={() => void openMain("/")}>
+                  Open Main Window
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setShortcutsShown(true);
+                  }}
+                >
+                  Keyboard shortcuts
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem accelerator="⌘Q" onSelect={quit}>
+                  Quit DayBoard
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
     </div>
   );

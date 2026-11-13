@@ -967,3 +967,151 @@ test("the menu-bar quick add aims at a chosen list and remembers it", async () =
     await demo.close();
   }
 });
+
+async function mainWindowFocused(app: ElectronApplication): Promise<boolean> {
+  return app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().some(
+      (window) =>
+        window.webContents.getURL().includes("main-window.html") &&
+        window.isVisible() &&
+        window.isFocused(),
+    ),
+  );
+}
+
+async function hideMainWindow(app: ElectronApplication) {
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()
+      .find((window) => window.webContents.getURL().includes("main-window.html"))
+      ?.hide();
+  });
+}
+
+test("the menu-bar task list stays in the panel, grouped by list, and aims the quick add", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    await hideMainWindow(demo.app);
+    const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
+    await navigation.getByRole("button", { name: "All tasks", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "All tasks", exact: true })).toBeVisible();
+    await expect(
+      navigation.getByRole("button", { name: "All tasks", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const list = panel.getByRole("region", { name: "All tasks", exact: true });
+    // Google Tasks lists lead, then Reminders lists; each header counts its open items.
+    await expect(list.getByRole("button", { name: /, \d+ open$/ })).toHaveText([
+      /^Work\d+$/,
+      /^Personal\d+$/,
+      /^Reminders\d+$/,
+      /^Family\d+$/,
+      /^Errands\d+$/,
+    ]);
+    const work = list.getByRole("region", { name: "Work", exact: true });
+    await expect(work.getByText("Follow up with design agency")).toBeVisible();
+    await expect(work.getByText("Update team wiki")).toBeVisible();
+    await panel.screenshot({ path: "test-results/menubar-all-tasks.png" });
+
+    // A list's + aims the quick add at it and focuses the field, still inside the panel.
+    await list.getByRole("button", { name: "Add to Errands" }).click();
+    const input = panel.getByRole("textbox", { name: "Add or ask" });
+    await expect(input).toHaveAttribute("placeholder", "Add to “Errands”…");
+    await expect(input).toBeFocused();
+
+    // Folding a list keeps it folded after the renderer reloads.
+    await list.getByRole("button", { name: /^Personal, \d+ open$/ }).click();
+    await expect(list.getByText("Book flights for conference")).toHaveCount(0);
+    await panel.reload();
+    await panel
+      .getByRole("navigation", { name: "Menu bar navigation" })
+      .getByRole("button", { name: "All tasks", exact: true })
+      .click();
+    await expect(panel.getByText("Update team wiki")).toBeVisible();
+    await expect(panel.getByText("Book flights for conference")).toHaveCount(0);
+
+    // Checking an item off writes from the panel; demo mode refuses and the item comes back.
+    await panel.getByRole("checkbox", { name: "Complete “Update team wiki”" }).click();
+    await expect(panel.getByText(/Couldn't update “Update team wiki”/)).toBeVisible();
+    await expect(panel.getByText("Update team wiki", { exact: true })).toBeVisible();
+
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    expect(await mainWindowFocused(demo.app)).toBe(false);
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("the menu-bar gear opens an in-panel menu instead of Settings", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    await hideMainWindow(demo.app);
+    const settingsOpen = () =>
+      demo.app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().some(
+          (window) => window.webContents.getURL().includes("settings-window") && window.isVisible(),
+        ),
+      );
+    await panel.getByRole("button", { name: "DayBoard menu" }).click();
+    const menu = panel.getByRole("menu");
+    await expect(menu.getByRole("menuitem")).toHaveText([
+      /^Sync⌘R$/,
+      /^Settings…⌘,$/,
+      /^Open Main Window⌘O$/,
+      /^Keyboard shortcuts$/,
+      /^Quit DayBoard⌘Q$/,
+    ]);
+    await expect(menu).toHaveCSS("opacity", "1");
+    expect(await settingsOpen()).toBe(false);
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    await panel.screenshot({ path: "test-results/menubar-gear-menu.png" });
+
+    // Shortcuts replace the items in place, inside the panel, and Back returns to them.
+    await menu.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
+    await expect(menu.getByText("Keyboard shortcuts", { exact: true })).toBeVisible();
+    await expect(menu.getByRole("menuitem").filter({ hasText: "Close panel" })).toHaveText(
+      "Close panelEsc",
+    );
+    await expect(menu.getByRole("menuitem", { name: /^Quick Capture/ })).toBeVisible();
+    const bounds = await menu.boundingBox();
+    const width = await panel.evaluate(
+      () => (globalThis as unknown as { innerWidth: number }).innerWidth,
+    );
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await panel.screenshot({ path: "test-results/menubar-gear-shortcuts.png" });
+    await menu.getByRole("menuitem", { name: "Back" }).click();
+    await expect(menu.getByRole("menuitem", { name: /^Sync/ })).toBeVisible();
+    // A click elsewhere in the panel dismisses the menus and leaves the panel open.
+    await panel.mouse.click(20, 20);
+    await expect(panel.getByRole("menu")).toHaveCount(0);
+
+    // Sync re-reads the sources without leaving the panel.
+    await panel.getByRole("button", { name: "DayBoard menu" }).click();
+    await panel.getByRole("menuitem", { name: /^Sync/ }).click();
+    await expect(panel.getByRole("menu")).toHaveCount(0);
+    await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toBeVisible();
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    expect(await settingsOpen()).toBe(false);
+    expect(await mainWindowFocused(demo.app)).toBe(false);
+
+    // Open Main Window is the one item that leaves the panel.
+    await panel.getByRole("button", { name: "DayBoard menu" }).click();
+    await panel.getByRole("menuitem", { name: /^Open Main Window/ }).click();
+    await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(false);
+    await expect
+      .poll(() =>
+        demo.app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some(
+            (window) =>
+              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+          ),
+        ),
+      )
+      .toBe(true);
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});

@@ -34,11 +34,16 @@ export const PANEL_CHANNELS: ReadonlySet<string> = new Set([
   "meetings:getNotes",
   "tasks:create",
   "reminders:create",
+  // The menu bar's task list: check items off (and unpin a completed focus item)
+  "tasks:setCompleted",
+  "reminders:setCompleted",
+  "agenda:setFocus",
   // Panel control
   "panel:hide",
   "panel:show",
   "panel:resize",
   "panel:openMain",
+  "panel:quit",
   "window:openSettings",
   "app:openExternal",
 ]);

@@ -104,6 +104,12 @@ export function startSystemPanels(): void {
     hidePanel("menubar");
     await focusMainWindow({ to: route, prompt });
   });
+  // The menu bar's own Quit, for a panel that holds key focus without activating DayBoard.
+  ipcMain.handle("panel:quit", () => {
+    hidePanel("capture");
+    hidePanel("menubar");
+    app.quit();
+  });
   ipcMain.handle("app:takeNavigation", () => takePendingNavigation());
 
   ipcMain.handle("system:hotkeyStatus", () => hotkey.status());
