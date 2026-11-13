@@ -168,6 +168,9 @@ test("the first keystrokes after each reopen reach the capture input", async () 
     const panel = await openQuickCapture(demo.app);
     const input = panel.getByRole("textbox", { name: "Quick Capture" });
     await expect.poll(() => panelVisible(demo.app, "#capture")).toBe(true);
+    // The first show can land before the input has mounted on a slow runner; a key sent in that
+    // gap goes nowhere. The later reopens type at once, with the input already mounted.
+    await expect(input).toBeFocused();
     await panel.keyboard.type("a");
     await expect(input).toHaveValue("a");
 
