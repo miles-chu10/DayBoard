@@ -1,6 +1,6 @@
 import { app, dialog, logger } from "./platform/index.js";
 import { registerHandlers } from "./handlers/index.js";
-import { BrowserWindow, powerMonitor } from "electron";
+import { powerMonitor } from "electron";
 import {
   acquireSingleInstanceLock,
   createMainWindow,
@@ -8,7 +8,7 @@ import {
   setupApplicationMenu,
 } from "./window.js";
 import { startSystemPanels, stopSystemPanels } from "./system-panels/index.js";
-import { isPanelWindow, showPanel } from "./system-panels/panel-window.js";
+import { showPanel } from "./system-panels/panel-window.js";
 import { startMcpHttpServer } from "./services/mcp-http-server.js";
 import { mcpProjectIdForProfile } from "./services/mcp-port.js";
 import { drainAgendaStore } from "./services/agenda-store.js";
@@ -93,13 +93,12 @@ if (acquireSingleInstanceLock()) {
   app.on("will-quit", stopSystemPanels);
 
   app.on("activate", () => {
-    // Floating panels don't count: a Dock click while one is open still brings the dashboard back.
-    const hasVisibleWindows = BrowserWindow.getAllWindows().some(
-      (window) => !window.isDestroyed() && window.isVisible() && !isPanelWindow(window),
-    );
-    if (hasVisibleWindows) return;
+    // Only the dashboard counts: a Dock click while Settings, the update window or a panel is
+    // open still brings the dashboard back.
     const window = getMainWindow();
     if (window && !window.isDestroyed()) {
+      if (window.isVisible() && !window.isMinimized()) return;
+      if (window.isMinimized()) window.restore();
       window.show();
       window.focus();
     } else {

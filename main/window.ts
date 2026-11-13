@@ -273,8 +273,13 @@ export function setupApplicationMenu(options: {
           id: "new-tab",
           accelerator: "Command+T",
           click: () => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
-            void focusMainWindow().then(() => ipcMain.broadcast("tabs:command", { action: "new" }));
+            // A dashboard that had to be reopened already starts on a fresh tab.
+            const reopened = !mainWindow || mainWindow.isDestroyed();
+            void focusMainWindow()
+              .then(() => {
+                if (!reopened) ipcMain.broadcast("tabs:command", { action: "new" });
+              })
+              .catch((error) => logger.warn("window", "Could not open a new tab", error));
           },
         },
         {

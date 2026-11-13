@@ -195,6 +195,49 @@ test("closing the main window and activating the app reopens a usable window", a
   }
 });
 
+test("activating the app with only Settings open brings the dashboard back", async () => {
+  const demo = await launchDemo();
+  try {
+    await demo.page.evaluate(() =>
+      (globalThis as AppGlobal).dayboard.ipc.invoke("window:openSettings"),
+    );
+    await expect
+      .poll(() => demo.app.windows().some((page) => /settings-window/.test(page.url())))
+      .toBe(true);
+    const mainWindowCount = () =>
+      demo.app.evaluate(
+        ({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().filter(
+            (window) =>
+              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+          ).length,
+      );
+    const closeMainWindow = () =>
+      demo.app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()
+          .find((window) => window.webContents.getURL().includes("main-window.html"))
+          ?.close();
+      });
+    await closeMainWindow();
+    await expect.poll(mainWindowCount).toBe(0);
+    expect(demo.app.windows().some((page) => /settings-window/.test(page.url()))).toBe(true);
+
+    await demo.app.evaluate(({ app }) => app.emit("activate", {}, true));
+    await expect.poll(mainWindowCount).toBe(1);
+
+    await closeMainWindow();
+    await expect.poll(mainWindowCount).toBe(0);
+    await demo.app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()?.getMenuItemById("new-tab")?.click(),
+    );
+    await expect.poll(mainWindowCount).toBe(1);
+    const reopened = demo.app.windows().find((page) => /main-window/.test(page.url()))!;
+    await expect(reopened.getByRole("button", { name: /^Agenda\b/ }).first()).toBeVisible();
+  } finally {
+    await demo.close();
+  }
+});
+
 test("update progress freezes both windows and an installation failure restores editing", async () => {
   const demo = await launchDemo();
   try {
