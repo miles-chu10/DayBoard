@@ -141,7 +141,11 @@ test("Home cards customize, persist, collapse, reset and fit narrow windows", as
     const windowWidth = await demo.app.evaluate(
       ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getContentBounds().width,
     );
-    for (const card of await cards.all()) {
+    // The Up next meeting card hides itself when no demo meeting is coming up at this time of day.
+    const visible = [];
+    for (const card of await cards.all()) if (await card.isVisible()) visible.push(card);
+    expect(visible.length).toBeGreaterThanOrEqual(3);
+    for (const card of visible) {
       const box = await card.boundingBox();
       expect(box).not.toBeNull();
       expect(box!.x + box!.width).toBeLessThanOrEqual(windowWidth);
