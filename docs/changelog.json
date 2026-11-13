@@ -1,6 +1,7 @@
 {
   "_comment": "Releases shown on getdayboard.com/changelog, newest first. Add a release here once it is published (date in Pacific time), then run `npm run changelog`. Notes come from docs/release-notes-<version>.md.",
   "releases": [
+    { "version": "1.3.6", "date": "2026-11-13" },
     { "version": "1.3.2", "date": "2026-11-12" },
     {
       "version": "1.3.0",
