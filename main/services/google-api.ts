@@ -260,7 +260,8 @@ export async function setTaskCompleted(
 export async function createTask(
   input: CreateTaskInput,
 ): Promise<{ listId: string; taskId: string }> {
-  const task = await googleFetch<GTask>(`${TASKS}/lists/@default/tasks`, {
+  const listId = input.listId || "@default";
+  const task = await googleFetch<GTask>(`${TASKS}/lists/${enc(listId)}/tasks`, {
     method: "POST",
     body: {
       title: input.title,
@@ -269,7 +270,7 @@ export async function createTask(
     },
   });
   if (!task?.id) throw new GoogleApiError(500, "Google Tasks did not return the new task.");
-  return { listId: "@default", taskId: task.id };
+  return { listId, taskId: task.id };
 }
 
 /** Updates only the editable fields on one Google Task and returns Google's canonical item. */

@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { Notification } from "electron";
 
-import { describeCapture, type ItemDraft } from "../../shared/capture.js";
+import { describeCapture, parseCaptureTarget, type ItemDraft } from "../../shared/capture.js";
 import {
   getAccountsStatus,
   onAccountsChanged,
@@ -52,10 +52,12 @@ const service = createCaptureService({
   complete: (system, prompt) =>
     completeCapture((signal) => runCompletion({ system, prompt, signal })),
   create: {
-    task: (draft) => createTask({ ...draftInput(draft), due: draft.date || undefined }),
-    reminder: (draft) =>
+    task: (draft, listId) =>
+      createTask({ ...draftInput(draft), due: draft.date || undefined, listId }),
+    reminder: (draft, listId) =>
       createReminder({
         ...draftInput(draft),
+        listId,
         dueDate: draft.date || undefined,
         dueTime: draft.date && draft.time ? draft.time : undefined,
       }),
@@ -129,8 +131,10 @@ function submitInput(value: unknown): CaptureSubmit {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     throw new Error("capture:submit: expected an object");
   const input = value as Record<string, unknown>;
-  if (typeof input.text === "string") return { text: input.text };
-  if (typeof input.draft === "object" && input.draft !== null) return { draft: input.draft };
+  const target = parseCaptureTarget(input.target);
+  if (typeof input.text === "string") return { text: input.text, target };
+  if (typeof input.draft === "object" && input.draft !== null)
+    return { draft: input.draft, target };
   throw new Error("capture:submit: send text or a draft");
 }
 

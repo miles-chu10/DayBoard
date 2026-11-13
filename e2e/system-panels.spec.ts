@@ -9,13 +9,16 @@ type AppGlobal = typeof globalThis & { dayboard: DayboardBridge };
 async function openQuickCapture(app: ElectronApplication): Promise<Page> {
   // The main window's first show takes focus, which would immediately hide a panel opened earlier.
   await expect
-    .poll(() =>
-      app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().some(
-          (window) =>
-            window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+    .poll(
+      () =>
+        app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some(
+            (window) =>
+              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+          ),
         ),
-      ),
+      // Cold native startup can exceed the assertion default on a busy developer Mac.
+      { timeout: 15_000 },
     )
     .toBe(true);
   const opened = app.waitForEvent("window", (page) => page.url().endsWith("#capture"));
@@ -200,13 +203,16 @@ test("the first keystrokes after each reopen reach the capture input", async () 
 
 async function openMenuBarAgenda(app: ElectronApplication): Promise<Page> {
   await expect
-    .poll(() =>
-      app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().some(
-          (window) =>
-            window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+    .poll(
+      () =>
+        app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some(
+            (window) =>
+              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+          ),
         ),
-      ),
+      // Cold native startup can exceed the assertion default on a busy developer Mac.
+      { timeout: 15_000 },
     )
     .toBe(true);
   const opened = app.waitForEvent("window", (page) => page.url().endsWith("#menubar"));
@@ -222,7 +228,7 @@ test("File → Menu Bar Agenda shows today's panel", async ({
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    await expect(panel.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
     await expect(panel.getByRole("region", { name: "Today's items" })).toBeVisible();
     await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(true);
 
@@ -367,7 +373,7 @@ test("Escape hides a freshly shown menu-bar panel", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    await expect(panel.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
     await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(true);
     await recordKeys(panel);
     const focusWhenShown = await panelFocus(demo.app, panel, "#menubar");
@@ -398,6 +404,7 @@ type DomGlobal = {
   document: { documentElement: unknown; activeElement: unknown };
   getComputedStyle(node: unknown): {
     backgroundColor: string;
+    color: string;
     fontVariantNumeric: string;
     outlineOffset: string;
     outlineWidth: string;
@@ -852,6 +859,106 @@ test("a notes-changed notification refreshes Agenda and Menubar together", async
       await expect(page.getByText("Fresh complete meeting notes", { exact: true })).toBeVisible();
       await expect(page.getByText("Previous meeting notes", { exact: true })).toHaveCount(0);
     }
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("menu bar switches date groups without losing capture or footer navigation", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
+    const input = panel.getByRole("textbox", { name: "Add or ask" });
+    // Read the active color only once the tab's color transition (e.g. into Dark mode) settles.
+    const activeTab = await navigation
+      .getByRole("button", { name: "Today", exact: true })
+      .evaluate(async (node) => {
+        const element = node as { getAnimations(): { finished: Promise<unknown> }[] };
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+        return (globalThis as unknown as DomGlobal).getComputedStyle(node).color;
+      });
+    await input.fill("Unsent idea");
+    await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
+    await expect(panel.getByRole("region", { name: "Upcoming items", exact: true })).toBeVisible();
+    await expect(input).toHaveValue("Unsent idea");
+    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await navigation.getByRole("button", { name: "Today", exact: true }).click();
+    await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toBeVisible();
+    const layout = await panel.evaluate(() => {
+      const { document, innerHeight } = globalThis as unknown as {
+        innerHeight: number;
+        document: {
+          querySelector(
+            selector: string,
+          ): { getBoundingClientRect(): { bottom: number; top: number } } | null;
+        };
+      };
+      const nav = document.querySelector("nav")!.getBoundingClientRect();
+      const input = document.querySelector("input")!.getBoundingClientRect();
+      const feed = document.querySelector('[aria-label="Agenda feed"]')!.getBoundingClientRect();
+      return {
+        navBottom: nav.bottom,
+        height: innerHeight,
+        inputBottom: input.bottom,
+        feedTop: feed.top,
+      };
+    });
+    expect(layout.navBottom).toBeLessThanOrEqual(layout.height);
+    expect(layout.inputBottom).toBeLessThanOrEqual(layout.feedTop);
+    await panel.screenshot({ path: "test-results/menubar-refined-today.png" });
+    await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // The active tab takes the accent color the Today tab had while it was active.
+    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveCSS(
+      "color",
+      activeTab,
+    );
+    await expect(navigation.getByRole("button", { name: "Today", exact: true })).not.toHaveCSS(
+      "color",
+      activeTab,
+    );
+    await panel.screenshot({ path: "test-results/menubar-refined-upcoming.png" });
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("the menu-bar quick add aims at a chosen list and remembers it", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    const input = () => panel.getByRole("textbox", { name: "Add or ask" });
+    await expect(input()).toHaveAttribute("placeholder", "Add or ask…");
+    await panel.getByRole("button", { name: "Add to: Let AI decide" }).click();
+    await expect(panel.getByRole("menuitemcheckbox", { name: "Let AI decide" })).toBeChecked();
+    await expect(panel.getByText("Google Tasks", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("menuitemcheckbox", { name: "Errands" })).toBeVisible();
+    await expect(panel.getByRole("menu")).toHaveCSS("opacity", "1");
+    await panel.screenshot({ path: "test-results/menubar-list-picker.png" });
+    await panel.getByRole("menuitemcheckbox", { name: "Work" }).click();
+    await expect(input()).toHaveAttribute("placeholder", "Add to “Work”…");
+
+    await input().fill("Book flights");
+    await input().press("Enter");
+    // Demo mode never writes; the refusal proves the targeted submit reached capture.
+    await expect(panel.getByText(/turned off in demo mode/)).toBeVisible();
+    await expect(input()).toHaveValue("Book flights");
+
+    // The choice survives a fresh renderer, not just this open panel.
+    await panel.reload();
+    await expect(input()).toHaveAttribute("placeholder", "Add to “Work”…");
+    await expect(panel.getByRole("button", { name: "Add to: Work" })).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();

@@ -217,6 +217,7 @@ export async function createReminder(input: CreateReminderInput): Promise<{ ref:
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const created = await reminders.createReminder({
     title: input.title,
+    calendarId: input.listId || undefined,
     notes: input.notes || undefined,
     due: input.dueDate
       ? input.dueTime

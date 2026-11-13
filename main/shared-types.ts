@@ -464,6 +464,8 @@ export interface CreateTaskInput {
   title: string;
   notes?: string;
   due?: string;
+  /** Google Tasks list; the default list when omitted. */
+  listId?: string;
 }
 
 export interface CreateReminderInput {
@@ -471,6 +473,8 @@ export interface CreateReminderInput {
   notes?: string;
   dueDate?: string;
   dueTime?: string;
+  /** Reminders list; the default list when omitted. */
+  listId?: string;
 }
 
 export interface CreateEventInput {

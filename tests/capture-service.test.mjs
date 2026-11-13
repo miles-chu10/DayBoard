@@ -7,6 +7,7 @@ const { completeCapture } = await loadTs("main/services/capture/capture-completi
 const { createLicenseOperations } = await loadTs("main/services/license/license-operations.ts");
 const { LicenseService } = await loadTs("main/services/license/license-service.ts");
 const { LicenseRequiredError } = await loadTs("shared/license-policy.ts");
+const { parseCaptureTarget } = await loadTs("shared/capture.ts");
 
 const ACCOUNT_CHANGED = "Your account changed. Check the details and add it again.";
 
@@ -65,12 +66,12 @@ function harness(options = {}) {
       return output;
     },
     create: {
-      task: async (draft) => (
-        calls.create.push(["task", draft]),
-        { listId: "@default", taskId: "t1" }
+      task: async (draft, listId) => (
+        calls.create.push(["task", draft, listId]),
+        { listId: listId ?? "@default", taskId: "t1" }
       ),
-      reminder: async (draft) => {
-        calls.create.push(["reminder", draft]);
+      reminder: async (draft, listId) => {
+        calls.create.push(["reminder", draft, listId]);
         await options.duringCreate?.(state);
         if (options.createError) throw new Error(options.createError);
         return { ref: `r${calls.create.length}` };
@@ -654,4 +655,73 @@ test("text with nowhere to add it neither starts the AI trial nor calls AI", asy
   assert.equal(calls.license, 0);
   assert.equal(calls.complete, 0);
   assert.equal(license.trialStartedAt(), null);
+});
+
+test("a chosen task list offers the AI only tasks and creates it in that list", async () => {
+  const { service, calls } = harness({
+    complete: async () =>
+      JSON.stringify({ kind: "task", title: "Call dentist", date: "2026-10-22" }),
+  });
+  const record = await service.submit({
+    text: "Call dentist Thursday",
+    target: { kind: "task", listId: "work-list" },
+  });
+  assert.equal(record.state, "created");
+  assert.equal(record.draft.kind, "task");
+  assert.deepEqual(
+    calls.create.map(([kind, , listId]) => [kind, listId]),
+    [["task", "work-list"]],
+  );
+});
+
+test("an AI answer outside the chosen list's kind goes back to the form, never elsewhere", async () => {
+  const { service, calls } = harness();
+  const record = await service.submit({
+    text: "Call dentist Thursday 3pm",
+    target: { kind: "task", listId: "work-list" },
+  });
+  assert.equal(record.state, "failed");
+  assert.equal(calls.create.length, 0);
+  assert.equal(record.partial.title, "Call dentist");
+});
+
+test("a manual draft keeps its chosen Reminders list", async () => {
+  const { service, calls } = harness({ settings: settings({ ai: false }) });
+  const record = await service.submit({
+    draft: { kind: "reminder", title: "Milk", notes: "", date: "", time: "", endTime: "" },
+    target: { kind: "reminder", listId: "groceries" },
+  });
+  assert.equal(record.state, "created");
+  assert.equal(calls.complete, 0);
+  assert.deepEqual(
+    calls.create.map(([kind, , listId]) => [kind, listId]),
+    [["reminder", "groceries"]],
+  );
+});
+
+test("a chosen list whose source is unavailable fails before any AI call or write", async () => {
+  const { service, calls } = harness({
+    accounts: { google: { connected: true }, reminders: "denied" },
+  });
+  const record = await service.submit({
+    text: "Buy milk",
+    target: { kind: "reminder", listId: "groceries" },
+  });
+  assert.equal(record.state, "failed");
+  assert.match(record.error, /list isn’t available/);
+  assert.deepEqual(record.partial, { title: "Buy milk" });
+  assert.equal(calls.license, 0);
+  assert.equal(calls.complete, 0);
+  assert.equal(calls.create.length, 0);
+});
+
+test("capture targets are validated at the IPC edge", () => {
+  assert.equal(parseCaptureTarget(undefined), null);
+  assert.equal(parseCaptureTarget(null), null);
+  assert.deepEqual(parseCaptureTarget({ kind: "task", listId: "a" }), {
+    kind: "task",
+    listId: "a",
+  });
+  for (const bad of [{ kind: "event", listId: "a" }, { kind: "task", listId: "" }, "task", []])
+    assert.throws(() => parseCaptureTarget(bad), /target needs a task or reminder list/);
 });
