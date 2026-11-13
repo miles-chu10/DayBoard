@@ -871,9 +871,14 @@ test("menu bar switches date groups without losing capture or footer navigation"
     const panel = await openMenuBarAgenda(demo.app);
     const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
     const input = panel.getByRole("textbox", { name: "Add or ask" });
+    // Read the active color only once the tab's color transition (e.g. into Dark mode) settles.
     const activeTab = await navigation
       .getByRole("button", { name: "Today", exact: true })
-      .evaluate((node) => (globalThis as unknown as DomGlobal).getComputedStyle(node).color);
+      .evaluate(async (node) => {
+        const element = node as { getAnimations(): { finished: Promise<unknown> }[] };
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+        return (globalThis as unknown as DomGlobal).getComputedStyle(node).color;
+      });
     await input.fill("Unsent idea");
     await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
     await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
