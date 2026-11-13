@@ -210,6 +210,25 @@ Read the counts in the Cloudflare dashboard (D1, `dayboard`, Console) or with `n
 
 Setup, from Miles's Mac (not performed here): back up D1, apply `migrations/0007_usage_checkins.sql` with `npx wrangler d1 migrations apply <database> --remote` (it only adds the table, an index and the three views), then deploy. Until the migration is applied, check-ins get `503`, which the app ignores and retries the next hour. Deploy the Worker and the privacy page before releasing an app version that sends check-ins.
 
+## KPI report
+
+`scripts/kpis.mjs` prints the owner's KPIs as Markdown, or as JSON with `--json`, for people and for agents such as Codex: active installs (from the views above), versions in use, live licenses (paid vs. comp, activated, revoked), live Stripe checkouts, paid sales, refunds, estimated fees and net, GitHub downloads per release, and an all-time funnel from DMG downloads to activated paid licenses. It only reads: one D1 query endpoint with fixed SQL, two Stripe list endpoints and the public GitHub releases API. It prints counts only, never keys, emails or install IDs.
+
+Credentials come from 1Password. Copy `kpis.env.template` and point each reference at your own items, then run from the repo root:
+
+```sh
+op run --env-file=billing/kpis.env.template -- npm --prefix billing run kpis -- --json
+```
+
+| Variable                                           | What to create                                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`                             | A Cloudflare API token limited to **D1 Read** on the account                                                                         |
+| `CLOUDFLARE_ACCOUNT_ID`, `DAYBOARD_D1_DATABASE_ID` | The account and the live `dayboard` database ids                                                                                     |
+| `STRIPE_KPI_KEY`                                   | A live **restricted** key (`rk_live_...`) with Read on Checkout Sessions and Refunds and nothing else. Secret `sk_` keys are refused |
+| `GITHUB_TOKEN`                                     | Optional, raises GitHub's rate limit (`gh auth token` works)                                                                         |
+
+A section whose variables are missing prints as not configured, and one whose source fails prints its error, while the rest still print. Fees are estimated at 2.9% + $0.30 + 3.5% per sale (Managed Payments); Stripe's balance transactions hold the exact fees. The claude.ai KPI dashboard shows the same numbers, read through claude.ai connectors.
+
 ## Durable states and recovery
 
 A signed webhook is only an input. Before minting, the service retrieves the current Checkout Session, PaymentIntent, and line items and checks test/live mode, paid state, amount, currency, exact product and price, and quantity one. A D1 transaction persists payment ownership, one encrypted key bound to the issuing origin/product/environment, order state, and event deduplication. Retries return the original key. Full refunds and disputes create permanent payment tombstones even if they arrive before the paid webhook. Later paid events cannot restore access. Partial refunds currently retain access; dispute reversal does **not** automatically regrant. Confirm this policy before launch. An unpaid `checkout.session.completed` is durably acknowledged as pending; only subsequent verified asynchronous success can issue a key. Failed asynchronous payment stays unentitled. Manual regrant requires a separately reviewed process and database audit trail.
