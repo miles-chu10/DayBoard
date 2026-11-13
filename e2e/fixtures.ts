@@ -33,6 +33,26 @@ export async function createTestProfile(mode: IsolatedProfileMode = "demo"): Pro
   return prepareIsolatedProfile(profile, mode);
 }
 
+/**
+ * Waits until the main window's root view has mounted. The window's shortcuts are attached in
+ * effects once it has, so on a slow runner a key sent before that goes nowhere: wait for the mount
+ * and one more frame. Call it again after a reload.
+ */
+export async function waitForWindowReady(page: Page): Promise<void> {
+  await page.waitForLoadState("domcontentloaded");
+  await page.locator("[data-window-content]").waitFor({ state: "attached", timeout: 30_000 });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const view = globalThis as unknown as {
+          requestAnimationFrame(callback: () => void): void;
+          setTimeout(callback: () => void, delay: number): void;
+        };
+        view.requestAnimationFrame(() => view.setTimeout(resolve, 0));
+      }),
+  );
+}
+
 async function launchIsolated(profile?: string, demoMode = true): Promise<DemoApp> {
   const requested = profile ?? (await createTestProfile(demoMode ? "demo" : "test"));
   const userData = resolveProfileOverride(requested, [
@@ -70,20 +90,7 @@ async function launchIsolated(profile?: string, demoMode = true): Promise<DemoAp
   }
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.waitForLoadState("domcontentloaded");
-  // The window's shortcuts are attached in effects once the root view has mounted. On a slow
-  // runner a key sent before that goes nowhere, so wait for the mount and one more frame.
-  await page.locator("[data-window-content]").waitFor({ state: "attached", timeout: 30_000 });
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        const view = globalThis as unknown as {
-          requestAnimationFrame(callback: () => void): void;
-          setTimeout(callback: () => void, delay: number): void;
-        };
-        view.requestAnimationFrame(() => view.setTimeout(resolve, 0));
-      }),
-  );
+  await waitForWindowReady(page);
   return {
     app,
     page,

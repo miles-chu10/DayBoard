@@ -1,6 +1,6 @@
-# DayBoard 1.3.5 — A Home you can arrange and a faster menu bar
+# DayBoard 1.3.6 — A Home you can arrange and a faster menu bar
 
-DayBoard 1.3.5 lets you arrange the cards on Home, reworks the menu-bar panel so adding a to-do
+DayBoard 1.3.6 lets you arrange the cards on Home, reworks the menu-bar panel so adding a to-do
 to a specific list takes one line, and keeps your email drafts safer.
 
 ## New
