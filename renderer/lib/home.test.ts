@@ -116,3 +116,27 @@ test("the summary lists what waits, what's suggested and the meetings", () => {
     "1 waiting on you and 1 meeting this week.",
   );
 });
+
+test("Home layouts validate persisted values and retain every card when reordered", async () => {
+  const { defaultHomeLayout, isHomeLayout, moveHomeModule } = await import("./home-layout");
+  const layout = defaultHomeLayout();
+  assert.equal(isHomeLayout(layout), true);
+  assert.equal(isHomeLayout(null), false);
+  assert.equal(isHomeLayout([...layout.slice(0, 3), layout[0]]), false);
+  assert.equal(isHomeLayout(layout.map((item) => ({ ...item, wide: "yes" }))), false);
+  const moved = moveHomeModule(layout, "waiting", 1);
+  assert.deepEqual(
+    moved.map((item) => item.id),
+    ["meeting", "waiting", "agenda", "suggested"],
+  );
+  assert.deepEqual(
+    layout.map((item) => item.id),
+    ["meeting", "agenda", "suggested", "waiting"],
+  );
+  assert.equal(moveHomeModule(layout, "meeting", -1), layout);
+  assert.equal(moveHomeModule(layout, "meeting", 99), layout);
+  assert.equal(
+    isHomeLayout(layout.map((item) => ({ ...item, hidden: true, collapsed: true }))),
+    true,
+  );
+});

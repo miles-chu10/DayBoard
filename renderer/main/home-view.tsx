@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
+import { HomeDashboard, HomeCard as Card } from "../components/home-dashboard";
 import {
   Button,
   ScrollArea,
@@ -63,40 +64,6 @@ const isBoolean = (value: unknown): value is boolean => typeof value === "boolea
 const isKeys = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
-function Card({
-  title,
-  count,
-  action,
-  children,
-  className,
-}: {
-  title: string;
-  count?: number;
-  action?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      aria-label={title}
-      className={cn("flex min-w-0 flex-col gap-1 rounded-xl bg-well px-2 pb-2 pt-1", className)}
-    >
-      <div className="flex min-h-9 items-center gap-2 px-2">
-        <Text variant="strong" as="h2" className="min-w-0 truncate">
-          {title}
-        </Text>
-        {count !== undefined ? (
-          <Text variant="small" color="secondary" className="tabular-nums">
-            {count}
-          </Text>
-        ) : null}
-        <span className="ml-auto flex items-center gap-1">{action}</span>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function MoreToggle({
   hidden,
   open,
@@ -131,7 +98,7 @@ function NeedsYouRow({
       onClick={onOpen}
       aria-label={`${item.title}: ${item.detail}, ${item.chip}, ${ageLabel(item.since, now)}`}
       className={cn(
-        "grid w-full grid-cols-[1rem_minmax(6rem,10rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left",
+        "grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left",
         "hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-accent",
       )}
     >
@@ -139,13 +106,13 @@ function NeedsYouRow({
       <Text variant="strong" truncate>
         {item.title}
       </Text>
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-2">
         <Text color="secondary" truncate className="min-w-0">
           {item.detail}
         </Text>
         <span
           className={cn(
-            "hidden shrink-0 items-center gap-1 rounded-full bg-control px-2 py-0.5 text-small text-secondary @2xl:inline-flex",
+            "hidden min-w-0 items-center gap-1 rounded-full bg-control px-2 py-0.5 text-small text-secondary @2xl:inline-flex",
             item.kind === "follow-up" && "text-support-orange",
           )}
         >
@@ -165,7 +132,7 @@ function NeedsYouRow({
       </span>
       <span
         className={cn(
-          "flex shrink-0 items-center gap-1 text-small tabular-nums",
+          "col-start-3 row-start-1 flex shrink-0 items-center gap-1 text-small tabular-nums",
           stale ? "text-support-orange" : "text-secondary",
         )}
       >
@@ -331,212 +298,246 @@ export function HomeView() {
               })}
             </Text>
           </div>
-          <SegmentedControl
-            size="small"
-            value={span}
-            onValueChange={(next: string) => isSpan(next) && setSpan(next)}
-            aria-label="Home range"
-          >
-            <SegmentedControlItem value="today">Today</SegmentedControlItem>
-            <SegmentedControlItem value="week">This week</SegmentedControlItem>
-          </SegmentedControl>
         </header>
 
-        <div className="grid gap-6">
-          <div className="flex min-w-0 flex-col gap-6">
-            <MeetingCard surface="agenda" />
-
-            <Card
-              title="Agenda"
-              count={agendaCount}
-              action={
-                <Button
-                  size="small"
-                  variant="transparent"
-                  onClick={() => void navigate({ to: "/agenda" })}
-                >
-                  Open Agenda
-                </Button>
-              }
+        <HomeDashboard
+          rangeControl={
+            <SegmentedControl
+              size="small"
+              value={span}
+              onValueChange={(next: string) => isSpan(next) && setSpan(next)}
+              aria-label="Home range"
             >
-              <div className="flex flex-col gap-3 px-1">
-                {agenda.overdue.length ? (
-                  <OverdueSummary
-                    count={agenda.overdue.length}
-                    open={overdueOpen}
-                    onOpenChange={setOverdueOpen}
-                  >
-                    <AgendaList
-                      entries={agenda.overdue.map(todoEntry)}
-                      now={now}
-                      focusKeys={planning.data?.focusKeys ?? []}
-                      onOpen={openTodo}
-                      onPin={(todo) => toggleFocus(planning, todo)}
-                    />
-                  </OverdueSummary>
-                ) : null}
-                {agendaDays.map(({ date, entries }) => {
-                  if (span === "week" && !entries.length) return null;
-                  return (
-                    <div key={date} className="flex flex-col gap-1.5">
-                      {span === "week" || agenda.overdue.length ? (
-                        <Text variant="small-strong" color="secondary" className="px-1">
-                          {span === "week" ? dayHeading(date) : "Today"}
-                        </Text>
-                      ) : null}
-                      {entries.length ? (
-                        <AgendaList
-                          entries={entries}
-                          now={now}
-                          focusKeys={planning.data?.focusKeys ?? []}
-                          onOpen={openTodo}
-                          onOpenEvent={(event) => openEvent(event)}
-                          onPin={(todo) => toggleFocus(planning, todo)}
-                        />
-                      ) : (
-                        <Text color="tertiary" className="px-1 py-2">
-                          {agendaLoading ? "Loading…" : "Nothing scheduled today."}
-                        </Text>
-                      )}
-                    </div>
-                  );
-                })}
-                {span === "week" && !agendaCount && !agendaLoading ? (
-                  <Text color="tertiary" className="px-1 py-2">
-                    Nothing scheduled this week.
-                  </Text>
-                ) : null}
-              </div>
-              <Button
-                size="small"
-                variant="transparent"
-                className="self-start"
-                onClick={openCapture}
-              >
-                <Plus />
-                New item
-              </Button>
-            </Card>
-
-            {mailOn ? (
-              <Card
-                title="Needs you"
-                count={waiting.length}
-                action={
-                  <>
-                    {triageOn && untriaged ? (
-                      <Button
-                        size="small"
-                        variant="transparent"
-                        onClick={triage.isRunning ? triage.stop : triage.run}
-                      >
-                        <Sparkles />
-                        {triage.isRunning ? "Stop" : "Review inbox"}
-                      </Button>
-                    ) : null}
+              <SegmentedControlItem value="today">Today</SegmentedControlItem>
+              <SegmentedControlItem value="week">This week</SegmentedControlItem>
+            </SegmentedControl>
+          }
+          modules={[
+            {
+              id: "meeting",
+              title: "Up next meeting",
+              content: (
+                <MeetingCard
+                  surface="agenda"
+                  emptyState={
+                    <Text data-home-empty="" color="tertiary" className="px-2 py-2">
+                      No meeting card available right now.
+                    </Text>
+                  }
+                />
+              ),
+            },
+            {
+              id: "agenda",
+              title: "Agenda",
+              content: (
+                <Card
+                  title="Agenda"
+                  count={agendaCount}
+                  action={
                     <Button
                       size="small"
                       variant="transparent"
-                      onClick={() => void navigate({ to: "/mail" })}
+                      onClick={() => void navigate({ to: "/agenda" })}
                     >
-                      Open Inbox
+                      Open Agenda
                     </Button>
-                  </>
-                }
-              >
-                {mail.isPending ? (
-                  <Text color="tertiary" className="px-2 py-2">
-                    Loading…
-                  </Text>
-                ) : waiting.length ? (
-                  <div className="flex flex-col">
-                    {shownWaiting.map((item) => (
-                      <NeedsYouRow
-                        key={item.key}
-                        item={item}
-                        now={now.getTime()}
-                        onOpen={() => openMail(item.mail.id)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Text color="tertiary" className="px-2 py-2">
-                    Nothing is waiting on you.
-                  </Text>
-                )}
-                <MoreToggle
-                  hidden={waiting.length - shownWaiting.length}
-                  open={showAllWaiting}
-                  onToggle={() => setShowAllWaiting((open) => !open)}
-                />
-              </Card>
-            ) : null}
-
-            {triageOn && mailOn ? (
-              <Card
-                title="Suggested"
-                count={suggested.length}
-                action={
-                  <Text variant="small" color="secondary">
-                    From your mail
-                  </Text>
-                }
-              >
-                {suggested.length ? (
-                  <ul className="flex flex-col">
-                    {shownSuggested.map((task) => (
-                      <li
-                        key={task.key}
-                        className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-list-hover"
+                  }
+                >
+                  <div className="flex flex-col gap-3 px-1">
+                    {agenda.overdue.length ? (
+                      <OverdueSummary
+                        count={agenda.overdue.length}
+                        open={overdueOpen}
+                        onOpenChange={setOverdueOpen}
                       >
-                        <CircleDashed
-                          aria-hidden="true"
-                          className="size-4 shrink-0 text-secondary"
+                        <AgendaList
+                          entries={agenda.overdue.map(todoEntry)}
+                          now={now}
+                          focusKeys={planning.data?.focusKeys ?? []}
+                          onOpen={openTodo}
+                          onPin={(todo) => toggleFocus(planning, todo)}
                         />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <Text truncate>{task.title}</Text>
-                          <Text variant="small" color="secondary" truncate>
-                            {task.mail.from} · {task.mail.subject}
+                      </OverdueSummary>
+                    ) : null}
+                    {agendaDays.map(({ date, entries }) => {
+                      if (span === "week" && !entries.length) return null;
+                      return (
+                        <div key={date} className="flex flex-col gap-1.5">
+                          {span === "week" || agenda.overdue.length ? (
+                            <Text variant="small-strong" color="secondary" className="px-1">
+                              {span === "week" ? dayHeading(date) : "Today"}
+                            </Text>
+                          ) : null}
+                          {entries.length ? (
+                            <AgendaList
+                              entries={entries}
+                              now={now}
+                              focusKeys={planning.data?.focusKeys ?? []}
+                              onOpen={openTodo}
+                              onOpenEvent={(event) => openEvent(event)}
+                              onPin={(todo) => toggleFocus(planning, todo)}
+                            />
+                          ) : (
+                            <Text color="tertiary" className="px-1 py-2">
+                              {agendaLoading ? "Loading…" : "Nothing scheduled today."}
+                            </Text>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {span === "week" && !agendaCount && !agendaLoading ? (
+                      <Text color="tertiary" className="px-1 py-2">
+                        Nothing scheduled this week.
+                      </Text>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="small"
+                    variant="transparent"
+                    className="self-start"
+                    onClick={openCapture}
+                  >
+                    <Plus />
+                    New item
+                  </Button>
+                </Card>
+              ),
+            },
+            ...(triageOn && mailOn
+              ? [
+                  {
+                    id: "suggested" as const,
+                    title: "Suggested",
+                    content: (
+                      <Card
+                        title="Suggested"
+                        count={suggested.length}
+                        action={
+                          <Text variant="small" color="secondary">
+                            From your mail
                           </Text>
-                        </span>
-                        <Button
-                          size="small"
-                          aria-label={`Add task: ${task.title}`}
-                          disabled={addSuggested.isPending}
-                          onClick={() => addSuggested.mutate(task)}
-                        >
-                          <Plus />
-                          Add
-                        </Button>
-                        <Button
-                          size="small"
-                          iconOnly
-                          variant="transparent"
-                          aria-label={`Dismiss suggestion: ${task.title}`}
-                          title="Dismiss"
-                          onClick={() => handle(task.key)}
-                        >
-                          <X />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <Text color="tertiary" className="px-2 py-2">
-                    {untriaged
-                      ? "Review your inbox to find tasks hiding in your mail."
-                      : "No new tasks in your mail."}
-                  </Text>
-                )}
-                <MoreToggle
-                  hidden={suggested.length - shownSuggested.length}
-                  open={showAllSuggested}
-                  onToggle={() => setShowAllSuggested((open) => !open)}
-                />
-              </Card>
-            ) : null}
-          </div>
-        </div>
+                        }
+                      >
+                        {suggested.length ? (
+                          <ul className="flex flex-col">
+                            {shownSuggested.map((task) => (
+                              <li
+                                key={task.key}
+                                className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-list-hover"
+                              >
+                                <CircleDashed
+                                  aria-hidden="true"
+                                  className="size-4 shrink-0 text-secondary"
+                                />
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <Text truncate>{task.title}</Text>
+                                  <Text variant="small" color="secondary" truncate>
+                                    {task.mail.from} · {task.mail.subject}
+                                  </Text>
+                                </span>
+                                <Button
+                                  size="small"
+                                  aria-label={`Add task: ${task.title}`}
+                                  disabled={addSuggested.isPending}
+                                  onClick={() => addSuggested.mutate(task)}
+                                >
+                                  <Plus />
+                                  Add
+                                </Button>
+                                <Button
+                                  size="small"
+                                  iconOnly
+                                  variant="transparent"
+                                  aria-label={`Dismiss suggestion: ${task.title}`}
+                                  title="Dismiss"
+                                  onClick={() => handle(task.key)}
+                                >
+                                  <X />
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <Text color="tertiary" className="px-2 py-2">
+                            {untriaged
+                              ? "Review your inbox to find tasks hiding in your mail."
+                              : "No new tasks in your mail."}
+                          </Text>
+                        )}
+                        <MoreToggle
+                          hidden={suggested.length - shownSuggested.length}
+                          open={showAllSuggested}
+                          onToggle={() => setShowAllSuggested((open) => !open)}
+                        />
+                      </Card>
+                    ),
+                  },
+                ]
+              : []),
+            ...(mailOn
+              ? [
+                  {
+                    id: "waiting" as const,
+                    title: "Needs you",
+                    content: (
+                      <Card
+                        title="Needs you"
+                        count={waiting.length}
+                        action={
+                          <>
+                            {triageOn && untriaged ? (
+                              <Button
+                                size="small"
+                                variant="transparent"
+                                onClick={triage.isRunning ? triage.stop : triage.run}
+                              >
+                                <Sparkles />
+                                {triage.isRunning ? "Stop" : "Review inbox"}
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="small"
+                              variant="transparent"
+                              onClick={() => void navigate({ to: "/mail" })}
+                            >
+                              Open Inbox
+                            </Button>
+                          </>
+                        }
+                      >
+                        {mail.isPending ? (
+                          <Text color="tertiary" className="px-2 py-2">
+                            Loading…
+                          </Text>
+                        ) : waiting.length ? (
+                          <div className="flex flex-col">
+                            {shownWaiting.map((item) => (
+                              <NeedsYouRow
+                                key={item.key}
+                                item={item}
+                                now={now.getTime()}
+                                onOpen={() => openMail(item.mail.id)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <Text color="tertiary" className="px-2 py-2">
+                            Nothing is waiting on you.
+                          </Text>
+                        )}
+                        <MoreToggle
+                          hidden={waiting.length - shownWaiting.length}
+                          open={showAllWaiting}
+                          onToggle={() => setShowAllWaiting((open) => !open)}
+                        />
+                      </Card>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
       </div>
     </ScrollArea>
   );

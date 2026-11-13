@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button, Callout, Markdown, Status, Text, cn } from "@renderer/ui";
 import { Sparkles, Video } from "lucide-react";
 import type { CalendarEventItem } from "@main/shared-types";
@@ -79,15 +80,21 @@ function UpNextMeeting({
 }
 
 /** The next meeting with its join link and prep; hidden when switched off or nothing is next. */
-export function MeetingCard({ surface }: { surface: "agenda" | "menubar" }) {
+export function MeetingCard({
+  surface,
+  emptyState = null,
+}: {
+  surface: "agenda" | "menubar";
+  emptyState?: ReactNode;
+}) {
   const settings = useSettings().data;
   const now = useAgendaClock();
   const calendar = useCalendarRange(todayISO(), 2);
-  if (!settings || !sourceOn(settings, "calendar")) return null;
+  if (!settings || !sourceOn(settings, "calendar")) return emptyState;
   const events = calendar.data?.state === "ok" ? calendar.data.items : [];
   const upNext = settings.system.meetings.upNext ? pickUpNext(events, now) : null;
   const ended = settings.system.meetings.notesImport ? justEnded(events, now) : null;
-  if (!upNext && !ended) return null;
+  if (!upNext && !ended) return emptyState;
   return (
     <>
       {upNext ? (
