@@ -155,6 +155,10 @@ function isActivatableLicense(license: LicenseInfo, now: Date): boolean {
   );
 }
 
+/** Longest wait between validation attempts while the service is unreachable. Kept short so a
+ * Mac that comes back online is rechecked within minutes, not an hour. */
+const VALIDATION_RETRY_MAX_MS = 5 * 60_000;
+
 export class LicenseService {
   private readonly verifier: LicenseVerifier;
   private readonly store: LicenseStore;
@@ -522,7 +526,7 @@ export class LicenseService {
         instance: record.instanceId,
         validatedAt: record.lastValidationAt,
         attemptedAt: now.getTime(),
-        nextAt: now.getTime() + Math.min(3_600_000, 60_000 * 2 ** Math.min(attempts - 1, 6)),
+        nextAt: now.getTime() + Math.min(VALIDATION_RETRY_MAX_MS, 60_000 * 2 ** (attempts - 1)),
         attempts,
       };
       // Network/server unreachable: don't flip validity, just report the current (possibly

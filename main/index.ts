@@ -1,6 +1,6 @@
 import { app, dialog, logger } from "./platform/index.js";
 import { registerHandlers } from "./handlers/index.js";
-import { BrowserWindow } from "electron";
+import { BrowserWindow, powerMonitor } from "electron";
 import {
   acquireSingleInstanceLock,
   createMainWindow,
@@ -35,9 +35,13 @@ async function drainAppWrites(): Promise<void> {
   await drainNativeThemeWrites();
 }
 
+// macOS is shutting down, restarting or logging out. A question here would hold that up, so
+// held emails are sent without asking, as they were before the confirmation existed.
+let systemShuttingDown = false;
+
 const saveBeforeQuit = createSaveQuitGuard({
   confirmBeforeDrain: async () => {
-    if (!heldMailCount()) return true;
+    if (systemShuttingDown || !heldMailCount()) return true;
     const result = await dialog.showMessageBox({
       type: "warning",
       title: "Emails are waiting to send",
@@ -108,6 +112,9 @@ if (acquireSingleInstanceLock()) {
   void app
     .whenReady()
     .then(async () => {
+      powerMonitor.on("shutdown", () => {
+        systemShuttingDown = true;
+      });
       await loadNativeTheme();
       registerHandlers();
       updates = registerUpdateHandlers({

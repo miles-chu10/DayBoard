@@ -39,7 +39,7 @@ for (const mode of ["compiled test", "compiled QA", "runtime demo"]) {
     const stubs = new Map([
       [
         "electron",
-        `export const app = globalThis.__app; export const BrowserWindow = {}; export const clipboard = {}; export const dialog = {}; export const Menu = {}; export const nativeImage = {}; export const nativeTheme = {}; export const shell = {};`,
+        `export const app = globalThis.__app; export const BrowserWindow = {}; export const clipboard = {}; export const dialog = {}; export const Menu = {}; export const nativeImage = {}; export const nativeTheme = {}; export const powerMonitor = {}; export const shell = {};`,
       ],
       [
         "./ipc.js",

@@ -18,7 +18,7 @@ export interface ComposeDraft {
 type SendMail = (request: MailSendRequest, restore: () => void) => Promise<void>;
 
 const ComposeContext = createContext<{
-  openCompose: (draft?: Partial<ComposeDraft>) => void;
+  openCompose: (draft?: Partial<ComposeDraft>, options?: { recovered?: boolean }) => void;
   sendMail: SendMail;
 }>({ openCompose: () => {}, sendMail: async () => {} });
 
@@ -39,15 +39,23 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
   const waitingDrafts = useRef<ComposeDraft[]>([]);
   const tickets = useRef(new Map<string, { toastId: string | number; restore: () => void }>());
 
-  function openCompose(next?: Partial<ComposeDraft>) {
-    const restored = { ...EMPTY, ...next };
+  function openCompose(next?: Partial<ComposeDraft>, options?: { recovered?: boolean }) {
+    const opened = { ...EMPTY, ...next };
     if (activeDraft.current) {
-      waitingDrafts.current.push(restored);
-      toast("Draft recovered. Finish the current email to open it.");
+      // Never replace the email being written. A blank request has nothing worth queueing.
+      const hasContent = Boolean(opened.to || opened.cc || opened.subject || opened.body);
+      if (hasContent) waitingDrafts.current.push(opened);
+      toast(
+        options?.recovered
+          ? "Draft recovered. Finish the current email to open it."
+          : hasContent
+            ? "Finish the current email to open the next one."
+            : "Finish or close the current email first.",
+      );
       return;
     }
     activeDraft.current = true;
-    setDraft(restored);
+    setDraft(opened);
     setGeneration((value) => value + 1);
   }
 
@@ -129,7 +137,7 @@ function ComposeDialog({
   initial: ComposeDraft;
   onClose: () => void;
   sendMail: SendMail;
-  reopen: (draft: ComposeDraft) => void;
+  reopen: (draft: ComposeDraft, options?: { recovered?: boolean }) => void;
 }) {
   const [value, setValue] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +175,7 @@ function ComposeDialog({
         };
     try {
       const snapshot = value;
-      await sendMail(request, () => reopen(snapshot));
+      await sendMail(request, () => reopen(snapshot, { recovered: true }));
       if (alive.current) onClose();
     } catch (cause) {
       setError(errorMessage(cause));

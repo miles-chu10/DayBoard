@@ -97,12 +97,15 @@ export function ReplyDialog({
     const written = ai.isDone ? ai.output.trim() : "";
     try {
       await sendMail({ kind: "reply", id: sent.id, body }, () =>
-        openCompose({
-          replyToId: sent.id,
-          heading: `Reply to ${sent.from}`,
-          subject: sent.subject,
-          body,
-        }),
+        openCompose(
+          {
+            replyToId: sent.id,
+            heading: `Reply to ${sent.from}`,
+            subject: sent.subject,
+            body,
+          },
+          { recovered: true },
+        ),
       );
       if (memoryOn && written) learnFromDraft(written, body);
       if (alive.current) onOpenChange(false);

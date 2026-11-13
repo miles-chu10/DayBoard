@@ -40,10 +40,16 @@ test("restoring an older mail cannot replace the active compose draft", async ()
   const view = mod.ComposeProvider({ children: null });
   const { openCompose } = view.props.value;
   openCompose({ body: "current" });
-  openCompose({ body: "restored old mail" });
+  openCompose({ body: "restored old mail" }, { recovered: true });
   assert.equal(state.values.filter((x) => x?.body).length, 1);
   assert.equal(state.values.find((x) => x?.body).body, "current");
-  assert.match(state.toasts.at(-1)[0], /Finish the current email/);
+  assert.match(state.toasts.at(-1)[0], /^Draft recovered\. Finish the current email/);
+  // An ordinary New Email while one is open is not a recovered draft and must not say so.
+  openCompose();
+  assert.equal(state.values.filter((x) => x?.body).length, 1);
+  assert.equal(state.toasts.at(-1)[0], "Finish or close the current email first.");
+  openCompose({ to: "a@example.com", body: "second" });
+  assert.equal(state.toasts.at(-1)[0], "Finish the current email to open the next one.");
 });
 
 test("repeated Send and Cmd-Enter share a synchronous in-flight lock", async () => {

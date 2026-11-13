@@ -15,6 +15,8 @@ interface StoreFile {
 const MAX_ENTRIES = 500;
 /** Check at least hourly, so a sleeping Mac or a clock change can't strand an entry. */
 const MAX_WAIT = 60 * 60 * 1000;
+// Longest wait between retries of a failed check, so mail returns soon after the network does.
+const MAX_RETRY_WAIT = 5 * 60 * 1000;
 
 interface Timers {
   setTimeout: (callback: () => void, ms: number) => unknown;
@@ -75,7 +77,7 @@ export function createMailSchedule(deps: {
     const attempts = (retries.get(entry)?.attempts ?? 0) + 1;
     retries.set(entry, {
       attempts,
-      at: deps.now() + Math.min(MAX_WAIT, 60_000 * 2 ** Math.min(attempts - 1, 6)),
+      at: deps.now() + Math.min(MAX_RETRY_WAIT, 60_000 * 2 ** (attempts - 1)),
     });
   }
 

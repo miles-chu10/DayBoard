@@ -187,7 +187,14 @@ test("offline snoozes back off instead of retrying every second", async () => {
   assert.deepEqual(h.timerWaits(), [60_000]);
   await h.advance(60_000);
   assert.deepEqual(h.timerWaits(), [120_000]);
-  h.state.failUnsnooze = false;
   await h.advance(120_000);
+  assert.deepEqual(h.timerWaits(), [240_000]);
+  await h.advance(240_000);
+  // Capped at five minutes, so mail comes back soon after the network does.
+  assert.deepEqual(h.timerWaits(), [300_000]);
+  await h.advance(300_000);
+  assert.deepEqual(h.timerWaits(), [300_000]);
+  h.state.failUnsnooze = false;
+  await h.advance(300_000);
   assert.deepEqual(h.events.unsnoozed, ["retry"]);
 });

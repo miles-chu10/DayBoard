@@ -1031,4 +1031,13 @@ test("transient validation failure backs off without extending offline grace", a
   assert.equal(s.current().lastValidationAt, NOW.toISOString());
   await service.refresh(new Date(+NOW + DAY + 60_000));
   assert.equal(v.calls.validate.length, calls + 1);
+  // The wait is capped at five minutes, however many attempts failed, and a success clears it.
+  let at = +NOW + DAY + 60_000;
+  for (let i = 0; i < 8; i++) {
+    at += 5 * 60_000;
+    await service.refresh(new Date(at));
+  }
+  assert.equal(v.calls.validate.length, calls + 9);
+  offline = false;
+  assert.equal((await service.refresh(new Date(at + 5 * 60_000))).state, "licensed");
 });
