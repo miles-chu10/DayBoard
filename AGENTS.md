@@ -27,6 +27,7 @@ Run from the repo root. The shell may export `NODE_ENV=production`, which makes 
 - `npm test` — unit tests. `npm run test:e2e` — builds, then Playwright Electron E2E.
 - `npm run package:preview` — local ad-hoc-signed (not notarized) arm64 preview DMG and update ZIP; no publishing.
 - `npm run test:billing` — typecheck and test the separate license backend after installing its dependencies.
+- `npm --prefix billing run kpis -- --json` — read-only KPI report (installs, funnel, revenue, licenses, downloads); credentials via `op run`, see `billing/README.md` "KPI report".
 - `npm run package:test` — credential-free ad-hoc-signed test app.
 - `npm run dist` — unsigned arm64 release candidate in `release/`, requiring complete build configuration; publishing remains disabled. See `docs/RELEASE.md` for signing and external gates.
 - `postinstall` runs `electron-builder install-app-deps` to rebuild node-pty for Electron.
