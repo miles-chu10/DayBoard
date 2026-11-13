@@ -9,13 +9,18 @@ import {
   buildCapturePrompt,
   normalizeDraft,
   parseDraftStrict,
+  type AvailableKinds,
+  type CaptureTarget,
   type ItemDraft,
   type ItemKind,
 } from "../../../shared/capture.js";
 import type { AiLockState } from "../../../shared/license.js";
 import { aiLockState } from "../../../shared/license-policy.js";
 
-export type CaptureSubmit = { text: string } | { draft: unknown };
+/** Text for the AI to parse, or a manual draft; `target` pins it to one list. */
+export type CaptureSubmit = ({ text: string } | { draft: unknown }) & {
+  target?: CaptureTarget | null;
+};
 
 export interface CaptureRecord {
   id: string;
@@ -51,8 +56,8 @@ export interface CaptureDeps {
   assertAiAccess(): Promise<void>;
   complete(system: string, prompt: string): Promise<string>;
   create: {
-    task(draft: ItemDraft): Promise<TaskRef>;
-    reminder(draft: ItemDraft): Promise<ReminderRef>;
+    task(draft: ItemDraft, listId?: string): Promise<TaskRef>;
+    reminder(draft: ItemDraft, listId?: string): Promise<ReminderRef>;
     event(draft: ItemDraft): Promise<EventRef>;
   };
   remove: {
@@ -77,6 +82,7 @@ const MAX_TEXT = 1_000;
 const UNDO_MS = 10 * 60_000;
 const WITHOUT_AI = "Fill in the details to add it without AI.";
 const NOTHING_AVAILABLE = "Connect Google or allow Reminders access to add items.";
+const TARGET_UNAVAILABLE = "That list isn’t available right now. Choose another list.";
 const AI_LOCKED: Record<AiLockState, string> = {
   expired:
     "Your AI trial has ended, so DayBoard can't read this for you. Fill in the details to add it without AI, or get DayBoard Pro in Settings → License.",
@@ -137,9 +143,14 @@ export function createCaptureService(deps: CaptureDeps) {
     return snapshot(record);
   }
 
-  async function create(kind: ItemKind, scope: string, draft: ItemDraft): Promise<Receipt> {
+  async function create(
+    kind: ItemKind,
+    scope: string,
+    draft: ItemDraft,
+    listId?: string,
+  ): Promise<Receipt> {
     if (kind === "task") {
-      const ref = await deps.guardedWrite(scope, () => deps.create.task(draft));
+      const ref = await deps.guardedWrite(scope, () => deps.create.task(draft, listId));
       return {
         kind,
         scope,
@@ -156,7 +167,7 @@ export function createCaptureService(deps: CaptureDeps) {
         ref,
       };
     }
-    const { ref } = await deps.guardedWrite(scope, () => deps.create.reminder(draft));
+    const { ref } = await deps.guardedWrite(scope, () => deps.create.reminder(draft, listId));
     return { kind, scope, expires: deps.now().getTime() + UNDO_MS, ref };
   }
 
@@ -169,11 +180,16 @@ export function createCaptureService(deps: CaptureDeps) {
     const scope = await deps.currentScope();
     const [settings, accounts] = await Promise.all([deps.getSettings(), deps.getAccounts()]);
     assertCurrent(started);
-    const available = availableKinds({
+    const connected = availableKinds({
       googleConnected: accounts.google.connected,
       remindersAccess: accounts.reminders,
       sources: settings.sources,
     });
+    // A chosen list narrows the parse to that one kind, so the item lands where it was aimed.
+    const target = input.target ?? null;
+    const available: AvailableKinds = target
+      ? { task: false, reminder: false, event: false, [target.kind]: connected[target.kind] }
+      : connected;
     const record: CaptureRecord = {
       id: deps.newId(),
       text,
@@ -186,6 +202,9 @@ export function createCaptureService(deps: CaptureDeps) {
       canUndo: false,
     };
     track(record);
+
+    if (target && !available[target.kind])
+      return fail(record, TARGET_UNAVAILABLE, "draft" in input ? null : { title: text });
 
     let draft: ItemDraft;
     if ("draft" in input) {
@@ -232,7 +251,7 @@ export function createCaptureService(deps: CaptureDeps) {
     }
 
     try {
-      const receipt = await create(draft.kind, scope, draft);
+      const receipt = await create(draft.kind, scope, draft, target?.listId);
       assertCurrent(started);
       receipts.set(record.id, receipt);
       undoRecords.set(record.id, { record, expires: receipt.expires });

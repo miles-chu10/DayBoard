@@ -13,6 +13,8 @@ export const PANEL_CHANNELS: ReadonlySet<string> = new Set([
   "reminders:list",
   "calendar:list",
   "calendar:listRange",
+  "tasks:lists",
+  "reminders:lists",
   "ai:availability",
   "license:status",
   // Quick Capture

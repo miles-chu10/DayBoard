@@ -17,6 +17,27 @@ export interface ItemDraft {
 
 export type AvailableKinds = Record<ItemKind, boolean>;
 
+/** A specific Google Tasks list or Reminders list chosen for a capture. */
+export interface CaptureTarget {
+  kind: "task" | "reminder";
+  listId: string;
+}
+
+/** Reads a capture target from IPC input; anything malformed is rejected, absent is null. */
+export function parseCaptureTarget(value: unknown): CaptureTarget | null {
+  if (value === undefined || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof value !== "object" ||
+    (record.kind !== "task" && record.kind !== "reminder") ||
+    typeof record.listId !== "string" ||
+    !record.listId ||
+    record.listId.length > 1_000
+  )
+    throw new Error("capture:submit: target needs a task or reminder list");
+  return { kind: record.kind, listId: record.listId };
+}
+
 export const KIND_LABEL: Record<ItemKind, string> = {
   task: "Google Task",
   reminder: "Reminder",

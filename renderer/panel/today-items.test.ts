@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { Agenda } from "../lib/agenda";
+import { formatTimeOfDay } from "../lib/dates";
 import { upcomingItems, todayItems } from "./today-items";
 
 const now = new Date(2026, 9, 20, 12, 0);
@@ -194,4 +195,15 @@ test("upcoming groups skip today, empty dates and completed tasks, never duplica
     ["future"],
   );
   assert.equal(result[0].overdueCount, 0);
+});
+
+test("events carry their end time and overdue to-dos are flagged for the red age label", () => {
+  const input = agenda({
+    timed: [{ kind: "event", key: "e1", event: event("e1", at(13), at(14, 30)) }],
+    overdue: [todo("late", { dueDate: "2026-10-10" })],
+  });
+  const { items, overdue } = todayItems(input, now);
+  assert.equal(items[0].end, formatTimeOfDay(at(14, 30)));
+  assert.equal(overdue[0].overdue, true);
+  assert.equal(overdue[0].time, "A week ago");
 });

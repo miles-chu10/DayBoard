@@ -10,8 +10,12 @@ export interface TodayItem {
    * anytime to-do. */
   time: string | null;
   source: "calendar" | "tasks" | "reminders";
+  /** A timed event's end time, formatted for display. */
+  end?: string;
   /** An event that has already ended today; it stays listed, styled as past. */
   past?: boolean;
+  /** An open to-do whose due date has passed; `time` then holds its age ("A week ago"). */
+  overdue?: boolean;
 }
 
 const MAX_ITEMS = 8;
@@ -51,6 +55,7 @@ export function todayItems(
         kind: "event",
         title: entry.event.title,
         time: formatTimeOfDay(entry.event.start),
+        end: formatTimeOfDay(entry.event.end),
         source: "calendar",
         ...(past ? { past } : {}),
       });
@@ -77,6 +82,7 @@ export function todayItems(
       title: todo.title,
       time: todo.dueDate ? relativeDue(todo.dueDate, todo.dueTime, now).label : null,
       source: todo.source,
+      overdue: true,
     })),
     items: capItems(items),
     hiddenCount: items.length - capItems(items).length,

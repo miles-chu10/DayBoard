@@ -33,9 +33,11 @@ test("panel allow-list is exactly the reviewed set", () => {
     "panel:show",
     "reminders:create",
     "reminders:list",
+    "reminders:lists",
     "settings:get",
     "tasks:create",
     "tasks:list",
+    "tasks:lists",
     "window:openSettings",
   ]);
 });

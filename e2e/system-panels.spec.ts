@@ -404,6 +404,7 @@ type DomGlobal = {
   document: { documentElement: unknown; activeElement: unknown };
   getComputedStyle(node: unknown): {
     backgroundColor: string;
+    color: string;
     fontVariantNumeric: string;
     outlineOffset: string;
     outlineWidth: string;
@@ -870,6 +871,9 @@ test("menu bar switches date groups without losing capture or footer navigation"
     const panel = await openMenuBarAgenda(demo.app);
     const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
     const input = panel.getByRole("textbox", { name: "Add or ask" });
+    const activeTab = await navigation
+      .getByRole("button", { name: "Today", exact: true })
+      .evaluate((node) => (globalThis as unknown as DomGlobal).getComputedStyle(node).color);
     await input.fill("Unsent idea");
     await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
     await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
@@ -909,7 +913,47 @@ test("menu bar switches date groups without losing capture or footer navigation"
       "aria-pressed",
       "true",
     );
+    // The active tab takes the accent color the Today tab had while it was active.
+    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveCSS(
+      "color",
+      activeTab,
+    );
+    await expect(navigation.getByRole("button", { name: "Today", exact: true })).not.toHaveCSS(
+      "color",
+      activeTab,
+    );
     await panel.screenshot({ path: "test-results/menubar-refined-upcoming.png" });
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("the menu-bar quick add aims at a chosen list and remembers it", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    const input = () => panel.getByRole("textbox", { name: "Add or ask" });
+    await expect(input()).toHaveAttribute("placeholder", "Add or ask…");
+    await panel.getByRole("button", { name: "Add to: Let AI decide" }).click();
+    await expect(panel.getByRole("menuitemcheckbox", { name: "Let AI decide" })).toBeChecked();
+    await expect(panel.getByText("Google Tasks", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("menuitemcheckbox", { name: "Errands" })).toBeVisible();
+    await expect(panel.getByRole("menu")).toHaveCSS("opacity", "1");
+    await panel.screenshot({ path: "test-results/menubar-list-picker.png" });
+    await panel.getByRole("menuitemcheckbox", { name: "Work" }).click();
+    await expect(input()).toHaveAttribute("placeholder", "Add to “Work”…");
+
+    await input().fill("Book flights");
+    await input().press("Enter");
+    // Demo mode never writes; the refusal proves the targeted submit reached capture.
+    await expect(panel.getByText(/turned off in demo mode/)).toBeVisible();
+    await expect(input()).toHaveValue("Book flights");
+
+    // The choice survives a fresh renderer, not just this open panel.
+    await panel.reload();
+    await expect(input()).toHaveAttribute("placeholder", "Add to “Work”…");
+    await expect(panel.getByRole("button", { name: "Add to: Work" })).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
