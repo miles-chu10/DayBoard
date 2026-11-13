@@ -178,3 +178,23 @@ test("a damaged file reads as empty and malformed entries are dropped", () => {
     ["ok"],
   );
 });
+
+test("offline snoozes back off instead of retrying every second", async () => {
+  const h = harness({ failUnsnooze: true });
+  await h.schedule.start();
+  await h.schedule.add(entry("snooze", "retry", h.now(), h.now() + 1000));
+  await h.advance(1000);
+  assert.deepEqual(h.timerWaits(), [60_000]);
+  await h.advance(60_000);
+  assert.deepEqual(h.timerWaits(), [120_000]);
+  await h.advance(120_000);
+  assert.deepEqual(h.timerWaits(), [240_000]);
+  await h.advance(240_000);
+  // Capped at five minutes, so mail comes back soon after the network does.
+  assert.deepEqual(h.timerWaits(), [300_000]);
+  await h.advance(300_000);
+  assert.deepEqual(h.timerWaits(), [300_000]);
+  h.state.failUnsnooze = false;
+  await h.advance(300_000);
+  assert.deepEqual(h.events.unsnoozed, ["retry"]);
+});

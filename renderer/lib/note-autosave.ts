@@ -11,11 +11,15 @@ export interface NoteDraft {
  */
 export function createNoteAutosave(options: {
   id: string | undefined;
-  persist: (note: NoteDraft & { id?: string }) => Promise<{ id: string }>;
+  updatedAt?: number;
+  persist: (
+    note: NoteDraft & { id?: string; expectedUpdatedAt?: number },
+  ) => Promise<{ id: string; updatedAt?: number }>;
   onState: (state: NoteSaveState) => void;
   delay?: number;
 }) {
   let id = options.id;
+  let updatedAt = options.updatedAt;
   let pending: NoteDraft | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let discarded = false;
@@ -39,7 +43,13 @@ export function createNoteAutosave(options: {
         saving = true;
         options.onState("saving");
         try {
-          id = (await options.persist({ ...(id ? { id } : {}), ...draft })).id;
+          const saved = await options.persist({
+            ...(id ? { id } : {}),
+            ...(updatedAt !== undefined ? { expectedUpdatedAt: updatedAt } : {}),
+            ...draft,
+          });
+          id = saved.id;
+          updatedAt = saved.updatedAt;
           options.onState(pending ? "unsaved" : "saved");
         } catch {
           // Keep the failed draft, unless newer typing replaced it, so it is retried, not dropped.
@@ -64,6 +74,29 @@ export function createNoteAutosave(options: {
     },
     flush,
     hasPendingChanges: () => pending !== null || saving,
+    /** Preserve a conflicting draft as a separate note before permitting navigation. */
+    saveCopy(draft: NoteDraft): Promise<boolean> {
+      clearTimeout(timer);
+      chain = chain.then(async () => {
+        saving = true;
+        options.onState("saving");
+        try {
+          const saved = await options.persist(draft);
+          id = saved.id;
+          updatedAt = saved.updatedAt;
+          pending = null;
+          options.onState("saved");
+          return true;
+        } catch {
+          pending = draft;
+          options.onState("unsaved");
+          return false;
+        } finally {
+          saving = false;
+        }
+      });
+      return chain;
+    },
     /** Drops unsaved edits (the note is being deleted) and waits for a save already running. */
     async discard(): Promise<string | undefined> {
       clearTimeout(timer);

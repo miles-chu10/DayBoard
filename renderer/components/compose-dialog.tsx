@@ -18,7 +18,7 @@ export interface ComposeDraft {
 type SendMail = (request: MailSendRequest, restore: () => void) => Promise<void>;
 
 const ComposeContext = createContext<{
-  openCompose: (draft?: Partial<ComposeDraft>) => void;
+  openCompose: (draft?: Partial<ComposeDraft>, options?: { recovered?: boolean }) => void;
   sendMail: SendMail;
 }>({ openCompose: () => {}, sendMail: async () => {} });
 
@@ -35,10 +35,27 @@ const EMPTY: ComposeDraft = { to: "", cc: "", subject: "", body: "" };
 export function ComposeProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<ComposeDraft | null>(null);
   const [generation, setGeneration] = useState(0);
+  const activeDraft = useRef(false);
+  const waitingDrafts = useRef<ComposeDraft[]>([]);
   const tickets = useRef(new Map<string, { toastId: string | number; restore: () => void }>());
 
-  function openCompose(next?: Partial<ComposeDraft>) {
-    setDraft({ ...EMPTY, ...next });
+  function openCompose(next?: Partial<ComposeDraft>, options?: { recovered?: boolean }) {
+    const opened = { ...EMPTY, ...next };
+    if (activeDraft.current) {
+      // Never replace the email being written. A blank request has nothing worth queueing.
+      const hasContent = Boolean(opened.to || opened.cc || opened.subject || opened.body);
+      if (hasContent) waitingDrafts.current.push(opened);
+      toast(
+        options?.recovered
+          ? "Draft recovered. Finish the current email to open it."
+          : hasContent
+            ? "Finish the current email to open the next one."
+            : "Finish or close the current email first.",
+      );
+      return;
+    }
+    activeDraft.current = true;
+    setDraft(opened);
     setGeneration((value) => value + 1);
   }
 
@@ -97,7 +114,12 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
         <ComposeDialog
           key={generation}
           initial={draft}
-          onClose={() => setDraft(null)}
+          onClose={() => {
+            activeDraft.current = false;
+            setDraft(null);
+            const next = waitingDrafts.current.shift();
+            if (next) openCompose(next);
+          }}
           sendMail={sendMail}
           reopen={openCompose}
         />
@@ -115,15 +137,27 @@ function ComposeDialog({
   initial: ComposeDraft;
   onClose: () => void;
   sendMail: SendMail;
-  reopen: (draft: ComposeDraft) => void;
+  reopen: (draft: ComposeDraft, options?: { recovered?: boolean }) => void;
 }) {
   const [value, setValue] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const sending = useRef(false);
+  const [busy, setBusy] = useState(false);
   const reply = Boolean(value.replyToId);
   const set = (key: keyof ComposeDraft) => (text: string) =>
     setValue((current) => ({ ...current, [key]: text }));
 
   async function send() {
+    if (sending.current || !value.body.trim() || (!reply && !value.to.trim())) return;
+    sending.current = true;
+    setBusy(true);
     setError(null);
     const request: MailSendRequest = value.replyToId
       ? {
@@ -141,22 +175,25 @@ function ComposeDialog({
         };
     try {
       const snapshot = value;
-      await sendMail(request, () => reopen(snapshot));
-      onClose();
+      await sendMail(request, () => reopen(snapshot, { recovered: true }));
+      if (alive.current) onClose();
     } catch (cause) {
       setError(errorMessage(cause));
+    } finally {
+      sending.current = false;
+      setBusy(false);
     }
   }
 
   return (
     <Dialog
       open
-      onOpenChange={(open) => !open && onClose()}
+      onOpenChange={(open) => !open && !sending.current && onClose()}
       size="large"
       title={value.heading ?? "New Email"}
       description={reply ? value.subject : undefined}
       confirmLabel="Send"
-      confirmDisabled={!value.body.trim() || (!reply && !value.to.trim())}
+      confirmDisabled={busy || !value.body.trim() || (!reply && !value.to.trim())}
       onConfirm={send}
     >
       <div
@@ -172,6 +209,7 @@ function ComposeDialog({
           {reply ? null : (
             <Field label="To">
               <Input
+                disabled={busy}
                 aria-label="To"
                 autoFocus
                 value={value.to}
@@ -182,6 +220,7 @@ function ComposeDialog({
           )}
           <Field label="Cc">
             <Input
+              disabled={busy}
               aria-label="Cc"
               value={value.cc}
               onChange={(event) => set("cc")(event.target.value)}
@@ -191,6 +230,7 @@ function ComposeDialog({
           {reply ? null : (
             <Field label="Subject">
               <Input
+                disabled={busy}
                 aria-label="Subject"
                 value={value.subject}
                 onChange={(event) => set("subject")(event.target.value)}
@@ -199,6 +239,7 @@ function ComposeDialog({
           )}
         </FieldGroup>
         <Textarea
+          disabled={busy}
           aria-label="Message"
           autoFocus={reply}
           className="min-h-48 max-h-96"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Callout, Dialog, Input, Status, Text, Textarea, toast } from "@renderer/ui";
 import type { MailItem } from "@main/shared-types";
@@ -27,6 +27,15 @@ export function ReplyDialog({
   const { sendMail, openCompose } = useCompose();
   const [instructions, setInstructions] = useState("");
   const [draft, setDraft] = useState("");
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const sending = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   const body = useQuery({
     queryKey: ["mail-body", message?.id],
@@ -49,7 +58,7 @@ export function ReplyDialog({
   if (!message) return null;
 
   function write() {
-    if (!message || !body.data) return;
+    if (!message || !body.data || sending.current) return;
     void ai.run({
       system: REPLY_SYSTEM,
       prompt: buildReplyPrompt({
@@ -64,34 +73,47 @@ export function ReplyDialog({
   }
 
   async function save() {
-    if (!message) return;
+    if (!message || sending.current || ai.isRunning || !draft.trim()) return;
+    sending.current = true;
+    setBusy(true);
     try {
       await invoke("mail:createDraft", { id: message.id, body: draft });
       toast.success("Draft saved in Gmail");
     } catch (error) {
       toast.error(`Couldn't save draft: ${errorMessage(error)}`);
       throw error;
+    } finally {
+      sending.current = false;
+      setBusy(false);
     }
   }
 
   async function send() {
-    if (!message) return;
+    if (!message || sending.current || !draft.trim() || ai.isRunning) return;
+    sending.current = true;
+    setBusy(true);
     const sent = message;
     const body = draft;
     const written = ai.isDone ? ai.output.trim() : "";
     try {
       await sendMail({ kind: "reply", id: sent.id, body }, () =>
-        openCompose({
-          replyToId: sent.id,
-          heading: `Reply to ${sent.from}`,
-          subject: sent.subject,
-          body,
-        }),
+        openCompose(
+          {
+            replyToId: sent.id,
+            heading: `Reply to ${sent.from}`,
+            subject: sent.subject,
+            body,
+          },
+          { recovered: true },
+        ),
       );
       if (memoryOn && written) learnFromDraft(written, body);
-      onOpenChange(false);
+      if (alive.current) onOpenChange(false);
     } catch (error) {
       toast.error(`Couldn't send: ${errorMessage(error)}`);
+    } finally {
+      sending.current = false;
+      setBusy(false);
     }
   }
 
@@ -99,6 +121,7 @@ export function ReplyDialog({
     <Dialog
       open
       onOpenChange={(open) => {
+        if (sending.current) return;
         if (!open) ai.stop();
         onOpenChange(open);
       }}
@@ -106,7 +129,7 @@ export function ReplyDialog({
       title={`Reply to ${message.from}`}
       description={message.subject}
       confirmLabel="Send"
-      confirmDisabled={!draft.trim() || ai.isRunning}
+      confirmDisabled={busy || !draft.trim() || ai.isRunning}
       onConfirm={send}
       secondaryAction={{
         label: "Save Draft",
@@ -141,7 +164,7 @@ export function ReplyDialog({
             {ai.isRunning ? (
               <Button onClick={ai.stop}>Stop</Button>
             ) : (
-              <Button onClick={write} disabled={!body.data}>
+              <Button onClick={write} disabled={busy || !body.data}>
                 Write with AI
               </Button>
             )}
@@ -151,7 +174,7 @@ export function ReplyDialog({
         <Textarea
           className="min-h-40 max-h-72"
           value={ai.isRunning ? ai.output : draft}
-          readOnly={ai.isRunning}
+          readOnly={ai.isRunning || busy}
           onChange={(event) => setDraft(event.target.value)}
           aria-label="Your reply"
           placeholder="Write your reply…"

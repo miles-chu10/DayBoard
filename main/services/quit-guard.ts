@@ -4,6 +4,7 @@ interface QuitEvent {
 
 interface SaveQuitOptions {
   drain: () => Promise<void>;
+  confirmBeforeDrain?: () => Promise<boolean>;
   confirmUnfinished: () => Promise<boolean>;
   resumeQuit: () => void;
   isUpdateInstallReady?: () => boolean;
@@ -14,6 +15,7 @@ interface SaveQuitOptions {
 /** Cancel native quit synchronously, then finish pending saves before requesting it again. */
 export function createSaveQuitGuard({
   drain,
+  confirmBeforeDrain = async () => true,
   confirmUnfinished,
   resumeQuit,
   isUpdateInstallReady = () => false,
@@ -32,6 +34,7 @@ export function createSaveQuitGuard({
     waiting = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
+      if (!(await confirmBeforeDrain())) return;
       try {
         await Promise.race([
           drain(),

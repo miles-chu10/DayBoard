@@ -146,7 +146,7 @@ function normalizeMessage(value: unknown): AssistantMessage {
   };
 }
 
-function normalizeChat(value: unknown): AssistantChat {
+export function normalizeChat(value: unknown): AssistantChat {
   if (!isRecord(value)) throw new Error("Assistant history contains an invalid chat record.");
   if (!Array.isArray(value.messages) || value.messages.length > MAX_MESSAGES_PER_CHAT)
     throw new Error("Assistant history exceeds the message limit for one chat.");

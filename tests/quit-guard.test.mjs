@@ -100,3 +100,21 @@ test("a prepared update owns its quit; a failed preparation uses the normal save
   assert.equal(drains, 1);
   assert.equal(resumed, 1);
 });
+
+test("cancelling the held-mail confirmation never starts the drain", async () => {
+  let drains = 0;
+  let quits = 0;
+  const guard = createSaveQuitGuard({
+    confirmBeforeDrain: async () => false,
+    drain: async () => {
+      drains++;
+    },
+    confirmUnfinished: async () => true,
+    resumeQuit: () => {
+      quits++;
+    },
+  });
+  await guard({ preventDefault() {} });
+  assert.equal(drains, 0);
+  assert.equal(quits, 0);
+});

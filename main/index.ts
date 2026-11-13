@@ -1,6 +1,6 @@
 import { app, dialog, logger } from "./platform/index.js";
 import { registerHandlers } from "./handlers/index.js";
-import { BrowserWindow } from "electron";
+import { BrowserWindow, powerMonitor } from "electron";
 import {
   acquireSingleInstanceLock,
   createMainWindow,
@@ -13,7 +13,7 @@ import { startMcpHttpServer } from "./services/mcp-http-server.js";
 import { mcpProjectIdForProfile } from "./services/mcp-port.js";
 import { drainAgendaStore } from "./services/agenda-store.js";
 import { drainProductivityWrites } from "./handlers/productivity.js";
-import { drainMailOutbox } from "./handlers/mail.js";
+import { drainMailOutbox, heldMailCount } from "./handlers/mail.js";
 import { createSaveQuitGuard } from "./services/quit-guard.js";
 import { drainPendingWrites } from "./services/pending-writes.js";
 import { drainSettingsStores } from "./services/settings-store.js";
@@ -35,7 +35,24 @@ async function drainAppWrites(): Promise<void> {
   await drainNativeThemeWrites();
 }
 
+// macOS is shutting down, restarting or logging out. A question here would hold that up, so
+// held emails are sent without asking, as they were before the confirmation existed.
+let systemShuttingDown = false;
+
 const saveBeforeQuit = createSaveQuitGuard({
+  confirmBeforeDrain: async () => {
+    if (systemShuttingDown || !heldMailCount()) return true;
+    const result = await dialog.showMessageBox({
+      type: "warning",
+      title: "Emails are waiting to send",
+      message: "Send pending emails now and quit?",
+      detail: "Keeping DayBoard open preserves the remaining Undo send time.",
+      buttons: ["Keep Open", "Send and Quit"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    return result.response === 1;
+  },
   drain: async () => {
     await pauseAndDrainAppOperations();
     await drainAppWrites();
@@ -95,6 +112,9 @@ if (acquireSingleInstanceLock()) {
   void app
     .whenReady()
     .then(async () => {
+      powerMonitor.on("shutdown", () => {
+        systemShuttingDown = true;
+      });
       await loadNativeTheme();
       registerHandlers();
       updates = registerUpdateHandlers({
