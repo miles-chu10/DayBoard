@@ -100,6 +100,8 @@ export function HomeDashboard({
         className={cn(
           "min-w-0",
           item.wide && "@3xl:col-span-2",
+          // Outside Customize, a card with nothing to show (no meeting up next) stays out of the way.
+          !editing && "has-[[data-home-empty]]:hidden",
 
           editing && "rounded-xl border border-separator p-2",
           editing && item.hidden && "opacity-60",

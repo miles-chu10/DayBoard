@@ -152,16 +152,21 @@ test("Home cards customize, persist, collapse, reset and fit narrow windows", as
       const settings = await bridge.ipc.invoke<AppSettings>("settings:get");
       await bridge.ipc.invoke("settings:update", {
         ...settings,
-        sources: {
-          ...settings.sources,
-          calendar: { ...settings.sources.calendar, enabled: false },
+        // Demo mode keeps every source on, so turn the meeting card's own options off.
+        system: {
+          ...settings.system,
+          meetings: { ...settings.system.meetings, upNext: false, notesImport: false },
         },
       });
     });
     await page.reload();
-    await expect(
-      page.getByText("No meeting card available right now.", { exact: true }),
-    ).toBeVisible();
+    // With nothing up next, the meeting card stays out of the way until you customize Home.
+    const noMeeting = page.getByText("No meeting card available right now.", { exact: true });
+    await expect(page.getByRole("region", { name: "Agenda" })).toBeVisible();
+    await expect(page.locator('[data-home-module="meeting"]')).toBeHidden();
+    await expect(noMeeting).toBeHidden();
+    await page.getByRole("button", { name: "Customize" }).click();
+    await expect(noMeeting).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();

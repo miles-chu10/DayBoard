@@ -320,7 +320,7 @@ export function HomeView() {
                 <MeetingCard
                   surface="agenda"
                   emptyState={
-                    <Text color="tertiary" className="px-2 py-2">
+                    <Text data-home-empty="" color="tertiary" className="px-2 py-2">
                       No meeting card available right now.
                     </Text>
                   }
