@@ -30,6 +30,27 @@ export const QUERIES = {
     "WHERE l.environment = 'live') x ON x.kind = k.kind GROUP BY k.kind ORDER BY k.kind DESC",
 };
 
+// Cloudflare Web Analytics (the beacon on the website). The query only reads page-load counts
+// for one hostname; the token needs Account Analytics Read.
+export const TRAFFIC_QUERY = `query Traffic($account: String!, $host: String!, $since: Date!) {
+  viewer {
+    accounts(filter: { accountTag: $account }) {
+      byDay: rumPageloadEventsAdaptiveGroups(
+        limit: 100
+        filter: { requestHost: $host, date_geq: $since }
+        orderBy: [date_ASC]
+      ) { count sum { visits } dimensions { date } }
+      byPath: rumPageloadEventsAdaptiveGroups(
+        limit: 25
+        filter: { requestHost: $host, date_geq: $since }
+        orderBy: [count_DESC]
+      ) { count sum { visits } dimensions { requestPath } }
+    }
+  }
+}`;
+const TRAFFIC_DAYS = 30;
+const DEFAULT_SITE_HOST = "getdayboard.com";
+
 // Stripe Managed Payments: card processing 2.9% + $0.30 plus 3.5%. Stripe keeps fees on refunds.
 const FEE_RATE = 0.029 + 0.035;
 const FEE_FIXED = 0.3;
@@ -38,13 +59,15 @@ const DEFAULT_REPO = "miles-chu10/DayBoard";
 const USAGE = `Usage: kpis.mjs [--json]
 
 Environment (each section needs only its own):
-  CLOUDFLARE_API_TOKEN       Cloudflare API token with D1 Read only.
+  CLOUDFLARE_API_TOKEN       Cloudflare API token with D1 Read (installs, licenses) and
+                             Account Analytics Read (site traffic) only.
   CLOUDFLARE_ACCOUNT_ID      Cloudflare account id.
   DAYBOARD_D1_DATABASE_ID    Id of the live billing D1 database.
   STRIPE_KPI_KEY             Stripe restricted key (rk_live_...) with read access to
                              Checkout Sessions and Refunds only.
   GITHUB_TOKEN               Optional. Raises GitHub's rate limit for release downloads.
   DAYBOARD_REPO              Optional. Defaults to ${DEFAULT_REPO}.
+  DAYBOARD_SITE_HOST         Optional. Website hostname for traffic. Defaults to ${DEFAULT_SITE_HOST}.
 `;
 
 class UsageError extends Error {}
@@ -92,6 +115,38 @@ async function d1Query(fetchImpl, cf, sql) {
   if (!body?.success || !result || result.success === false || !Array.isArray(result.results))
     throw new Error(`Cloudflare D1 query failed: ${body?.errors?.[0]?.message ?? "no results"}`);
   return result.results;
+}
+
+async function cfGraphql(fetchImpl, token, query, variables) {
+  const body = await getJson(
+    fetchImpl,
+    "https://api.cloudflare.com/client/v4/graphql",
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+    },
+    "Cloudflare Analytics",
+  );
+  if (body?.errors?.length)
+    throw new Error(`Cloudflare Analytics: ${body.errors.map((e) => e.message).join("; ")}`);
+  return body?.data;
+}
+
+export function summarizeTraffic(account, host, since) {
+  const visits = (g) => g.sum?.visits ?? 0;
+  const daily = (account?.byDay ?? []).map((g) => ({
+    day: g.dimensions.date,
+    visits: visits(g),
+    pageviews: g.count,
+  }));
+  const pages = (account?.byPath ?? []).map((g) => ({
+    path: g.dimensions.requestPath,
+    visits: visits(g),
+    pageviews: g.count,
+  }));
+  const total = (key) => daily.reduce((n, d) => n + d[key], 0);
+  return { host, since, visits: total("visits"), pageviews: total("pageviews"), daily, pages };
 }
 
 async function stripeList(fetchImpl, key, path) {
@@ -195,8 +250,12 @@ export async function collectKpis({
   const stripeKey = secret(env, "STRIPE_KPI_KEY", { prefix: "rk_" });
   const ghToken = secret(env, "GITHUB_TOKEN");
   const repo = env.DAYBOARD_REPO || DEFAULT_REPO;
+  const host = env.DAYBOARD_SITE_HOST || DEFAULT_SITE_HOST;
+  const since = new Date(now.getTime() - (TRAFFIC_DAYS - 1) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 
-  const [usage, licenses, money, downloads] = await Promise.all([
+  const [usage, licenses, money, downloads, traffic] = await Promise.all([
     section(async () => {
       if (!cf) return null;
       const [summary, daily, versions] = await Promise.all(
@@ -227,6 +286,15 @@ export async function collectKpis({
       );
       return { releases: summarizeReleases(releases) };
     }),
+    section(async () => {
+      if (!cfToken || !env.CLOUDFLARE_ACCOUNT_ID) return null;
+      const data = await cfGraphql(fetchImpl, cfToken, TRAFFIC_QUERY, {
+        account: env.CLOUDFLARE_ACCOUNT_ID,
+        host,
+        since,
+      });
+      return summarizeTraffic(data?.viewer?.accounts?.[0], host, since);
+    }),
   ]);
 
   return {
@@ -235,11 +303,13 @@ export async function collectKpis({
       "Active installs come from the app's anonymous daily check-in (UTC days); official builds only, users can turn it off.",
       "Counts include the owner's and QA installs and downloads.",
       "Revenue is live mode; fees are estimated at 2.9% + $0.30 + 3.5% per sale.",
+      "Site traffic is Cloudflare Web Analytics (cookieless, sampled, UTC days); it starts 2026-11-12, when the beacon went live.",
     ],
     usage,
     licenses,
     money,
     downloads,
+    traffic,
     funnel: funnel({
       releases: downloads.status === "ok" ? downloads.releases : null,
       usage: usage.status === "ok" ? usage.summary : null,
@@ -301,6 +371,16 @@ export function toMarkdown(k) {
       ),
     );
   else out.push(unavailable(k.licenses));
+  out.push(``, `## Site traffic (last ${TRAFFIC_DAYS} days)`, ``);
+  if (k.traffic.status === "ok")
+    out.push(
+      `- ${k.traffic.host} since ${k.traffic.since}: ${k.traffic.visits} visits, ${k.traffic.pageviews} page views`,
+      ``,
+      `| Page | Visits | Page views |`,
+      `|---|---:|---:|`,
+      ...k.traffic.pages.map((p) => `| ${p.path} | ${p.visits} | ${p.pageviews} |`),
+    );
+  else out.push(unavailable(k.traffic));
   out.push(``, `## Downloads by release`, ``);
   if (k.downloads.status === "ok")
     out.push(
