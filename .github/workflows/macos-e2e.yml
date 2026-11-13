@@ -1,0 +1,61 @@
+name: macOS E2E
+
+# The full Playwright Electron suite on the same runner image as macos-release.yml's test step,
+# without its environment or any secret. Release runs failed three times on macOS-only timing
+# (1.3.3, 1.3.4, 1.3.5), so app and test changes see this suite before a tag does.
+
+on:
+  pull_request:
+    paths:
+      - "main/**"
+      - "renderer/**"
+      - "shared/**"
+      - "electron/**"
+      - "native/**"
+      - "e2e/**"
+      - "*.html"
+      - "package.json"
+      - "package-lock.json"
+      - "electron.vite.config.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/macos-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright Electron E2E (macOS)
+    if: github.repository == 'miles-chu10/dayboard'
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      # The same public build inputs as the release test step, so the suite builds the same app.
+      DAYBOARD_LICENSE_API_URL: https://api.getdayboard.com
+      DAYBOARD_STRIPE_PRODUCT_ID: prod_VZ5SiyzDZ4ASHs
+      DAYBOARD_LICENSE_ENVIRONMENT: live
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run test:e2e -- --trace off
+      - name: Keep failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-e2e-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

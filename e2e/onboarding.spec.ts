@@ -2,7 +2,13 @@ import { expect, test, type ElectronApplication, type Page } from "@playwright/t
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DayboardBridge } from "../shared/bridge-protocol";
-import { createEmptyProfile, createTestProfile, launchDemo, launchEmptyProfile } from "./fixtures";
+import {
+  createEmptyProfile,
+  createTestProfile,
+  launchDemo,
+  launchEmptyProfile,
+  waitForWindowReady,
+} from "./fixtures";
 
 type AppGlobal = typeof globalThis & { dayboard: DayboardBridge };
 
@@ -36,8 +42,11 @@ async function useTheme(app: ElectronApplication, page: Page, theme: "light" | "
  * What a fresh Mac with Claude Code installed reports, so every run sees the same steps: test
  * builds carry no license service (a release build starts in the trial), CI has no Google client
  * or Reminders access, and which AI tools are installed depends on the machine.
+ *
+ * The window has already mounted and asked for these by then, and the answers stay cached, so
+ * reload it to make every step read the stand-ins.
  */
-async function standInFreshMac(app: ElectronApplication) {
+async function standInFreshMac(app: ElectronApplication, page: Page) {
   await app.evaluate(({ ipcMain }) => {
     ipcMain.removeHandler("license:refresh");
     ipcMain.handle("license:refresh", () => ({
@@ -77,6 +86,8 @@ async function standInFreshMac(app: ElectronApplication) {
         : { ok: false, reason: "missing", message: "This tool isn’t installed on this Mac." },
     );
   });
+  await page.reload();
+  await waitForWindowReady(page);
 }
 
 for (const theme of ["light", "dark"] as const) {
@@ -92,7 +103,7 @@ for (const theme of ["light", "dark"] as const) {
       });
     try {
       const page = first.page;
-      await standInFreshMac(first.app);
+      await standInFreshMac(first.app, first.page);
       await useTheme(first.app, page, theme);
 
       const dialog = page.getByRole("dialog");
@@ -199,7 +210,7 @@ test("Turn on AI saves the chosen provider and moves on", async () => {
   const app = await launchEmptyProfile(await createNewInstallProfile());
   try {
     const page = app.page;
-    await standInFreshMac(app.app);
+    await standInFreshMac(app.app, app.page);
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Get started" }).click();
     await dialog.getByRole("button", { name: "Continue" }).click();
