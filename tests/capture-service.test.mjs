@@ -715,6 +715,53 @@ test("a chosen list whose source is unavailable fails before any AI call or writ
   assert.equal(calls.create.length, 0);
 });
 
+test("a chosen list still gets the line as typed when the AI call fails", async () => {
+  const { service, calls } = harness({
+    completeError: "Codex isn't signed in. Run `codex login` in Terminal, then try again.",
+  });
+  const record = await service.submit({
+    text: "Buy milk tomorrow",
+    target: { kind: "task", listId: "work-list" },
+  });
+  assert.equal(record.state, "created");
+  assert.equal(record.error, null);
+  assert.equal(calls.complete, 1);
+  assert.deepEqual(calls.create, [
+    [
+      "task",
+      { kind: "task", title: "Buy milk tomorrow", notes: "", date: "", time: "", endTime: "" },
+      "work-list",
+    ],
+  ]);
+});
+
+test("a chosen list skips the AI and adds the line as typed when AI is locked", async () => {
+  const { service, calls } = harness({
+    assertAiAccess: async () => {
+      throw new LicenseRequiredError("expired");
+    },
+  });
+  const record = await service.submit({
+    text: "Buy milk",
+    target: { kind: "reminder", listId: "groceries" },
+  });
+  assert.equal(record.state, "created");
+  assert.equal(calls.complete, 0, "no AI call once locked");
+  assert.deepEqual(
+    calls.create.map(([kind, draft, listId]) => [kind, draft.title, listId]),
+    [["reminder", "Buy milk", "groceries"]],
+  );
+});
+
+test("without a chosen list a failed AI call still goes back to the form", async () => {
+  const { service, calls } = harness({ completeError: "Codex failed." });
+  const record = await service.submit({ text: "Buy milk" });
+  assert.equal(record.state, "failed");
+  assert.equal(record.error, "Codex failed.");
+  assert.deepEqual(record.partial, { title: "Buy milk" });
+  assert.equal(calls.create.length, 0);
+});
+
 test("capture targets are validated at the IPC edge", () => {
   assert.equal(parseCaptureTarget(undefined), null);
   assert.equal(parseCaptureTarget(null), null);

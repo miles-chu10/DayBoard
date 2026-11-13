@@ -17,6 +17,7 @@ import { getSettings } from "../settings-store.js";
 import { getToolEnv, toStringEnv } from "../shell-env.js";
 
 import { resolveCli } from "./cli-binaries.js";
+import { codexAuthArgs } from "./codex-auth.js";
 import { listCodexModels } from "./codex-models.js";
 import { claudeModelArgs, codexModelArgs } from "./model-options.js";
 import { withAssistantEffort } from "./assistant-effort.js";
@@ -632,7 +633,8 @@ async function runCodex(options: CliRunOptions): Promise<string> {
         args.push("-c", `${key}.http_headers=${tomlTable(server.headers)}`);
     }
   }
-  args.push("-");
+  const env = await getToolEnv(STRIPPED_ENV.codex);
+  args.push(...(await codexAuthArgs(env)), "-");
 
   const state = createState();
   try {
@@ -641,7 +643,7 @@ async function runCodex(options: CliRunOptions): Promise<string> {
       bin,
       args,
       stdin: `${options.system}\n\n---\n\n${options.prompt}`,
-      env: await getToolEnv(STRIPPED_ENV.codex),
+      env,
       cwd,
       timeoutMs: options.timeoutMs,
       signal: options.signal,

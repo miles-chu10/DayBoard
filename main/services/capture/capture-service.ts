@@ -219,35 +219,47 @@ export function createCaptureService(deps: CaptureDeps) {
       if (!aiCaptureEnabled(settings))
         return fail(record, "Fill in the details, then add it.", { title: text });
       // Only the AI parse is paid, so the license is checked here and never for a manual draft.
-      // When AI is locked, the text goes back to the manual form, which stays free.
+      // When AI is locked, the text goes back to the manual form, which stays free. A chosen list
+      // already says where it goes, so then the line is added as typed, like the manual form would.
+      const typed = target ? normalizeDraft({ kind: target.kind, title: text }, available) : null;
+      const asTyped = typed && !("error" in typed) ? typed : null;
+      let aiAllowed = true;
       try {
         await deps.assertAiAccess();
       } catch (error) {
         assertCurrent(started);
         const lock = aiLockState(error);
-        return lock
-          ? fail(record, AI_LOCKED[lock], { title: text }, "license")
-          : fail(record, `${message(error)} ${WITHOUT_AI}`, { title: text });
+        if (!asTyped)
+          return lock
+            ? fail(record, AI_LOCKED[lock], { title: text }, "license")
+            : fail(record, `${message(error)} ${WITHOUT_AI}`, { title: text });
+        aiAllowed = false;
       }
       assertCurrent(started);
-      let output: string;
-      try {
-        output = await deps.complete(
-          CAPTURE_SYSTEM,
-          buildCapturePrompt(text, available, deps.now()),
-        );
-      } catch (error) {
+      let output: string | null = null;
+      if (aiAllowed) {
+        try {
+          output = await deps.complete(
+            CAPTURE_SYSTEM,
+            buildCapturePrompt(text, available, deps.now()),
+          );
+        } catch (error) {
+          assertCurrent(started);
+          if (!asTyped) return fail(record, message(error), { title: text });
+        }
         assertCurrent(started);
-        return fail(record, message(error), { title: text });
       }
-      assertCurrent(started);
-      const parsed = parseDraftStrict(output, available);
-      if (!parsed.ok)
-        return fail(record, `${parsed.reason} Check the details, then add it.`, {
-          title: text,
-          ...parsed.partial,
-        });
-      draft = parsed.draft;
+      if (output === null && asTyped) {
+        draft = asTyped;
+      } else {
+        const parsed = parseDraftStrict(output ?? "", available);
+        if (!parsed.ok)
+          return fail(record, `${parsed.reason} Check the details, then add it.`, {
+            title: text,
+            ...parsed.partial,
+          });
+        draft = parsed.draft;
+      }
     }
 
     try {
