@@ -59,7 +59,7 @@ for (const mode of ["compiled test", "compiled QA", "runtime demo"]) {
       ],
       [
         "./window.js",
-        `export function acquireSingleInstanceLock() { globalThis.__calls.push("lock"); return true; }; export const createMainWindow = async () => { globalThis.__calls.push("window"); }; export const getMainWindow = () => null; export const setupApplicationMenu = () => { globalThis.__calls.push("menu"); };`,
+        `export function acquireSingleInstanceLock() { globalThis.__calls.push("lock"); return true; }; export const createMainWindow = async () => { globalThis.__calls.push("window"); }; export const getMainWindow = () => null; export const keepMainWindowLoadedWhile = () => {}; export const setupApplicationMenu = () => { globalThis.__calls.push("menu"); };`,
       ],
       [
         "./system-panels/index.js",

@@ -11,9 +11,10 @@ const bundled = await build({
   write: false,
   logLevel: "silent",
 });
-const { windowEntryUrl, isAllowedWindowNavigation, isExternalWebUrl } = await import(
-  `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`
-);
+const { windowEntryUrl, isAllowedWindowNavigation, isExternalWebUrl, mainWindowCloseAction } =
+  await import(
+    `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`
+  );
 
 test("privileged local windows accept only their exact document and hash routes", () => {
   const entry = windowEntryUrl("main-window.html", "/fixture/renderer");
@@ -53,4 +54,16 @@ test("external link policy excludes executable schemes and embedded credentials"
     "not a url",
   ])
     assert.equal(isExternalWebUrl(url), false, url);
+});
+
+test("closing the dashboard on macOS keeps it loaded unless the app is quitting", () => {
+  const open = { platform: "darwin", keepLoaded: true, fullScreen: false };
+  assert.equal(mainWindowCloseAction(open), "hide");
+  // A hidden full-screen window would leave an empty Space behind.
+  assert.equal(mainWindowCloseAction({ ...open, fullScreen: true }), "leave-full-screen");
+  // Quit and update install close every window first; holding one open would cancel them.
+  assert.equal(mainWindowCloseAction({ ...open, keepLoaded: false }), "close");
+  assert.equal(mainWindowCloseAction({ ...open, keepLoaded: false, fullScreen: true }), "close");
+  // Elsewhere the last window closing is what quits the app.
+  assert.equal(mainWindowCloseAction({ ...open, platform: "linux" }), "close");
 });

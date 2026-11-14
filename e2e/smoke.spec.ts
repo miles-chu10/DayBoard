@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type ElectronApplication } from "@playwright/test";
 import type { DayboardBridge } from "../shared/bridge-protocol";
 import { BridgeChannel } from "../shared/bridge-protocol";
 import { launchDemo } from "./fixtures";
@@ -179,12 +179,59 @@ test("native update menu opens the update window and preview update actions stay
   }
 });
 
-test("closing the main window and activating the app reopens a usable window", async () => {
+const mainWindowVisible = (app: ElectronApplication) =>
+  app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().some(
+      (window) => window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+    ),
+  );
+
+test("closing the main window keeps it loaded, and activating the app shows it as it was", async () => {
+  const demo = await launchDemo();
+  try {
+    const agenda = demo.page.getByRole("button", { name: /^Agenda\b/ }).first();
+    await agenda.click();
+    await expect(agenda).toHaveAttribute("aria-current", "page");
+    // Lost if the renderer starts again.
+    await demo.page.evaluate(() => {
+      (globalThis as { keptLoaded?: boolean }).keptLoaded = true;
+    });
+    await demo.app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()?.getMenuItemById("close")?.click(),
+    );
+    await expect.poll(() => mainWindowVisible(demo.app)).toBe(false);
+    expect(demo.app.windows()).toHaveLength(1);
+
+    // ⌘W with the dashboard out of sight leaves it alone.
+    await demo.app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()?.getMenuItemById("close")?.click(),
+    );
+    await demo.app.evaluate(({ app }) => app.emit("activate", {}, false));
+    await expect.poll(() => mainWindowVisible(demo.app)).toBe(true);
+    expect(demo.app.windows()).toHaveLength(1);
+    expect(demo.app.windows()[0] === demo.page).toBe(true);
+    expect(
+      await demo.page.evaluate(() => (globalThis as { keptLoaded?: boolean }).keptLoaded),
+    ).toBe(true);
+    await expect(agenda).toHaveAttribute("aria-current", "page");
+    expect(demo.errors).toEqual([]);
+
+    // Quitting with the dashboard hidden still closes it: this close would time out otherwise.
+    await demo.app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()?.getMenuItemById("close")?.click(),
+    );
+    await expect.poll(() => mainWindowVisible(demo.app)).toBe(false);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("activating the app after the main window is gone opens a usable window", async () => {
   const demo = await launchDemo();
   try {
     await expect(demo.page.getByRole("button", { name: /^Agenda\b/ }).first()).toBeVisible();
     await demo.app.evaluate(({ BrowserWindow }) => {
-      for (const window of BrowserWindow.getAllWindows()) window.close();
+      for (const window of BrowserWindow.getAllWindows()) window.destroy();
     });
     await expect.poll(() => demo.app.windows().length).toBe(0);
     await demo.app.evaluate(({ app }) => app.emit("activate", {}, false));

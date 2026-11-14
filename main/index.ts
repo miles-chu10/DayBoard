@@ -5,6 +5,7 @@ import {
   acquireSingleInstanceLock,
   createMainWindow,
   getMainWindow,
+  keepMainWindowLoadedWhile,
   setupApplicationMenu,
 } from "./window.js";
 import { startSystemPanels, stopSystemPanels } from "./system-panels/index.js";
@@ -80,11 +81,16 @@ const saveBeforeQuit = createSaveQuitGuard({
 });
 
 if (acquireSingleInstanceLock()) {
+  let quitting = false;
   app.on("before-quit", (event) => {
     void saveBeforeQuit(event).catch((error) => {
       logger.warn("main", "Quit cancelled because pending changes could not be checked", error);
     });
+    // The guard cancels synchronously while saves drain; only a quit that goes ahead closes windows.
+    quitting = !event.defaultPrevented;
   });
+  // Squirrel closes every window before it quits, so an installing update must not be held open.
+  keepMainWindowLoadedWhile(() => !quitting && updates?.status().phase !== "installing");
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();

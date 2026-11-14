@@ -1,7 +1,13 @@
 import type { QueryClient } from "@tanstack/query-core";
 
-/** Caches that hold one account's private data beyond the source lists (meeting notes). */
-const ACCOUNT_SCOPED_KEYS = [["meetings"]] as const;
+/** Caches that hold one account's private data beyond the source lists. */
+const ACCOUNT_SCOPED_KEYS = [
+  ["meetings"],
+  ["mail-body"],
+  ["mail-related"],
+  ["mail-subscriptions"],
+  ["item-lists"],
+] as const;
 
 /** On an account change: stop in-flight reads and forget their results, never show them later. */
 export function clearAccountScopedQueries(queryClient: QueryClient): void {
