@@ -19,7 +19,7 @@ export const buttonVariants = cva(
           "bg-destructive text-white hover:bg-destructive-hover active:bg-destructive-active",
         glass: "bg-well text-primary hover:bg-control",
         glassAccent: "bg-accent text-accent-contrast hover:bg-accent-hover",
-        transparent: "bg-transparent text-primary hover:bg-control-subtle",
+        transparent: "bg-transparent text-primary hover:bg-control-subtle active:bg-control",
       },
       size: {
         small: "h-7 px-2.5 text-small [&>svg]:size-4",
