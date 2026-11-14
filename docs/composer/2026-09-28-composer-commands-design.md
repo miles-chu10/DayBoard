@@ -28,19 +28,19 @@ In the Assistant composer, Miles can set reasoning effort from a Codex-style pic
 
 ## 1. Effort picker
 
-### Look (matches Codex)
+### Look (macOS popover; revised 2026-11-14)
 
-- **Closed:** the existing model chip shows the model label and, in muted text, the effort label, for example "GPT-6-Astra Max". When the model has no effort control, the chip shows only the model, as today. The Fast badge stays.
-- **Open:** a panel above the chip, right-aligned with it:
-  - **Top left:** a bolt button that toggles Fast mode. It shows only where Fast mode exists (Claude `claudeFast`, Codex `codexServiceTier`) and replaces the Fast checkbox in today's model menu. The bolt in Codex's chip and panel is its Fast-mode indicator, not an effort glyph.
-  - **Top center:** the current effort label in the accent color.
-  - **Top right:** a reset button that returns to the model's default, which means DayBoard sends no effort override.
-  - **Second line:** the model label with a chevron. It opens the existing provider and model menu, including "Connect Accounts & AI Settings…".
-  - **Slider:** one stop per level the current model supports, in order. Arrow keys move one stop.
-  - **Ultra:** when Ultra is selected, a line under the slider reads "Runs several agents at once and uses your limit much faster."
-  - **Ultra where it isn't supported:** on every route with a slider but no Ultra (the OpenAI and Anthropic APIs, Claude Code, and Codex models whose catalog doesn't list it), Ultra appears as a dimmed dot past the last stop, like the dot in Codex's slider. The thumb can't reach it by drag, click or arrow keys. Hovering or focusing it shows "Ultra is available with Codex on GPT-6 Astra, GPT-6 Sol, and GPT-5.6 Sol or Terra." That list comes from the live Codex catalog when there is one, otherwise from the models named here. `/effort ultra` on these routes shows the same message instead of changing anything.
-  - **No effort control:** the slider area reads "This model doesn't have effort settings."
-- **While open:** the chip label reads "Select effort", as Codex's does.
+The first version copied the Codex composer's effort picker (`codex-effort-picker-reference.jpg`). Miles found it out of place in the app, so the panel now uses DayBoard's own menu and Settings vocabulary. Behavior, levels and labels are unchanged.
+
+- **Closed:** the existing model chip shows the model label and, in muted text, the effort label, for example "GPT-6-Astra Max". When the model has no effort control, the chip shows only the model, as today. The Fast badge stays. The chip keeps this label while the panel is open.
+- **Open:** a popover above the chip, left-aligned with it, in four rows separated by hairlines:
+  - **Model:** a pop-up button with the provider mark, the model label and the provider name. It opens the existing provider and model menu, including "Connect Accounts & AI Settings…". The current provider carries a check mark.
+  - **Effort:** the current level at the right ("Default" while DayBoard sends no level, or "Default (Medium)" when the provider names its default), with a Reset button that appears once a level is chosen. Below it, a thin slider with a tick per level the current model supports and the first and last level named under its ends. Arrow keys move one stop. A line under the slider describes the chosen level, or says whose default applies.
+  - **Ultra:** when Ultra is selected, that line reads "Runs several agents at once and uses your limit much faster."
+  - **Ultra where it isn't supported:** on every route with a slider but no Ultra (the OpenAI and Anthropic APIs, Claude Code, and Codex models whose catalog doesn't list it), a dimmed "Ultra" stop sits past the slider. The thumb can't reach it by drag, click or arrow keys. Hovering or focusing it shows "Ultra is available with Codex on GPT-6 Astra, GPT-6 Sol, and GPT-5.6 Sol or Terra." That list comes from the live Codex catalog when there is one, otherwise from the models named here. `/effort ultra` on these routes shows the same message instead of changing anything.
+  - **No effort control:** the Effort row reads "This model doesn't have effort settings."
+  - **Fast mode:** a switch with the same description as Settings → AI. It shows only where Fast mode exists (Claude `claudeFast`, Codex `codexServiceTier`).
+  - **Footer:** "Next request" (the model, effort and Fast mode the next message uses) and "Last reply" (what the chat's last reply recorded), kept apart so a setting is never read as proof of what ran.
 
 Labels, from Codex: `none` None, `minimal` Minimal, `low` Light, `medium` Medium, `high` High, `xhigh` Extra High, `max` Max, `ultra` Ultra.
 

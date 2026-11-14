@@ -71,6 +71,19 @@ const ANTHROPIC_LEVELS: [RegExp, string[]][] = [
   [/^claude-(?:opus|sonnet)-4-6(?:-\d{8})?$/, WITHOUT_EXTRA_HIGH],
 ];
 
+const HINTS = new Map([
+  ["low", "Fast responses with lighter thinking"],
+  ["medium", "Balances speed and depth"],
+  ["high", "Deeper thinking for complex requests"],
+  ["xhigh", "Even more thinking"],
+  ["max", "Maximum thinking for the hardest problems"],
+]);
+
+/** One line on what a level trades off, for the picker and Settings; "" when DayBoard has none. */
+export function effortHint(level: string): string {
+  return HINTS.get(level) ?? "";
+}
+
 export function effortLabel(level: string): string {
   return LABELS.get(level) ?? level.charAt(0).toUpperCase() + level.slice(1);
 }
