@@ -22,6 +22,7 @@ import { FEEDBACK_EMAIL } from "../shared/feedback.js";
 import {
   isAllowedWindowNavigation,
   isExternalWebUrl,
+  mainWindowCloseAction,
   windowEntryUrl,
 } from "./platform/window-policy.js";
 
@@ -39,9 +40,17 @@ export function setMainTabCount(count: number): void {
   mainTabCount = count;
 }
 
+let keepMainWindowLoaded: () => boolean = () => false;
+
+/** While `when` holds, closing the dashboard hides it and reopening shows it as it was. */
+export function keepMainWindowLoadedWhile(when: () => boolean): void {
+  keepMainWindowLoaded = when;
+}
+
 function closeFocusedWindow(): void {
   const focused = BrowserWindow.getFocusedWindow() ?? mainWindow;
-  if (!focused || focused.isDestroyed()) return;
+  // A closed dashboard stays loaded but hidden; ⌘W must not close its tabs out of sight.
+  if (!focused || focused.isDestroyed() || !focused.isVisible()) return;
   if (focused === mainWindow && mainTabCount > 1)
     ipcMain.broadcast("tabs:command", { action: "close" });
   else focused.close();
@@ -117,6 +126,21 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   hardenWindow(window, url);
 
   window.once("ready-to-show", () => window.show());
+  window.on("close", (event) => {
+    const action = mainWindowCloseAction({
+      platform: process.platform,
+      keepLoaded: keepMainWindowLoaded(),
+      fullScreen: window.isFullScreen(),
+    });
+    if (action === "close") return;
+    event.preventDefault();
+    if (action === "hide") window.hide();
+    else {
+      // Hiding a full-screen window leaves its empty Space on screen.
+      window.once("leave-full-screen", () => window.hide());
+      window.setFullScreen(false);
+    }
+  });
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });

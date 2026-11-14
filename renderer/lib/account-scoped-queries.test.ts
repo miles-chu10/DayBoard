@@ -10,7 +10,19 @@ test("an account change drops every cached meeting-notes query", () => {
   client.setQueryData(["meetings", "snapshot-notes", "google:a", []], { "primary/e1": {} });
   client.setQueryData(["meetings", "notes-status"], { provider: null });
   client.setQueryData(["tasks"], { state: "ok", items: [] });
+  // The dashboard keeps unobserved queries for a day, so these no longer expire within minutes.
+  client.setQueryData(["mail-body", "m1"], { html: "A's message" });
+  client.setQueryData(["mail-related", "e1"], [{ id: "m1" }]);
+  client.setQueryData(["mail-subscriptions"], { senders: [] });
+  client.setQueryData(["item-lists", "tasks"], [{ id: "A's list" }]);
   clearAccountScopedQueries(client);
+  for (const key of [
+    ["mail-body", "m1"],
+    ["mail-related", "e1"],
+    ["mail-subscriptions"],
+    ["item-lists", "tasks"],
+  ])
+    assert.equal(client.getQueryData(key), undefined, key[0]);
   assert.equal(client.getQueryData(["meetings", "notes", "google:a", "primary", "e1"]), undefined);
   assert.equal(client.getQueryData(["meetings", "snapshot-notes", "google:a", []]), undefined);
   assert.equal(client.getQueryData(["meetings", "notes-status"]), undefined);

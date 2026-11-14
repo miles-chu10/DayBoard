@@ -55,3 +55,17 @@ export function isExternalWebUrl(url: string): boolean {
     return false;
   }
 }
+
+/**
+ * What closing the dashboard does. macOS keeps it loaded and hides it, so a Dock click shows it as
+ * it was instead of starting the renderer and every query again. Quitting and installing an update
+ * close every window first, so then it must really close.
+ */
+export function mainWindowCloseAction(state: {
+  platform: NodeJS.Platform;
+  keepLoaded: boolean;
+  fullScreen: boolean;
+}): "close" | "hide" | "leave-full-screen" {
+  if (state.platform !== "darwin" || !state.keepLoaded) return "close";
+  return state.fullScreen ? "leave-full-screen" : "hide";
+}

@@ -128,6 +128,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 60_000,
+      // A view left for more than the default five minutes would come back empty and load again.
+      // Kept for a day, it shows what it last had and refreshes behind it.
+      gcTime: 24 * 60 * 60_000,
     },
   },
 });
