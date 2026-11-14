@@ -152,6 +152,15 @@ export function buildChangelogPage(options: {
     "$1Release notes for every DayBoard version: new features and bug fixes, newest first.$2",
   );
   replace(/(<link rel="canonical" href=")[^"]*(")/, "$1https://getdayboard.com/changelog$2");
+  replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, "$1DayBoard changelog$2");
+  replace(
+    /(<meta\s+property="og:description"\s+content=")[^"]*(")/,
+    "$1Every DayBoard release, newest first.$2",
+  );
+  replace(
+    /(<meta\s+property="og:url"\s+content=")[^"]*(")/,
+    "$1https://getdayboard.com/changelog$2",
+  );
   replace(/ aria-current="page"/, "");
   replace(
     /(<a class="nav-link" href="changelog\.html")(>Changelog<\/a>)/,
