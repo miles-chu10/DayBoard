@@ -57,9 +57,9 @@
   }
 
   --animate-fade-in: fade-in 0.12s ease-out;
-  --animate-fade-out: fade-out 0.1s ease-in;
+  --animate-fade-out: fade-out 0.1s ease-out;
   --animate-scale-in: scale-in 0.12s ease-out;
-  --animate-scale-out: scale-out 0.1s ease-in;
+  --animate-scale-out: scale-out 0.1s ease-out;
   @keyframes fade-in {
     from {
       opacity: 0;

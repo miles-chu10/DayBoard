@@ -2,20 +2,13 @@ import { Field } from "@renderer/ui";
 import type { AIProvider } from "@main/shared-types";
 
 import {
+  effortHint,
   effortLabel,
   noEffortNote,
   supportedEffort,
   type EffortOptions,
 } from "../../shared/ai-effort";
 import { SettingSelect } from "./setting-select";
-
-const LEVEL_HINT: Record<string, string> = {
-  low: "Fast responses with lighter thinking",
-  medium: "Balances speed and depth",
-  high: "Deeper thinking for complex requests",
-  xhigh: "Even more thinking",
-  max: "Maximum thinking for the hardest problems",
-};
 
 /**
  * "Effort for AI features": the levels, names and no-effort message the Assistant's effort panel
@@ -64,7 +57,7 @@ export function EffortField({
           ...options.levels.map((level) => ({
             value: level,
             label: effortLabel(level),
-            sublabel: descriptions?.[level] || LEVEL_HINT[level],
+            sublabel: descriptions?.[level] || effortHint(level) || undefined,
           })),
         ]}
         onChange={onChange}

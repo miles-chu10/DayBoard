@@ -287,6 +287,11 @@ export function AssistantComposer({
         ? Boolean(codexSelected?.tiers.length)
         : false;
 
+  const fastNote =
+    provider === "claude"
+      ? "Faster Opus output. Uses paid usage credits outside subscription limits."
+      : codexSelected?.tiers[0]?.description || "Faster output uses more of your plan's usage.";
+
   const [effortOpen, setEffortOpen] = useState(false);
   const effort = effortOptions(provider, current.id, codexModels.data);
   const selection = effortSelection(effort, ai?.assistantEffort?.[provider]);
@@ -608,31 +613,26 @@ export function AssistantComposer({
                   variant="transparent"
                   aria-label={chipLabel}
                   title={modelSummary(current)}
-                  className="min-w-0"
+                  className="min-w-0 data-[state=open]:bg-control-subtle"
                 >
-                  {effortOpen ? (
-                    <span>Select effort</span>
-                  ) : (
-                    <>
-                      <ProviderMark provider={provider} className="size-3.5" />
-                      <span className="min-w-0 max-w-44 truncate">{current.label}</span>
-                      {current.effort ? (
-                        <span className="text-tertiary">{current.effort.text}</span>
-                      ) : null}
-                      {current.fast ? (
-                        <span className="inline-flex items-center gap-0.5 rounded bg-support-yellow-10 px-1 text-small font-medium text-support-yellow">
-                          <Zap className="size-3 fill-current" aria-hidden="true" />
-                          Fast
-                        </span>
-                      ) : null}
-                    </>
-                  )}
+                  <ProviderMark provider={provider} className="size-3.5" />
+                  <span className="min-w-0 max-w-44 truncate">{current.label}</span>
+                  {current.effort ? (
+                    <span className="text-tertiary">{current.effort.text}</span>
+                  ) : null}
+                  {current.fast ? (
+                    <span className="inline-flex items-center gap-0.5 rounded bg-support-yellow-10 px-1 text-small font-medium text-support-yellow">
+                      <Zap className="size-3 fill-current" aria-hidden="true" />
+                      Fast
+                    </span>
+                  ) : null}
                   <ChevronDown className="size-3 opacity-60" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent
                 aria-label="Model and effort"
-                className="w-80"
+                align="start"
+                className="w-72 overflow-hidden rounded-xl p-0"
                 onOpenAutoFocus={(event) => {
                   const slider = (
                     event.currentTarget as HTMLElement | null
@@ -644,13 +644,34 @@ export function AssistantComposer({
               >
                 <EffortPanel
                   modelLabel={current.label}
+                  providerLabel={PROVIDER_LABEL[provider]}
+                  modelIcon={<ProviderMark provider={provider} className="size-4 shrink-0" />}
+                  defaultNote={
+                    provider === "claude"
+                      ? "Uses Claude Code's own effort setting."
+                      : "Uses the model's default effort."
+                  }
+                  descriptions={
+                    provider === "codex"
+                      ? Object.fromEntries(
+                          (codexSelected?.efforts ?? []).map((entry) => [
+                            entry.effort,
+                            entry.description,
+                          ]),
+                        )
+                      : undefined
+                  }
                   nextRequest={modelSummary(current)}
                   lastReply={lastReply}
                   levels={effort.levels}
                   note={noEffortNote(effort)}
                   selection={selection}
                   onChange={setEffort}
-                  fast={fastAvailable ? { on: current.fast, onToggle: toggleFast } : null}
+                  fast={
+                    fastAvailable
+                      ? { on: current.fast, onToggle: toggleFast, note: fastNote }
+                      : null
+                  }
                   ultraNote={
                     effort.levels.length > 0 && !effort.levels.includes("ultra")
                       ? ultraNote(codexModels.data)
@@ -658,13 +679,14 @@ export function AssistantComposer({
                   }
                   modelMenu={
                     <>
-                      <DropdownMenuLabel>Model</DropdownMenuLabel>
+                      <DropdownMenuLabel>Provider</DropdownMenuLabel>
                       {PICKER_PROVIDERS.filter(
                         (option) => available?.[option] || option === provider,
                       ).map((option) => (
                         <DropdownMenuSub
                           key={option}
-                          label={`${option === provider ? "✓ " : ""}${PROVIDER_LABEL[option]}`}
+                          label={PROVIDER_LABEL[option]}
+                          checked={option === provider}
                         >
                           {(ai ? modelChoices(option, ai, lists(option)) : []).map((choice) => (
                             <DropdownMenuCheckboxItem
