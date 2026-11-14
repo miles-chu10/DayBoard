@@ -5,7 +5,7 @@ import type { CalendarEventItem, SourceResult, TaskItem } from "@main/shared-typ
 
 import { buildAgenda, findRelatedTodos, findTimedTwin, getAvailableSlots } from "./agenda";
 import { agendaSpanDays, validateAgendaSearch } from "./agenda-search";
-import { groupByDay } from "./day-items";
+import { groupByDay, monthGridDays } from "./day-items";
 import { buildTodos, type Todo } from "./todos";
 import {
   calendarEventKey,
@@ -358,4 +358,10 @@ test("getAvailableSlots ignores zero-length events, which take up no time", () =
   const starts = slots.map((slot) => slot.start.toTimeString().slice(0, 5));
   assert.ok(starts.includes("09:45"), "9:45–10:15 stays free around a 10:00 point event");
   assert.ok(starts.includes("10:00"));
+});
+
+test("a month grid has only the weeks the month touches", () => {
+  assert.equal(monthGridDays("2026-02-01"), 28);
+  assert.equal(monthGridDays("2026-11-01"), 35);
+  assert.equal(monthGridDays("2026-08-01"), 42);
 });

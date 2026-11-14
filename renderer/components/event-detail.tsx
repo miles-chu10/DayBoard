@@ -118,6 +118,7 @@ export function EventDetail({
         title={event.title}
         description={event.calendarName}
         confirmLabel="Done"
+        hideCancel
         onConfirm={onClose}
       >
         {body}

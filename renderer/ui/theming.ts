@@ -212,3 +212,10 @@ export function accentColors(
   const ink = ensureContrast(hex, tintedGrounds(hex, scheme, 10), TEXT_CONTRAST, scheme);
   return { fill, fillHover: hover, fillActive: active, contrast, ink };
 }
+
+/** macOS reports its accent as `rrggbbaa`; returns `#rrggbb`, or null for anything else. */
+export function systemAccentHex(value: unknown): string | null {
+  return typeof value === "string" && /^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)
+    ? `#${value.slice(0, 6).toLowerCase()}`
+    : null;
+}

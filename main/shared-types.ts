@@ -213,10 +213,14 @@ export interface SettingsChangedEvent {
 }
 
 /** Broadcast on `data:changed` when an MCP client changes a source's items. */
-/** A reply to one message, or a new email; recipients are comma-separated addresses. */
-export type MailSendRequest =
+/**
+ * A reply to one message, or a new email; recipients are comma-separated addresses.
+ * `expectedScope` is the account the email was written in: a send from any other is refused.
+ */
+export type MailSendRequest = { expectedScope: string } & (
   | { kind: "reply"; id: string; body: string; cc?: string }
-  | { kind: "new"; to: string; subject: string; body: string; cc?: string };
+  | { kind: "new"; to: string; subject: string; body: string; cc?: string }
+);
 
 export interface MailSendTicket {
   id: string;

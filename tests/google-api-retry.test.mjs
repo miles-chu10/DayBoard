@@ -128,3 +128,29 @@ test("401 disposes its body before reporting expired authentication", async () =
     globalThis.fetch = originalFetch;
   }
 });
+
+test("an event whose end is not after its start is refused before any request", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response("{}");
+  };
+  try {
+    for (const endTime of ["09:00", "08:30"]) {
+      await assert.rejects(
+        adapter.createEvent({
+          title: "Fixture",
+          date: "2027-01-01",
+          startTime: "09:00",
+          endTime,
+          timeZone: "UTC",
+        }),
+        /end time must be after its start time/,
+      );
+    }
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -65,13 +65,27 @@ export function RootView() {
   // pushed while the window lives. Either one replaces the launch view.
   React.useEffect(() => {
     const go = (value: unknown) => {
-      const target = value as { to?: unknown; prompt?: unknown; welcome?: unknown } | null;
+      const target = value as {
+        to?: unknown;
+        prompt?: unknown;
+        welcome?: unknown;
+        item?: unknown;
+        date?: unknown;
+      } | null;
       if (!target || typeof target.to !== "string" || !(target.to in ROUTE_BY_PATH)) return;
       launched.current = true;
       if (target.welcome === true) setWelcomeRequested(true);
       const to = ROUTE_BY_PATH[target.to];
       if (to === "/assistant" && typeof target.prompt === "string")
         void navigate({ to, search: { prompt: target.prompt } });
+      else if ((to === "/agenda" || to === "/calendar") && typeof target.item === "string")
+        void navigate({
+          to,
+          search: {
+            item: target.item,
+            date: typeof target.date === "string" ? target.date : undefined,
+          },
+        });
       else void navigate({ to });
     };
     void invoke<unknown>("app:takeNavigation").then(go, () => undefined);

@@ -16,6 +16,8 @@ export interface TodayItem {
   past?: boolean;
   /** An open to-do whose due date has passed; `time` then holds its age ("A week ago"). */
   overdue?: boolean;
+  /** The day the item is listed under (YYYY-MM-DD); absent for overdue to-dos. */
+  date?: string;
 }
 
 const MAX_ITEMS = 8;
@@ -84,7 +86,7 @@ export function todayItems(
       source: todo.source,
       overdue: true,
     })),
-    items: capItems(items),
+    items: capItems(items).map((item) => (today ? { ...item, date: today.date } : item)),
     hiddenCount: items.length - capItems(items).length,
   };
 }

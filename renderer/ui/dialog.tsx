@@ -31,6 +31,8 @@ export interface DialogProps extends React.ComponentProps<typeof DialogPrimitive
   confirmLabel?: React.ReactNode;
   confirmVariant?: "accent" | "destructive";
   confirmDisabled?: boolean;
+  /** For a dialog that only shows something: the confirm button is the one way out. */
+  hideCancel?: boolean;
   destructiveAction?: DialogAction;
   secondaryAction?: DialogAction;
   size?: DialogSize;
@@ -48,6 +50,7 @@ export function Dialog({
   confirmLabel = "Done",
   confirmVariant = "accent",
   confirmDisabled,
+  hideCancel,
   destructiveAction,
   secondaryAction,
   size = "medium",
@@ -94,9 +97,11 @@ export function Dialog({
               </Button>
             ) : null}
             <div className="ml-auto flex items-center gap-2">
-              <DialogPrimitive.Close asChild>
-                <Button variant="filled">Cancel</Button>
-              </DialogPrimitive.Close>
+              {hideCancel ? null : (
+                <DialogPrimitive.Close asChild>
+                  <Button variant="filled">Cancel</Button>
+                </DialogPrimitive.Close>
+              )}
               {onConfirm ? (
                 <Button
                   variant={confirmVariant}
@@ -156,6 +161,7 @@ export function DialogContent({
 }: DialogContentProps) {
   const content = (
     <DialogPrimitive.Content
+      data-modal=""
       className={cn(
         "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
         "flex max-h-[85vh] flex-col rounded-xl border border-separator bg-background shadow-2xl wrap-anywhere",

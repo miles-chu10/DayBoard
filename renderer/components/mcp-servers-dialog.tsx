@@ -45,6 +45,7 @@ export function McpServersDialog({
       title="MCP Servers"
       description="Tools the Assistant can use while answering."
       confirmLabel="Done"
+      hideCancel
       onConfirm={() => onOpenChange(false)}
     >
       <div className="flex flex-col gap-3">

@@ -2,7 +2,7 @@ import * as React from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 import { cn } from "./utils";
-import { clamp, separatorKey } from "../lib/shell";
+import { fitColumns, separatorKey } from "../lib/shell";
 import { Button, type ButtonProps } from "./button";
 
 interface ColumnSize {
@@ -249,8 +249,29 @@ export function SplitView({
     storageKey && `${storageKey}:inspector-collapsed`,
     defaultInspectorCollapsed,
   );
-  const sidebarCollapsed = sidebarCollapsedProp ?? sidebarCollapsedState;
   const inspectorCollapsed = inspectorCollapsedProp ?? inspectorCollapsedState;
+  const sidebarWanted = !(sidebarCollapsedProp ?? sidebarCollapsedState);
+  const fit = fitColumns(
+    available - (list ? listWidth + 1 : 0),
+    primarySize?.min ?? 0,
+    sidebar && sidebarWanted
+      ? {
+          width: sidebarWidth,
+          min: sidebarSize.min ?? 0,
+          max: sidebarSize.max ?? Number.POSITIVE_INFINITY,
+        }
+      : null,
+    inspector !== undefined && !inspectorCollapsed
+      ? {
+          width: inspectorWidth,
+          min: inspectorSize.min ?? 0,
+          max: inspectorSize.max ?? Number.POSITIVE_INFINITY,
+        }
+      : null,
+  );
+  // In a window too narrow for all three columns the sidebar hides while the right pane is open.
+  const sidebarCollapsed = !sidebarWanted || (Boolean(sidebar) && fit.sidebar === null);
+  const fittedInspector = fit.inspector ?? inspectorWidth;
 
   const setSidebarCollapsed = React.useCallback(
     (collapsed: boolean) => {
@@ -288,11 +309,8 @@ export function SplitView({
     ],
   );
 
-  const sidebarMax = Math.max(
-    sidebarSize.min ?? 0,
-    Math.min(sidebarSize.max ?? available, available - (primarySize?.min ?? 0) - 1),
-  );
-  const fittedSidebar = clamp(sidebarWidth, sidebarSize.min ?? 0, sidebarMax);
+  const sidebarMax = fit.sidebarMax;
+  const fittedSidebar = fit.sidebar ?? sidebarWidth;
   const columns: { key: string; node: React.ReactNode }[] = [];
   if (sidebar && !sidebarCollapsed) {
     columns.push({
@@ -385,7 +403,7 @@ export function SplitView({
       key: "inspector-handle",
       node: (
         <ResizeHandle
-          value={inspectorWidth}
+          value={fittedInspector}
           min={inspectorSize.min ?? 0}
           max={inspectorSize.max ?? available}
           direction={-1}
@@ -397,7 +415,7 @@ export function SplitView({
             setInspectorWidth(
               Math.min(
                 inspectorSize.max ?? Number.POSITIVE_INFINITY,
-                Math.max(inspectorSize.min ?? 0, inspectorWidth - dx),
+                Math.max(inspectorSize.min ?? 0, fittedInspector - dx),
               ),
               false,
             )
@@ -411,7 +429,7 @@ export function SplitView({
         <div
           id={inspectorId}
           style={{
-            width: inspectorWidth,
+            width: fittedInspector,
             minWidth: inspectorSize.min,
             maxWidth: inspectorSize.max,
           }}
