@@ -106,5 +106,13 @@ export function createNoteAutosave(options: {
       await chain;
       return id;
     },
+    /** The delete failed and the note is still open: keep `draft` and save it as before. */
+    restore(draft: NoteDraft): void {
+      discarded = false;
+      pending = draft;
+      options.onState("unsaved");
+      clearTimeout(timer);
+      timer = setTimeout(() => void flush(), options.delay ?? 600);
+    },
   };
 }

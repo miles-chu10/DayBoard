@@ -37,7 +37,7 @@ export function MailView() {
   const mail = useMail();
   const settings = useSettings().data;
   const triageOn = featureOn(settings, "triage");
-  const detailView = settings?.general.detailView ?? "dialog";
+  const detailView = settings?.general.detailView ?? "sidebar";
   const messages = mail.data?.state === "ok" ? mail.data.items : undefined;
   const triage = useTriage(messages);
   useAutoTriage(triage, messages, autoTriageOn(settings));
@@ -130,8 +130,8 @@ export function MailView() {
           className="h-full"
           leading={<HistoryNav />}
           viewportClassName="[&>div]:block!"
-          title={<SourceHeading source="mail">Gmail</SourceHeading>}
-          subtitle={messages ? `${messages.length} recent · ${unread} unread` : "Gmail"}
+          title={<SourceHeading source="mail">Inbox</SourceHeading>}
+          subtitle={messages ? `Gmail · ${messages.length} recent · ${unread} unread` : "Gmail"}
           actions={
             <>
               <WindowActions />

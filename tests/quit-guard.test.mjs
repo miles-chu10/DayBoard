@@ -51,7 +51,10 @@ test("unfinished saves keep the app open unless the user chooses to quit", async
   let resumedOperations = 0;
   const guard = createSaveQuitGuard({
     drain: () => new Promise(() => {}),
-    confirmUnfinished: async () => ++warnings === 2,
+    confirmUnfinished: async (error) => {
+      assert.match(error.message, /still saving/);
+      return ++warnings === 2;
+    },
     resumeQuit: () => {
       resumed += 1;
     },
@@ -117,4 +120,25 @@ test("cancelling the held-mail confirmation never starts the drain", async () =>
   await guard({ preventDefault() {} });
   assert.equal(drains, 0);
   assert.equal(quits, 0);
+});
+
+test("a failed drain tells the confirmation what went wrong", async () => {
+  const failure = new Error("An email couldn't be sent: offline");
+  let seen;
+  let resumed = 0;
+  const guard = createSaveQuitGuard({
+    drain: async () => {
+      throw failure;
+    },
+    confirmUnfinished: async (error) => {
+      seen = error;
+      return false;
+    },
+    resumeQuit: () => {
+      resumed += 1;
+    },
+  });
+  await guard({ preventDefault() {} });
+  assert.equal(seen, failure);
+  assert.equal(resumed, 0);
 });

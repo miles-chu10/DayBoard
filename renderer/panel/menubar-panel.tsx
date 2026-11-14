@@ -84,7 +84,7 @@ function rowClass(extra = "") {
 /** A to-do: its source dot, the title, then its due time or age on the right (red once late). */
 function TodoRow({ item }: { item: TodayItem }) {
   return (
-    <button type="button" className={rowClass()} onClick={() => void openMain("/agenda")}>
+    <button type="button" className={rowClass()} onClick={() => void openItem("/agenda", item)}>
       <SourceDot source={item.source} />
       <Text as="span" variant="regular" truncate title={item.title} className="min-w-0 flex-1">
         {item.title}
@@ -143,7 +143,7 @@ function EventGroup({
               key={item.key}
               type="button"
               className={rowClass()}
-              onClick={() => void openMain("/calendar")}
+              onClick={() => void openItem("/calendar", item)}
             >
               <SourceDot
                 source={item.source}
@@ -234,6 +234,11 @@ function DayItems({
 
 function openMain(route: string, prompt?: string) {
   return invoke("panel:openMain", prompt ? { route, prompt } : { route });
+}
+
+/** Opens the dashboard on the row's own item and day rather than the top of the view. */
+function openItem(route: string, item: TodayItem) {
+  return invoke("panel:openMain", { route, item: item.key, ...(item.date && { date: item.date }) });
 }
 
 function useRecentCaptures(): CaptureRecordView[] {

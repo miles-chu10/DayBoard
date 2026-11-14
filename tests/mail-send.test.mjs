@@ -104,6 +104,27 @@ test("quitting sends every held email instead of dropping it", async () => {
   assert.equal(clock.pending(), 0);
 });
 
+test("quitting reports a held email that failed to send", async () => {
+  const clock = fakeTimers();
+  const outbox = createOutbox({
+    send: async (payload) => {
+      if (payload === "bad") throw new Error("Gmail said no");
+    },
+    onResult: () => {},
+    timers: clock.timers,
+  });
+  outbox.queue("good", 5000);
+  outbox.queue("bad", 5000);
+  await assert.rejects(outbox.drain(), (error) => {
+    assert.equal(error.name, "MailNotSentError");
+    assert.deepEqual(error.failures, ["Gmail said no"]);
+    assert.match(error.message, /^An email couldn't be sent: Gmail said no$/);
+    return true;
+  });
+  // Nothing is left to fail again once the user has been told.
+  await outbox.drain();
+});
+
 test("no undo window sends at once and returns the failure", async () => {
   const outbox = createOutbox({
     send: async () => {
@@ -182,8 +203,12 @@ const stubs = {
       };
       export const logger = { info() {}, warn() {}, error() {} };
       export const app = { getPath: () => "/nonexistent" };`,
-      "../services/file-store.js": `export const readFileIfExists = async () => globalThis.__mailFile ?? null;
-      export const writeFileAtomic = async (_path, text) => { globalThis.__mailFile = Buffer.from(text); };`,
+      "../services/file-store.js": `export const readJsonFile = async () =>
+        globalThis.__mailFile ? JSON.parse(globalThis.__mailFile.toString("utf8")) : null;
+      export const writeFileAtomic = async (_path, text) => {
+        if (globalThis.__mailFixture.failWrite) throw new Error("disk full");
+        globalThis.__mailFile = Buffer.from(text);
+      };`,
       "./productivity.js": `export const requireAgendaScope = async () => globalThis.__mailFixture.scope ?? "google:test";
       export const getAccountsStatus = async () => ({ google: { email: "me@example.com" } });
       export const onAccountsChanged = () => () => {};`,
@@ -201,6 +226,7 @@ const stubs = {
         return { id: "sent", threadId: threadId ?? "new" };
       };
       export const modifyMessage = async (id, remove, add = []) => {
+        if (globalThis.__mailFixture.failModify) throw new Error("Gmail is unreachable");
         globalThis.__mailModified.push([id, remove, add]);
       };
       export const threadHasReplyAfter = async () => false;
@@ -226,7 +252,15 @@ const modified = [];
 globalThis.__mailModified = modified;
 const mail = await loadTs("main/handlers/mail.ts", [stubs]);
 mail.registerMailHandlers();
-const invoke = (channel, payload) => handlers.get(channel)({}, payload);
+const call = (channel, payload) => handlers.get(channel)({}, payload);
+// Every send names the account it was written in, as the compose windows do.
+const invoke = (channel, payload) =>
+  call(
+    channel,
+    channel === "mail:send" && payload && !("expectedScope" in payload)
+      ? { ...payload, expectedScope: "google:test" }
+      : payload,
+  );
 
 test("mail:send validates before anything is queued", async () => {
   await assert.rejects(invoke("mail:send", null), /expected an object/);
@@ -302,7 +336,8 @@ test("a held email is not sent from a different account than the one that wrote 
     assert.equal(ticket.held, true);
     // The Google account is switched inside the undo window.
     globalThis.__mailFixture.scope = "google:other";
-    await mail.drainMailOutbox();
+    // Quitting hears about it too, instead of exiting as if the email had gone.
+    await assert.rejects(mail.drainMailOutbox(), /account changed/i);
     assert.equal(sentRaw.length, before);
     const result = broadcasts.findLast(
       ([channel, params]) => channel === "mail:sendResult" && params.id === ticket.id,
@@ -313,6 +348,25 @@ test("a held email is not sent from a different account than the one that wrote 
     delete globalThis.__mailFixture.scope;
     globalThis.__mailFixture.undoSeconds = 0;
   }
+});
+
+test("a draft is refused when the account changed while it was being written", async () => {
+  const before = sentRaw.length;
+  await assert.rejects(
+    call("mail:send", { kind: "new", to: "a@x.com", subject: "s", body: "b" }),
+    /"expectedScope" is required/,
+  );
+  await assert.rejects(
+    call("mail:send", {
+      kind: "new",
+      to: "a@x.com",
+      subject: "s",
+      body: "Written in the first account",
+      expectedScope: "google:first",
+    }),
+    /account changed while you were writing/,
+  );
+  assert.equal(sentRaw.length, before);
 });
 
 const lunch = {
@@ -348,6 +402,48 @@ test("snoozing archives the email and records when it comes back", async () => {
   await invoke("mail:unsnooze", { messageId: "m6" });
   assert.deepEqual(modified.at(-1), ["m6", [], ["INBOX"]]);
   assert.deepEqual(await invoke("mail:schedule"), []);
+});
+
+test("a snooze that can't be saved leaves the email in the inbox", async () => {
+  const before = modified.length;
+  globalThis.__mailFixture.failWrite = true;
+  try {
+    await assert.rejects(
+      invoke("mail:snooze", { ...lunch, until: Date.now() + 3_600_000 }),
+      /disk full/,
+    );
+  } finally {
+    globalThis.__mailFixture.failWrite = false;
+  }
+  // Never archived, and not listed as snoozed either.
+  assert.equal(modified.length, before);
+  assert.deepEqual(await invoke("mail:schedule"), []);
+});
+
+test("a snooze Gmail refuses is not left in the schedule", async () => {
+  globalThis.__mailFixture.failModify = true;
+  try {
+    await assert.rejects(
+      invoke("mail:snooze", { ...lunch, until: Date.now() + 3_600_000 }),
+      /Gmail is unreachable/,
+    );
+    assert.deepEqual(await invoke("mail:schedule"), []);
+    // Changing an existing snooze keeps the earlier time when Gmail fails.
+    globalThis.__mailFixture.failModify = false;
+    const first = await invoke("mail:snooze", { ...lunch, until: Date.now() + 3_600_000 });
+    globalThis.__mailFixture.failModify = true;
+    await assert.rejects(
+      invoke("mail:snooze", { ...lunch, until: Date.now() + 7_200_000 }),
+      /Gmail is unreachable/,
+    );
+    assert.deepEqual(
+      (await invoke("mail:schedule")).map((item) => item.dueAt),
+      [first.dueAt],
+    );
+  } finally {
+    globalThis.__mailFixture.failModify = false;
+    await invoke("mail:unsnooze", { messageId: "m6" });
+  }
 });
 
 test("follow-ups take 1 to 30 days and can be cancelled", async () => {

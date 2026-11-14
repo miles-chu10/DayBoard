@@ -14,7 +14,7 @@ const stubs = {
   "@tanstack/react-query": `export const useQueryClient = () => globalThis.__completion.client; export const useMutation = options => options; export const useQuery = options => options;`,
   "@renderer/ui": `export const toast = { success: (...args) => globalThis.__completion.success.push(args), error: message => globalThis.__completion.errors.push(message) };`,
   "./ipc": `export const invoke = (channel, input) => globalThis.__completion.invoke(channel, input); export const errorMessage = error => error.message;`,
-  "./settings": `export const settingsQueryKey = ["settings"]; export const sourceOn = () => true; export const useSettings = () => ({isSuccess: true});`,
+  "./settings": `export const settingsQueryKey = ["settings"]; export const settingsSaveInFlight = () => false; export const sourceOn = () => true; export const useSettings = () => ({isSuccess: true});`,
 };
 
 async function harness({ tasks = [], reminders = [], links = [], invoke } = {}) {

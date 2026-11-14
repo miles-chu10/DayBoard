@@ -1500,6 +1500,10 @@ p {
   .aside-card {
     position: static;
   }
+  /* The buy and download cards come right under the page intro, ahead of the long text. */
+  .aside-card.is-action {
+    order: -1;
+  }
   .grid-3,
   .split,
   .roadmap-grid {

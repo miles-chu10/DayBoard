@@ -101,7 +101,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     refreshMinutes: 15,
     accent: "system",
     density: "default",
-    detailView: "dialog",
+    detailView: "sidebar",
     mailRows: "line",
     sidebar: { order: [...SIDEBAR_VIEWS], hidden: [], counts: true },
     onboarded: false,

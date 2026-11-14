@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, Dialog, Field, FieldGroup, Kbd, Status, Text, toast } from "@renderer/ui";
+import { Badge, Button, Dialog, Kbd, Status, Text, toast } from "@renderer/ui";
 import { Archive, ExternalLink, ListPlus, Reply, Sparkles } from "lucide-react";
 import { isTypingTarget } from "../lib/shortcuts";
 import type { MailItem, SourceResult } from "@main/shared-types";
@@ -136,34 +136,32 @@ export function MailDetail({
           </Button>
         </section>
       ) : null}
-      <FieldGroup>
-        <Field label="From" orientation="vertical">
-          <div className="flex items-center gap-2 min-w-0">
-            <Text className="min-w-0 break-words">{message.from}</Text>
-            {badge ? (
-              <Badge color={badge.color} className="shrink-0">
-                {badge.label}
-              </Badge>
-            ) : null}
-          </div>
-        </Field>
-        <Field label="Received" orientation="vertical">
-          <Text>{formatMailDate(message.date)}</Text>
-        </Field>
-        <Field label="Message" orientation="vertical">
-          {body.isPending ? (
-            <Status variant="loading">Loading message…</Status>
-          ) : body.isError ? (
-            <Text variant="small" color="red">
-              {errorMessage(body.error)}
-            </Text>
-          ) : (
-            <Text className="whitespace-pre-wrap break-words">
-              {body.data?.text?.trim() || message.snippet}
-            </Text>
-          )}
-        </Field>
-      </FieldGroup>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <Text variant="strong" className="min-w-0 break-words">
+            {message.from}
+          </Text>
+          {badge ? (
+            <Badge color={badge.color} className="shrink-0">
+              {badge.label}
+            </Badge>
+          ) : null}
+        </div>
+        <Text variant="small" color="secondary" className="shrink-0">
+          {formatMailDate(message.date)}
+        </Text>
+      </header>
+      {body.isPending ? (
+        <Status variant="loading">Loading message…</Status>
+      ) : body.isError ? (
+        <Text variant="small" color="red">
+          {errorMessage(body.error)}
+        </Text>
+      ) : (
+        <Text className="whitespace-pre-wrap break-words">
+          {body.data?.text?.trim() || message.snippet}
+        </Text>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           size="small"
@@ -219,6 +217,7 @@ export function MailDetail({
         title={message.subject || "(No subject)"}
         description={message.from}
         confirmLabel="Done"
+        hideCancel
         onConfirm={onClose}
       >
         {content}

@@ -38,6 +38,8 @@ export function TodoRow({
         onKeyDown={
           onOpen
             ? (event) => {
+                // Keys pressed on the checkbox inside the row belong to the checkbox.
+                if (event.target !== event.currentTarget) return;
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   onOpen(todo);

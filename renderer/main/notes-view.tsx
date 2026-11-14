@@ -186,7 +186,15 @@ function NoteEditor({ note, onBack }: { note: Note | null; onBack: () => void })
   async function deleteNote() {
     if (recovering) return;
     const id = await autosave.discard();
-    if (id) await remove.mutateAsync(id);
+    if (id) {
+      try {
+        await remove.mutateAsync(id);
+      } catch {
+        // The failure was shown; the note is still here, so its text goes back to autosaving.
+        autosave.restore({ title, body });
+        return;
+      }
+    }
     onBack();
   }
 

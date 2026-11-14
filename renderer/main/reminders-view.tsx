@@ -18,7 +18,7 @@ export function RemindersView() {
   const reminders = useReminders();
   const mail = useMail();
   const settings = useSettings().data;
-  const detailView = settings?.general.detailView ?? "dialog";
+  const detailView = settings?.general.detailView ?? "sidebar";
   const [selectedKey, setSelectedKey] = useState<string | undefined>();
   const todos =
     reminders.data?.state === "ok"
@@ -69,8 +69,10 @@ export function RemindersView() {
           className="h-full"
           leading={<HistoryNav />}
           viewportClassName="[&>div]:block!"
-          title={<SourceHeading source="reminders" />}
-          subtitle={reminders.data?.state === "ok" ? `${open} open` : undefined}
+          title={<SourceHeading source="reminders">Reminders</SourceHeading>}
+          subtitle={
+            reminders.data?.state === "ok" ? `Apple Reminders · ${open} open` : "Apple Reminders"
+          }
           actions={
             <ViewActions
               onRefresh={() => void reminders.refetch()}

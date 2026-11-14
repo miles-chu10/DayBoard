@@ -23,6 +23,7 @@ import { registerBadgeHandler, startMailNotifications } from "./mail-notificatio
 declare const __DAYBOARD_TEST_BUILD__: boolean;
 
 const MAX_PROMPT = 4_000;
+const MAX_ITEM_KEY = 1_000;
 
 /** Automated test builds never grab a system-wide shortcut or add a menu-bar icon. */
 export function nativeIntegrationsEnabled(): boolean {
@@ -100,9 +101,22 @@ export function startSystemPanels(): void {
     if (input.prompt !== undefined && (typeof input.prompt !== "string" || !input.prompt.trim()))
       throw new Error("panel:openMain: prompt must be text");
     const prompt = typeof input.prompt === "string" ? input.prompt.slice(0, MAX_PROMPT) : undefined;
+    if (input.item !== undefined && (typeof input.item !== "string" || !input.item))
+      throw new Error("panel:openMain: item must be text");
+    if (
+      input.date !== undefined &&
+      (typeof input.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.date))
+    )
+      throw new Error("panel:openMain: date must be YYYY-MM-DD");
+    const item = typeof input.item === "string" ? input.item.slice(0, MAX_ITEM_KEY) : undefined;
     hidePanel("capture");
     hidePanel("menubar");
-    await focusMainWindow({ to: route, prompt });
+    await focusMainWindow({
+      to: route,
+      prompt,
+      ...(item && { item }),
+      ...(typeof input.date === "string" && { date: input.date }),
+    });
   });
   // The menu bar's own Quit, for a panel that holds key focus without activating DayBoard.
   ipcMain.handle("panel:quit", () => {

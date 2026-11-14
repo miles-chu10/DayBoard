@@ -119,6 +119,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     () =>
       window.dayboard.ipc.onNotification("tabs:command", (params) => {
         const action = (params as { action?: unknown } | null)?.action;
+        if (modalOpen()) return;
         if (action === "new") value.open();
         if (action === "close") value.close(value.state.active);
       }),
@@ -127,6 +128,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function keydown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing || value.state.tabs.length < 2) return;
+      if (modalOpen()) return;
       if (event.key === "Tab" && event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         show(stepTab(value.state, event.shiftKey ? -1 : 1));
@@ -148,6 +150,14 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;
 }
 
+/**
+ * A dialog on screen (an editor, a reply, a new email) belongs to the current tab. Changing
+ * tabs would unmount it and throw away what was typed, so tab shortcuts wait until it closes.
+ */
+function modalOpen(): boolean {
+  return document.querySelector('[data-modal][data-state="open"]') !== null;
+}
+
 /** Shown once a second tab is open, like Safari's tab bar. */
 export function TabStrip() {
   const { state, open, close, select } = useTabs();
@@ -167,6 +177,7 @@ export function TabStrip() {
           return (
             <div
               key={tab.id}
+              role="presentation"
               className={cn(
                 "group flex h-7 min-w-0 max-w-56 flex-1 items-center rounded-md text-regular",
                 selected ? "bg-control text-primary" : "text-secondary hover:bg-list-hover",
@@ -176,6 +187,27 @@ export function TabStrip() {
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                onKeyDown={(event) => {
+                  const last = state.tabs.length - 1;
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (index + 1) % (last + 1)
+                      : event.key === "ArrowLeft"
+                        ? (index + last) % (last + 1)
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? last
+                            : -1;
+                  if (next < 0) return;
+                  event.preventDefault();
+                  const tablist = event.currentTarget.closest('[role="tablist"]');
+                  select(state.tabs[next].id);
+                  requestAnimationFrame(() =>
+                    tablist?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus(),
+                  );
+                }}
                 title={index < 9 ? `${title} (⌘${index + 1})` : title}
                 className="h-full min-w-0 flex-1 truncate px-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                 onClick={() => select(tab.id)}

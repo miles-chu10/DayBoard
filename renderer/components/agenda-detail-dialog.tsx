@@ -324,8 +324,8 @@ export function AgendaDetailDialog({
       ) : null}
       <FieldGroup>
         <Field
-          label="Deadline"
-          description="A deadline, not a booked calendar interval."
+          label="Due"
+          description="A due date. It doesn't block time on your calendar."
           orientation="vertical"
         >
           <Text>
@@ -351,7 +351,7 @@ export function AgendaDetailDialog({
             </Text>
           ) : null}
         </Field>
-        <Field label="Provider" orientation="vertical">
+        <Field label="Saved in" orientation="vertical">
           <span className="flex items-center gap-2">
             <SourceDot source={todo.source} />
             <Text>{todo.source === "tasks" ? "Google Tasks" : "Apple Reminders"}</Text>
@@ -694,6 +694,7 @@ export function AgendaDetailDialog({
       description={subtitle}
       confirmLabel={selectedStart ? "Create calendar block" : "Done"}
       confirmDisabled={confirmDisabled}
+      hideCancel={!selectedStart}
       onConfirm={selectedStart ? createBlock : onClose}
     >
       {body}

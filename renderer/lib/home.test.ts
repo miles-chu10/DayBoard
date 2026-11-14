@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { MailItem } from "@main/shared-types";
 
-import { ageLabel, firstName, greeting, homeSummary, needsYou, suggestedTasks } from "./home";
+import {
+  ageLabel,
+  firstName,
+  greeting,
+  homeSummary,
+  needsYou,
+  nothingConnected,
+  suggestedTasks,
+} from "./home";
 import type { TriageMap } from "./triage-types";
 
 const NOW = Date.parse("2026-11-04T18:00:00Z");
@@ -139,4 +147,13 @@ test("Home layouts validate persisted values and retain every card when reordere
     isHomeLayout(layout.map((item) => ({ ...item, hidden: true, collapsed: true }))),
     true,
   );
+});
+
+test("Home asks to connect only when it knows nothing is connected", () => {
+  const status = (connected: boolean, reminders: string) =>
+    ({ google: { connected }, reminders }) as Parameters<typeof nothingConnected>[0];
+  assert.equal(nothingConnected(undefined), false);
+  assert.equal(nothingConnected(status(false, "denied")), true);
+  assert.equal(nothingConnected(status(true, "denied")), false);
+  assert.equal(nothingConnected(status(false, "full-access")), false);
 });

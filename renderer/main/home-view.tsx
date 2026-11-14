@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { HomeDashboard, HomeCard as Card } from "../components/home-dashboard";
 import {
   Button,
+  Callout,
   ScrollArea,
   SegmentedControl,
   SegmentedControlItem,
@@ -15,7 +16,7 @@ import { ChevronDown, CircleAlert, CircleDashed, Mail, Plus, Sparkles, X } from 
 import type { MailItem } from "@main/shared-types";
 
 import { AgendaList, eventEntry, todoEntry } from "../components/agenda-list";
-import { displayName } from "../components/app-sidebar";
+import { knownName } from "../components/app-sidebar";
 import { useOpenCapture } from "../components/capture-dialog";
 import { HistoryNav } from "../components/history-nav";
 import { MeetingCard } from "../components/meeting-card";
@@ -29,6 +30,7 @@ import {
   ageLabel,
   firstName,
   greeting,
+  nothingConnected,
   homeSummary,
   isStale,
   needsYou,
@@ -36,7 +38,7 @@ import {
   type HomeSpan,
   type NeedsYouItem,
 } from "../lib/home";
-import { errorMessage, invoke } from "../lib/ipc";
+import { errorMessage, invoke, openSettings } from "../lib/ipc";
 import { dueFollowUps, useMailSchedule } from "../lib/mail-schedule";
 import {
   queryKeys,
@@ -230,7 +232,7 @@ export function HomeView() {
   const agendaLoading = (calendarOn && calendar.isPending) || tasks.isPending;
   const untriaged = messages.some((message) => !triage.map[message.id]);
 
-  const name = firstName(displayName(settings, accounts.data?.google.email));
+  const name = firstName(knownName(settings, accounts.data?.google.email));
   const dateLine = now.toLocaleDateString([], {
     weekday: "long",
     month: "long",
@@ -299,6 +301,19 @@ export function HomeView() {
             </Text>
           </div>
         </header>
+
+        {nothingConnected(accounts.data) ? (
+          <Callout
+            role="status"
+            actions={
+              <Button size="small" variant="accent" onClick={() => void openSettings("sources")}>
+                Connect an Account
+              </Button>
+            }
+          >
+            Connect Google or allow Apple Reminders to see your day here.
+          </Callout>
+        ) : null}
 
         <HomeDashboard
           rangeControl={

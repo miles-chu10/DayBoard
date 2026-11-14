@@ -6,7 +6,7 @@ async function fixture(initialDraft = null) {
   globalThis.React = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
   };
-  const state = { values: [], invokes: [], toasts: [], initialDraft, hook: 0 };
+  const state = { values: [], invokes: [], toasts: [], initialDraft, hook: 0, scope: "google:a" };
   globalThis.__composeSafety = state;
   const stubs = {
     react: `export const createContext = () => ({Provider: 'Provider'});
@@ -16,6 +16,8 @@ async function fixture(initialDraft = null) {
     "react/jsx-runtime": `export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;`,
     "@renderer/ui": `export const Dialog='Dialog', Field='Field', FieldGroup='FieldGroup', Input='Input', Text='Text', Textarea='Textarea';
       export const toast=(...args)=>{globalThis.__composeSafety.toasts.push(args);return 1}; toast.success=toast; toast.error=toast;`,
+    "@tanstack/react-query": `export const useQueryClient = () => ({ getQueryData: () => globalThis.__composeSafety.scope });`,
+    "../lib/queries": `export const queryKeys = { agendaScope: ["agenda", "scope"] };`,
     "../lib/ipc": `export const errorMessage=e=>e.message; export const invoke=(...args)=>{globalThis.__composeSafety.invokes.push(args);return new Promise(()=>{})};`,
   };
   const mod = await loadTs("renderer/components/compose-dialog.tsx", [
@@ -66,4 +68,43 @@ test("repeated Send and Cmd-Enter share a synchronous in-flight lock", async () 
   void dialog.props.onConfirm();
   assert.equal(state.invokes.length, 1);
   assert.equal(state.invokes[0][0], "mail:send");
+});
+
+test("a draft is not sent from an account it wasn't written in", async () => {
+  const draft = { to: "a@example.com", cc: "", subject: "hello", body: "one email" };
+  const { state, mod } = await fixture({ ...draft, scope: "google:a" });
+  const provider = mod.ComposeProvider({ children: null });
+  const dialogElement = provider.props.children[1];
+  // The Google account is switched while the draft is open.
+  state.scope = "google:b";
+  const dialog = dialogElement.type(dialogElement.props);
+  await dialog.props.onConfirm();
+  assert.equal(state.invokes.length, 0);
+  assert.ok(state.values.some((value) => /account changed while you were writing/.test(value)));
+  // The draft now names the new account, so a second, deliberate Send goes from it.
+  const retarget = state.values.find((value) => typeof value === "function");
+  assert.equal(retarget(dialogElement.props.initial).scope, "google:b");
+
+  // A reply belongs to the account that received the message and is never retargeted.
+  const reply = await fixture({ ...draft, replyToId: "m1", scope: "google:a" });
+  const replyProvider = reply.mod.ComposeProvider({ children: null });
+  const replyElement = replyProvider.props.children[1];
+  reply.state.scope = "google:b";
+  await replyElement.type(replyElement.props).props.onConfirm();
+  assert.equal(reply.state.invokes.length, 0);
+  assert.ok(reply.state.values.some((value) => /different Google account/.test(value)));
+});
+
+test("a send names the account the draft was written in", async () => {
+  const { state, mod } = await fixture({
+    to: "a@example.com",
+    cc: "",
+    subject: "hello",
+    body: "one email",
+    scope: "google:a",
+  });
+  const provider = mod.ComposeProvider({ children: null });
+  const dialogElement = provider.props.children[1];
+  void dialogElement.type(dialogElement.props).props.onConfirm();
+  assert.equal(state.invokes[0][1].expectedScope, "google:a");
 });

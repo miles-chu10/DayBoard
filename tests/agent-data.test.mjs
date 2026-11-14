@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -231,7 +231,7 @@ test("notes get a title from their first line, keep their creation time and reje
   });
 });
 
-test("the JSON store reads once, writes atomically, and starts over from an unreadable file", async () => {
+test("the JSON store reads once, writes atomically, and keeps a copy of a damaged file", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "dayboard-json-store-"));
   try {
     const file = path.join(dir, "store.json");
@@ -254,8 +254,42 @@ test("the JSON store reads once, writes atomically, and starts over from an unre
     assert.deepEqual(await store.read(), { items: [1, 2] });
 
     await writeFile(file, "{not json");
-    const fresh = createJsonStore({ path: () => file, parse });
+    const damaged = [];
+    const fresh = createJsonStore({
+      path: () => file,
+      parse,
+      onDamaged: (copy) => damaged.push(copy),
+    });
     assert.deepEqual(await fresh.read(), { items: [] });
+    await fresh.update(() => ({ items: [3] }));
+    // The bytes that couldn't be read are still on disk beside the new file.
+    assert.equal(damaged.length, 1);
+    assert.equal(path.dirname(damaged[0]), dir);
+    assert.equal(await readFile(damaged[0], "utf8"), "{not json");
+    assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { items: [3] });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the JSON store never writes over a file it could not read", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "dayboard-json-store-"));
+  try {
+    // A directory where the file should be makes every read fail the way a locked file does.
+    const file = path.join(dir, "store.json");
+    await mkdir(file);
+    const parse = (value) => ({ items: Array.isArray(value?.items) ? value.items : [] });
+    const store = createJsonStore({ path: () => file, parse });
+    await assert.rejects(store.read(), /EISDIR/);
+    await assert.rejects(
+      store.update(() => ({ items: [1] })),
+      /EISDIR/,
+    );
+    assert.deepEqual(await readdir(dir), ["store.json"]);
+    // Once the file can be read again the store works without a restart.
+    await rm(file, { recursive: true });
+    await writeFile(file, JSON.stringify({ items: [7] }));
+    assert.deepEqual(await store.read(), { items: [7] });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
