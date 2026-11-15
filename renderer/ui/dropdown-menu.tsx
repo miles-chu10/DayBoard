@@ -145,6 +145,8 @@ export interface DropdownMenuSubProps extends Omit<
   "accelerator" | "sublabel"
 > {
   label: string;
+  /** Marks the submenu that holds the current choice; leaves room for the mark when false. */
+  checked?: boolean;
   disabled?: boolean;
   children: React.ReactNode;
 }
@@ -154,12 +156,22 @@ export function DropdownMenuSub({
   icon,
   color,
   iconColor,
+  checked,
   disabled,
   children,
 }: DropdownMenuSubProps) {
   return (
     <DropdownMenuPrimitive.Sub>
-      <DropdownMenuPrimitive.SubTrigger disabled={disabled} className={itemRowClass(disabled)}>
+      <DropdownMenuPrimitive.SubTrigger
+        disabled={disabled}
+        className={itemRowClass(disabled)}
+        aria-current={checked ? "true" : undefined}
+      >
+        {checked === undefined ? null : (
+          <span className="flex size-4 shrink-0 items-center justify-center">
+            {checked ? <Check className="size-3.5" aria-hidden="true" /> : null}
+          </span>
+        )}
         <MenuIcon
           icon={icon}
           className={cn("size-4 shrink-0", menuItemColorClass(iconColor ?? color))}

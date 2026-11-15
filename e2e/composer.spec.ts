@@ -43,7 +43,7 @@ async function openSettingsTab(app: ElectronApplication, page: Page, tab: string
 
 async function chooseClaudeModel(page: Page, from: string, model: RegExp) {
   await page.getByRole("button", { name: `Change model: ${from}` }).click();
-  await page.getByRole("menuitem", { name: "✓ Claude" }).click();
+  await page.getByRole("menuitem", { name: "Claude", exact: true }).click();
   await page.getByRole("menuitemcheckbox", { name: model }).click();
 }
 
@@ -57,7 +57,8 @@ test("effort panel sets the Assistant's effort, resets it and keeps Ultra out of
     await expect(chip).toHaveAccessibleName("Model and effort: Claude Code default");
     await expect(chip).toHaveAttribute("title", "Claude Code default");
     await chip.click();
-    await expect(chip).toContainText("Select effort");
+    // The chip keeps naming the model while its panel is open.
+    await expect(chip).toContainText("Claude Code default");
     const panel = demo.page.getByRole("dialog", { name: "Model and effort" });
     // Claude Code resolves its default only when it runs, so the panel offers no level for it.
     await expect(panel).toContainText(
@@ -78,7 +79,8 @@ test("effort panel sets the Assistant's effort, resets it and keeps Ultra out of
     await expect(slider).toHaveAttribute("aria-valuetext", "Default");
     await expect(slider).toHaveAttribute("aria-valuemax", "4");
     const reset = panel.getByRole("button", { name: "Reset effort to the model default" });
-    await expect(reset).toBeDisabled();
+    // Reset shows only once a level is chosen.
+    await expect(reset).toBeHidden();
 
     await slider.press("ArrowRight");
     await expect(slider).toHaveAttribute("aria-valuetext", "Extra High");
@@ -97,14 +99,14 @@ test("effort panel sets the Assistant's effort, resets it and keeps Ultra out of
     );
     await demo.page.screenshot({ path: testInfo.outputPath("effort-panel.png") });
 
-    const bolt = panel.getByRole("button", { name: "Fast mode" });
-    await expect(bolt).toHaveAttribute("aria-pressed", "false");
-    await bolt.click();
-    await expect(bolt).toHaveAttribute("aria-pressed", "true");
+    const fast = panel.getByRole("switch", { name: "Fast mode" });
+    await expect(fast).toHaveAttribute("aria-checked", "false");
+    await fast.click();
+    await expect(fast).toHaveAttribute("aria-checked", "true");
     // Switching models keeps the effort where the new model has it and clears it where it doesn't.
     await chooseClaudeModel(demo.page, "Opus", /^Sonnet\s*Latest/);
     await expect(slider).toHaveAttribute("aria-valuetext", "Max");
-    await expect(panel.getByRole("button", { name: "Fast mode" })).toHaveCount(0);
+    await expect(panel.getByRole("switch", { name: "Fast mode" })).toHaveCount(0);
     await chooseClaudeModel(demo.page, "Sonnet", /^Haiku/);
     await expect(panel).toContainText("This model doesn't have effort settings.");
     await expect.poll(() => assistantEffort(demo.page)).toEqual({});
@@ -122,7 +124,7 @@ test("effort panel sets the Assistant's effort, resets it and keeps Ultra out of
     // With no level of its own, the Assistant runs at Claude Code's effort setting.
     await expect(chip).toHaveAccessibleName("Model and effort: Opus, Claude Code's effort");
     await expect(chip).toHaveAttribute("title", "Opus · Claude Code's effort");
-    await expect(chip).not.toContainText("Select effort");
+    await expect(chip).toContainText("Opus");
 
     const settings = await openSettingsTab(demo.app, demo.page, "AI");
     await expect(settings.getByRole("combobox", { name: "Claude model" })).toContainText("Opus");
