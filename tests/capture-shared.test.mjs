@@ -226,3 +226,14 @@ test("buildCapturePrompt lists only available kinds", () => {
   assert.match(prompt, /Today's ISO date is 2026-10-20\./);
   assert.match(prompt, /Sentence: "Call dentist Thursday 3pm"/);
 });
+
+test("an end time at or before the start is refused, not replaced", () => {
+  const event = { kind: "event", title: "Dinner", notes: "", date: "2026-10-22", time: "19:00" };
+  const strict = capture.parseDraftStrict(json({ ...event, endTime: "18:00" }), all);
+  assert.equal(strict.ok, false);
+  assert.equal(strict.reason, "The end time is not after the start time.");
+  assert.deepEqual(capture.normalizeDraft({ ...event, endTime: "19:00" }, all), {
+    error: "The end time must be after the start time.",
+  });
+  assert.equal(capture.normalizeDraft({ ...event, endTime: "20:30" }, all).endTime, "20:30");
+});

@@ -13,6 +13,13 @@ export function startOfWeek(iso: string): string {
   return addDays(iso, -parseISODate(iso).getDay());
 }
 
+/** Days in a month grid that starts on its first week: only the weeks the month touches. */
+export function monthGridDays(monthStart: string): number {
+  const first = parseISODate(monthStart);
+  const length = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return Math.ceil((first.getDay() + length) / 7) * 7;
+}
+
 /** Local dates an event covers (all-day end dates are exclusive). */
 export function eventDays(event: CalendarEventItem): string[] {
   if (event.allDay) {

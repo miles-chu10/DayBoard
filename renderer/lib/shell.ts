@@ -28,3 +28,40 @@ export function separatorKey(
   if (key === "End") return max;
   return null;
 }
+
+interface PaneSize {
+  width: number;
+  min: number;
+  max: number;
+}
+
+/**
+ * Widths for the sidebar and the right-hand pane that leave the content its minimum. Both are
+ * narrowed first; when the window is still too small for all three, the sidebar steps aside
+ * (null) while the pane is open, since the pane is what was just asked for.
+ */
+export function fitColumns(
+  available: number,
+  contentMin: number,
+  sidebar: PaneSize | null,
+  inspector: PaneSize | null,
+): { sidebar: number | null; sidebarMax: number; inspector: number | null } {
+  const HANDLE = 1;
+  let room = available - contentMin;
+  let sidebarShown = sidebar !== null;
+  let inspectorWidth: number | null = null;
+  if (inspector) {
+    if (sidebar && room - 2 * HANDLE - sidebar.min < inspector.min) sidebarShown = false;
+    const forInspector = room - HANDLE - (sidebar && sidebarShown ? sidebar.min + HANDLE : 0);
+    inspectorWidth = clamp(inspector.width, inspector.min, Math.max(inspector.min, forInspector));
+    inspectorWidth = Math.min(inspectorWidth, inspector.max);
+    room -= inspectorWidth + HANDLE;
+  }
+  if (!sidebar || !sidebarShown) return { sidebar: null, sidebarMax: 0, inspector: inspectorWidth };
+  const sidebarMax = Math.max(sidebar.min, Math.min(sidebar.max, room - HANDLE));
+  return {
+    sidebar: clamp(sidebar.width, sidebar.min, sidebarMax),
+    sidebarMax,
+    inspector: inspectorWidth,
+  };
+}

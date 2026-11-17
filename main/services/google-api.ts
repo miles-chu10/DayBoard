@@ -827,8 +827,10 @@ function nextDate(date: string): string {
 
 function calendarEventBody(input: CreateEventInput): Record<string, unknown> {
   const timed = Boolean(input.startTime);
-  const endTime =
-    input.endTime && input.startTime && input.endTime > input.startTime ? input.endTime : null;
+  // An end at or before the start is refused; quietly swapping in "one hour" hid the mistake.
+  if (timed && input.endTime && input.endTime <= input.startTime!)
+    throw new Error("The event's end time must be after its start time.");
+  const endTime = timed && input.endTime ? input.endTime : null;
   return {
     summary: input.title,
     description: input.notes || undefined,

@@ -54,3 +54,10 @@ test("a non-HTTPS or malformed checkout address keeps the button hidden", () => 
     assert.equal(note.hidden, false, url);
   }
 });
+
+test("the pricing page links to checkout in its HTML, so buying works without scripts", async () => {
+  const page = await readFile(new URL("../website/pricing.html", import.meta.url), "utf8");
+  const address = source.match(/buyUrl: "([^"]*)"/)[1];
+  assert.match(page, new RegExp(`<a class="button" data-buy href="${address}"`));
+  assert.match(page, /<p data-buy-pending hidden>/);
+});

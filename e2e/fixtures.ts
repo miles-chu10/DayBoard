@@ -29,8 +29,18 @@ export function launchEnvironment(): Record<string, string> {
 }
 
 export async function createTestProfile(mode: IsolatedProfileMode = "demo"): Promise<string> {
-  const profile = await mkdtemp(path.join(tmpdir(), `dayboard-${mode}-e2e-`));
-  return prepareIsolatedProfile(profile, mode);
+  const profile = prepareIsolatedProfile(
+    await mkdtemp(path.join(tmpdir(), `dayboard-${mode}-e2e-`)),
+    mode,
+  );
+  // Most specs drive details as a pop-up; a spec that tests another presentation (the default
+  // is the side panel) writes its own settings over this.
+  if (mode === "demo")
+    await writeFile(
+      path.join(profile, "demo-settings.json"),
+      JSON.stringify({ general: { detailView: "dialog" } }),
+    );
+  return profile;
 }
 
 /**

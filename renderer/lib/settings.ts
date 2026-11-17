@@ -23,6 +23,16 @@ export function useSettings() {
   });
 }
 
+// Saves this window has sent and not heard back about. Each save carries the whole settings
+// object, so while any is in flight the cache holds the newest edit and must not be replaced by
+// an older save's echo: the next edit would start from it and silently undo the one before.
+let savesInFlight = 0;
+
+/** True while this window's own settings saves are still on their way. */
+export function settingsSaveInFlight(): boolean {
+  return savesInFlight > 0;
+}
+
 /** Applies a change to a copy of the current settings, optimistically, and persists it. */
 export function useSettingsEditor() {
   const queryClient = useQueryClient();
@@ -30,13 +40,21 @@ export function useSettingsEditor() {
   const mutation = useMutation({
     mutationFn: (next: AppSettings) => invoke<AppSettings>("settings:update", next),
     onMutate: (next) => {
+      savesInFlight += 1;
       const previous = queryClient.getQueryData<AppSettings>(settingsQueryKey);
       queryClient.setQueryData(settingsQueryKey, next);
       return { previous };
     },
     onError: (error, _next, context) => {
-      if (context?.previous) queryClient.setQueryData(settingsQueryKey, context.previous);
+      // With later saves still pending, their edits stay; the refetch below settles the rest.
+      if (context?.previous && savesInFlight === 1)
+        queryClient.setQueryData(settingsQueryKey, context.previous);
       toast.error(`Couldn't save settings: ${errorMessage(error)}`);
+    },
+    onSettled: () => {
+      savesInFlight = Math.max(0, savesInFlight - 1);
+      // Pick up what was actually stored, including changes skipped while saves were pending.
+      if (!savesInFlight) void queryClient.invalidateQueries({ queryKey: settingsQueryKey });
     },
   });
 

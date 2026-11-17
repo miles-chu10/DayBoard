@@ -15,13 +15,13 @@ const buyUrl = (() => {
     return null;
   }
 })();
-if (buyUrl) {
-  for (const link of document.querySelectorAll("a[data-buy]")) {
-    link.href = buyUrl;
-    link.hidden = false;
-  }
-  for (const note of document.querySelectorAll("[data-buy-pending]")) note.hidden = true;
+// Pages carry the live link in their HTML so buying works without scripts; this keeps them in
+// step with the address above, and closes them when it is empty.
+for (const link of document.querySelectorAll("a[data-buy]")) {
+  if (buyUrl) link.href = buyUrl;
+  link.hidden = !buyUrl;
 }
+for (const note of document.querySelectorAll("[data-buy-pending]")) note.hidden = Boolean(buyUrl);
 
 const contactEmail = /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(SITE_CONFIG.contactEmail)
   ? SITE_CONFIG.contactEmail

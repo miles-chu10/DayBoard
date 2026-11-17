@@ -4,6 +4,7 @@ import { powerMonitor } from "electron";
 import {
   acquireSingleInstanceLock,
   createMainWindow,
+  focusMainWindow,
   getMainWindow,
   keepMainWindowLoadedWhile,
   setupApplicationMenu,
@@ -15,6 +16,7 @@ import { mcpProjectIdForProfile } from "./services/mcp-port.js";
 import { drainAgendaStore } from "./services/agenda-store.js";
 import { drainProductivityWrites } from "./handlers/productivity.js";
 import { drainMailOutbox, heldMailCount } from "./handlers/mail.js";
+import { MailNotSentError } from "./services/mail-outbox.js";
 import { createSaveQuitGuard } from "./services/quit-guard.js";
 import { drainPendingWrites } from "./services/pending-writes.js";
 import { drainSettingsStores } from "./services/settings-store.js";
@@ -27,13 +29,18 @@ import { pauseAndDrainAppOperations, resumeAppOperations } from "./services/runt
 
 let updates: ReturnType<typeof registerUpdateHandlers> | undefined;
 async function drainAppWrites(): Promise<void> {
-  // Held emails go out now (their sends are pending writes the next step waits for).
-  await drainMailOutbox();
+  // Held emails go out now (their sends are pending writes the next step waits for). One that
+  // fails is reported after the other saves finish, so quitting anyway still loses nothing else.
+  let mailError: unknown;
+  await drainMailOutbox().catch((error: unknown) => {
+    mailError = error;
+  });
   await drainProductivityWrites();
   await drainPendingWrites();
   await drainSettingsStores();
   await drainAgendaStore();
   await drainNativeThemeWrites();
+  if (mailError) throw mailError;
 }
 
 // macOS is shutting down, restarting or logging out. A question here would hold that up, so
@@ -60,7 +67,23 @@ const saveBeforeQuit = createSaveQuitGuard({
   },
   onCancelled: resumeAppOperations,
   isUpdateInstallReady: () => updates?.status().phase === "installing",
-  confirmUnfinished: async () => {
+  confirmUnfinished: async (error) => {
+    if (error instanceof MailNotSentError) {
+      const result = await dialog.showMessageBox({
+        type: "warning",
+        title: "An email wasn't sent",
+        message: error.message,
+        detail:
+          "Keep DayBoard open to edit it and send it again. Quitting now discards what you wrote.",
+        buttons: ["Keep Open", "Quit and Discard"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (result.response === 1) return true;
+      // The draft reopened in the main window, which may be closed.
+      void focusMainWindow().catch(() => undefined);
+      return false;
+    }
     const result = await dialog.showMessageBox({
       type: "warning",
       title: "Changes are still saving",

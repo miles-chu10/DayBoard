@@ -25,7 +25,7 @@ import type {
 
 import { clearAccountScopedQueries, refreshMeetingNotes } from "./account-scoped-queries";
 import { errorMessage, invoke } from "./ipc";
-import { settingsQueryKey, sourceOn, useSettings } from "./settings";
+import { settingsQueryKey, settingsSaveInFlight, sourceOn, useSettings } from "./settings";
 import { buildTodos, linkedKeys, type Todo } from "./todos";
 
 export const queryKeys = {
@@ -220,7 +220,9 @@ export function useBackendSync() {
       }),
       ipc.onNotification("settings:changed", (params) => {
         const event = params as Partial<SettingsChangedEvent> | null;
-        if (event?.settings) queryClient.setQueryData(settingsQueryKey, event.settings);
+        // An echo of this window's earlier save must not replace a newer edit still being saved.
+        if (event?.settings && !settingsSaveInFlight())
+          queryClient.setQueryData(settingsQueryKey, event.settings);
         void queryClient.invalidateQueries({ queryKey: queryKeys.assistantMcp });
         void queryClient.invalidateQueries({ queryKey: ["assistant-mcp-servers"] });
         if (event?.dataChanged) {

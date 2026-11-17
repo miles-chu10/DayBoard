@@ -59,14 +59,19 @@ import { LicenseStatusControl } from "./license-gate";
 import { sourceStatusShort } from "./source-gate";
 
 /** The name from Settings, or one derived from the Google address ("first.last" → "First Last"). */
-export function displayName(settings: AppSettings | undefined, email?: string | null): string {
+export function knownName(settings: AppSettings | undefined, email?: string | null): string {
   const configured = settings?.general.userName.trim();
   if (configured) return configured;
   const local = email?.split("@", 1)[0] ?? "";
   const words = local.split(/[._-]+/).filter((word) => /^[a-z]+$/i.test(word));
   return words.length
     ? words.map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(" ")
-    : (email ?? "You");
+    : (email ?? "");
+}
+
+/** A name to show for the person; "You" when DayBoard knows neither a name nor an address. */
+export function displayName(settings: AppSettings | undefined, email?: string | null): string {
+  return knownName(settings, email) || "You";
 }
 
 function initials(name: string): string {
@@ -76,7 +81,7 @@ function initials(name: string): string {
     .map((word) => word[0])
     .join("")
     .slice(0, 2);
-  return letters.toUpperCase() || "Y";
+  return letters.toUpperCase() || "D";
 }
 
 function plural(count: number, word: string): string {
@@ -185,15 +190,13 @@ export function AppSidebar() {
     ),
   };
   function summary(due: number, late: number): string | undefined {
-    return (
-      [due ? `${due} due today` : null, late ? `${late} overdue` : null]
-        .filter(Boolean)
-        .join(" · ") || undefined
-    );
+    // Short enough to read at the sidebar's default width.
+    if (due && late) return `${due} due · ${late} overdue`;
+    return due ? `${due} due today` : late ? `${late} overdue` : undefined;
   }
 
   const google = accounts.data?.google;
-  const name = displayName(settings, google?.email);
+  const name = knownName(settings, google?.email) || "DayBoard";
   const remindersOk = accounts.data?.reminders === "full-access";
   const connected = Boolean(google?.connected);
   const connectionDetail = [
@@ -202,7 +205,7 @@ export function AppSidebar() {
     "Change your name or picture in Settings → General.",
   ].join("\n");
   const status = !connected
-    ? "Not connected"
+    ? "Google not connected"
     : remindersOk || !sourceOn(settings, "reminders")
       ? "Connected"
       : "Connected · Reminders off";
@@ -466,7 +469,7 @@ export function AppSidebar() {
                   subtitle={
                     settings?.ai.providerChosen === false
                       ? "Choose an AI provider in Settings"
-                      : `${PROVIDER_LABEL[provider]} · ${modelSummary(model)}`
+                      : modelSummary(model)
                   }
                   selected={pathname === "/assistant"}
                   onClick={() => void navigate({ to: "/assistant" })}

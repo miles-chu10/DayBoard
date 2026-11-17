@@ -13,10 +13,11 @@ function harness({ scope = "google:a", replies = new Set(), failUnsnooze = false
   const timers = new Map();
   let nextHandle = 1;
   const events = { changes: 0, due: [], unsnoozed: [] };
-  const state = { scope, failUnsnooze };
+  const state = { scope, failUnsnooze, failWrite: false };
   const schedule = createMailSchedule({
     read: async () => stored,
     write: async (text) => {
+      if (state.failWrite) throw new Error("disk full");
       stored = text;
     },
     scope: async () => state.scope,
@@ -197,4 +198,56 @@ test("offline snoozes back off instead of retrying every second", async () => {
   h.state.failUnsnooze = false;
   await h.advance(300_000);
   assert.deepEqual(h.events.unsnoozed, ["retry"]);
+});
+
+test("a full schedule refuses a new entry instead of dropping an old snooze", async () => {
+  const h = harness();
+  const all = Array.from({ length: 500 }, (_, index) =>
+    entry("snooze", `m${index}`, h.now(), h.now() + HOUR),
+  );
+  h.setStored(JSON.stringify({ version: 1, accounts: { "google:a": all } }));
+  await assert.rejects(
+    h.schedule.add(entry("snooze", "one-more", h.now(), h.now() + HOUR)),
+    /already have 500 snoozed emails and follow-ups/,
+  );
+  const listed = await h.schedule.list();
+  assert.equal(listed.length, 500);
+  assert.equal(listed[0].messageId, "m0");
+  // Changing an entry that is already there still works.
+  await h.schedule.add(entry("snooze", "m0", h.now(), h.now() + 2 * HOUR));
+  assert.equal((await h.schedule.list()).length, 500);
+});
+
+test("a change that can't be saved is not kept in memory either", async () => {
+  const h = harness();
+  await h.schedule.add(entry("snooze", "kept", h.now(), h.now() + HOUR));
+  h.state.failWrite = true;
+  await assert.rejects(
+    h.schedule.add(entry("snooze", "lost", h.now(), h.now() + HOUR)),
+    /disk full/,
+  );
+  await assert.rejects(h.schedule.remove("snooze", "kept"), /disk full/);
+  assert.deepEqual(
+    (await h.schedule.list()).map((item) => item.messageId),
+    ["kept"],
+  );
+});
+
+test("a failed save after a due check keeps the timers running and is retried", async () => {
+  const h = harness();
+  await h.schedule.start();
+  await h.schedule.add(entry("snooze", "first", h.now(), h.now() + 1000));
+  await h.schedule.add(entry("snooze", "later", h.now(), h.now() + HOUR));
+  h.state.failWrite = true;
+  await h.advance(1000);
+  // The email is back in the inbox once, and the next check is still scheduled.
+  assert.deepEqual(h.events.unsnoozed, ["first"]);
+  assert.deepEqual(h.timerWaits(), [60_000]);
+  assert.match(h.stored(), /"first"/);
+  h.state.failWrite = false;
+  await h.advance(60_000);
+  assert.deepEqual(h.events.unsnoozed, ["first"]);
+  assert.doesNotMatch(h.stored(), /"first"/);
+  await h.advance(HOUR);
+  assert.deepEqual(h.events.unsnoozed, ["first", "later"]);
 });

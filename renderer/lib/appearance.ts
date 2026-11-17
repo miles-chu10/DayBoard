@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { accentColors, type Scheme } from "@renderer/ui";
+import { accentColors, systemAccentHex, type Scheme } from "@renderer/ui";
 import type { AccentColor, Density } from "@main/shared-types";
 
 import { useSettings } from "./settings";
@@ -25,26 +25,53 @@ export const ACCENT_OPTIONS: {
 
 const CACHE_KEY = "dayboard:accent";
 const DENSITY_KEY = "dayboard:density";
+const SYSTEM_HEX_KEY = "dayboard:accent:system";
 const STYLE_ID = "dayboard-accent";
 
-/** Overrides the accent (and the macOS system accent) for this window; "system" restores it. */
+/** Paints the window with these accents, or with the built-in blue when there are none. */
+function setAccentStyle(colors: { light: string; dark: string } | null): void {
+  let style = document.getElementById(STYLE_ID);
+  if (!colors) {
+    style?.remove();
+    return;
+  }
+  if (!style) {
+    style = document.createElement("style");
+    style.id = STYLE_ID;
+    document.head.appendChild(style);
+  }
+  const rule = (hex: string, scheme: Scheme) => {
+    const { fill, fillHover, fillActive, contrast, ink } = accentColors(hex, scheme);
+    return `--theme-accent: ${hex} !important; --accent: ${hex} !important; --accent-fill: ${fill} !important; --accent-fill-hover: ${fillHover} !important; --accent-fill-active: ${fillActive} !important; --accent-contrast: ${contrast} !important; --accent-ink: ${ink} !important;`;
+  };
+  style.textContent = `:root:root { ${rule(colors.light, "light")} } :root.dark:root { ${rule(colors.dark, "dark")} }`;
+}
+
+let applied: AccentColor | undefined;
+
+/** "System" follows the accent chosen in macOS System Settings → Appearance. */
+function applySystemAccent(): void {
+  const paint = (hex: string | null) => setAccentStyle(hex ? { light: hex, dark: hex } : null);
+  // The last known color paints at once; the current one follows from the main process.
+  paint(systemAccentHex(localStorage.getItem(storedKey(SYSTEM_HEX_KEY))?.slice(1)));
+  void window.dayboard?.nativeTheme
+    ?.getInfo()
+    .then((info) => {
+      if (applied !== "system") return;
+      const hex = systemAccentHex(info?.accentColor);
+      paint(hex);
+      if (hex) localStorage.setItem(storedKey(SYSTEM_HEX_KEY), hex);
+      else localStorage.removeItem(storedKey(SYSTEM_HEX_KEY));
+    })
+    .catch(() => undefined);
+}
+
+/** Sets this window's accent: one of DayBoard's colors, or "system" for the macOS accent. */
 export function applyAccent(accent: AccentColor): void {
   const option = ACCENT_OPTIONS.find((item) => item.value === accent);
-  let style = document.getElementById(STYLE_ID);
-  if (!option || option.value === "system") {
-    style?.remove();
-  } else {
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      document.head.appendChild(style);
-    }
-    const rule = (hex: string, scheme: Scheme) => {
-      const { fill, fillHover, fillActive, contrast, ink } = accentColors(hex, scheme);
-      return `--theme-accent: ${hex} !important; --accent: ${hex} !important; --accent-fill: ${fill} !important; --accent-fill-hover: ${fillHover} !important; --accent-fill-active: ${fillActive} !important; --accent-contrast: ${contrast} !important; --accent-ink: ${ink} !important;`;
-    };
-    style.textContent = `:root:root { ${rule(option.light, "light")} } :root.dark:root { ${rule(option.dark, "dark")} }`;
-  }
+  applied = option?.value ?? "system";
+  if (!option || option.value === "system") applySystemAccent();
+  else setAccentStyle({ light: option.light, dark: option.dark });
   localStorage.setItem(storedKey(CACHE_KEY), accent);
 }
 
@@ -68,7 +95,18 @@ export function useAppearanceSync(): void {
   const accent = general?.accent;
   const density = general?.density;
   useEffect(() => {
-    if (accent) applyAccent(accent);
+    if (!accent) return;
+    applyAccent(accent);
+    if (accent !== "system") return;
+    // macOS doesn't announce an accent change to web content, so look again when the theme
+    // updates and whenever the window comes back to the front.
+    const refresh = () => applyAccent("system");
+    const unsubscribe = window.dayboard?.ipc?.onNotification("nativeTheme:updated", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      unsubscribe?.();
+      window.removeEventListener("focus", refresh);
+    };
   }, [accent]);
   useEffect(() => {
     if (density) applyDensity(density);

@@ -123,7 +123,9 @@ function CommandMenuContent({ close }: { close: () => void }) {
         filter={commandFilter}
         className="flex min-h-0 flex-col"
         onKeyDown={(event) => {
-          if (event.key === "Tab" && !event.shiftKey && trimmed && assistantOn) {
+          // Plain Tab only: Ctrl-Tab and friends switch tabs and must not send a question.
+          const modified = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
+          if (event.key === "Tab" && !modified && trimmed && assistantOn) {
             event.preventDefault();
             ask();
           }

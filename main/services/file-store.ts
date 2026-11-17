@@ -10,6 +10,27 @@ export async function readFileIfExists(target: string): Promise<Buffer | null> {
   }
 }
 
+/**
+ * Reads a JSON file: null when it doesn't exist. A file that isn't valid JSON is copied beside
+ * itself as `<name>.damaged-<time>` before it reads as missing, and any other read failure
+ * throws, so a caller can never replace data it could not read.
+ */
+export async function readJsonFile(
+  target: string,
+  onDamaged?: (copy: string, error: unknown) => void,
+): Promise<unknown> {
+  const raw = await readFileIfExists(target);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw.toString("utf8")) as unknown;
+  } catch (error) {
+    const copy = `${target}.damaged-${Date.now()}`;
+    await fs.copyFile(target, copy, fs.constants.COPYFILE_EXCL);
+    onDamaged?.(copy, error);
+    return null;
+  }
+}
+
 export async function writeFileAtomic(target: string, data: string | Buffer): Promise<void> {
   await fs.mkdir(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;

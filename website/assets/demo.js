@@ -1228,6 +1228,15 @@ function startDemo(root) {
     const reminders = open("Reminders");
     const due = (items) => items.filter((item) => item.day === 0).length;
     const overdue = state.tasks.filter((item) => !item.done && item.day !== null && item.day < 0);
+    // The app's own wording: short enough to read at the sidebar's width.
+    const dueSummary = (today, late) =>
+      today && late
+        ? `${today} due · ${late} overdue`
+        : today
+          ? `${today} due today`
+          : late
+            ? `${late} overdue`
+            : "Nothing due";
     const unread = state.mail.filter((mail) => mail.status === "inbox" && mail.unread).length;
     const latest = state.mail.find((mail) => mail.status === "inbox");
     const upcoming = todayMeetings().filter((item) => minutes(item.time) > NOW);
@@ -1235,19 +1244,21 @@ function startDemo(root) {
       ["Home", `${waiting().length} waiting on you`, waiting().length],
       [
         "Agenda",
-        `${due(tasks) + due(reminders)} due today · ${overdue.length} overdue`,
+        dueSummary(due(tasks) + due(reminders), overdue.length),
         overdue.length,
         overdue.length ? "alert" : "",
       ],
       ["Calendar", "Next 3:00 PM · Q4 roadmap sync", upcoming.length],
       ["Inbox", latest ? `Latest: ${latest.from}` : "Inbox clear", unread],
-      ["Tasks", `${due(tasks)} due today · ${overdue.length} overdue`, tasks.length],
+      ["Tasks", dueSummary(due(tasks), overdue.length), tasks.length],
       ["Reminders", `${due(reminders)} due today`, reminders.length],
       ["Notes", "1 note", undefined],
     ];
     for (const [name, detail, count, tone] of items) {
       const node = button("", () => go(name), "demo-nav-button");
       node.dataset.key = `nav-${name}`;
+      // The label text is hidden at phone width, so the name can't come from it alone.
+      node.setAttribute("aria-label", `${name}, ${detail}`);
       const text = el("span", "demo-nav-text");
       text.append(el("strong", "", name), el("small", "", detail));
       node.replaceChildren(symbol(name), text);

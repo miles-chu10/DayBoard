@@ -102,6 +102,7 @@ export function AlertDialogContent({
     <AlertDialogPrimitive.Portal>
       <AlertDialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/30" />
       <AlertDialogPrimitive.Content
+        data-modal=""
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col gap-3",
           "rounded-xl border border-separator bg-background p-4 shadow-2xl",

@@ -192,6 +192,8 @@ export function parseDraftStrict(output: string, available: AvailableKinds): Str
   }
   if (!problems.length) {
     if (partial.endTime && !partial.time) problems.push("The end time has no start time.");
+    if (partial.endTime && partial.time && partial.endTime <= partial.time)
+      problems.push("The end time is not after the start time.");
     if (partial.kind === "task" && partial.time)
       problems.push("Google Tasks can't hold a time. Choose a reminder or event.");
     if (partial.kind === "reminder" && partial.endTime)
@@ -231,6 +233,7 @@ export function normalizeDraft(
   if (time && !realTime(time)) return { error: "Check the time." };
   const endTime = kind === "event" && time ? text(record, "endTime") : "";
   if (endTime && !realTime(endTime)) return { error: "Check the end time." };
+  if (endTime && endTime <= time) return { error: "The end time must be after the start time." };
   if (kind === "event" && !date) return { error: "Events need a date." };
   if (time && !date) return { error: "Add a date for that time." };
   return { kind, title, notes: text(record, "notes").slice(0, MAX_NOTES), date, time, endTime };

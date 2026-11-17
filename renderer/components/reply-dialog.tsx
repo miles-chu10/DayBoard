@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Callout, Dialog, Input, Status, Text, Textarea, toast } from "@renderer/ui";
 import type { MailItem } from "@main/shared-types";
 
@@ -7,7 +7,7 @@ import { useAITask } from "../lib/ai";
 import { learnFromDraft } from "../lib/agent-data";
 import { REPLY_SYSTEM, buildReplyPrompt } from "../lib/ai-prompts";
 import { errorMessage, invoke } from "../lib/ipc";
-import { useAccounts } from "../lib/queries";
+import { queryKeys, useAccounts } from "../lib/queries";
 import { featureOn, useSettings } from "../lib/settings";
 import { useCompose } from "./compose-dialog";
 
@@ -25,6 +25,9 @@ export function ReplyDialog({
   const memoryOn = settings?.ai.memory === true;
   const ai = useAITask();
   const { sendMail, openCompose } = useCompose();
+  const queryClient = useQueryClient();
+  // The account this reply is written in; the backend refuses to send it from any other.
+  const [scope] = useState(() => queryClient.getQueryData<string>(queryKeys.agendaScope));
   const [instructions, setInstructions] = useState("");
   const [draft, setDraft] = useState("");
   const alive = useRef(true);
@@ -90,19 +93,25 @@ export function ReplyDialog({
 
   async function send() {
     if (!message || sending.current || !draft.trim() || ai.isRunning) return;
+    const expectedScope = scope ?? queryClient.getQueryData<string>(queryKeys.agendaScope);
+    if (!expectedScope) {
+      toast.error("Your account is still loading. Try again in a moment.");
+      return;
+    }
     sending.current = true;
     setBusy(true);
     const sent = message;
     const body = draft;
     const written = ai.isDone ? ai.output.trim() : "";
     try {
-      await sendMail({ kind: "reply", id: sent.id, body }, () =>
+      await sendMail({ kind: "reply", id: sent.id, body, expectedScope }, () =>
         openCompose(
           {
             replyToId: sent.id,
             heading: `Reply to ${sent.from}`,
             subject: sent.subject,
             body,
+            scope: expectedScope,
           },
           { recovered: true },
         ),

@@ -237,7 +237,7 @@ export function AgendaView({
       event: selectedEvent,
     }),
   });
-  const detailView = settings?.general.detailView ?? "dialog";
+  const detailView = settings?.general.detailView ?? "sidebar";
   const allReady =
     (!on.tasks || !tasks.isPending) &&
     (!on.reminders || !reminders.isPending) &&

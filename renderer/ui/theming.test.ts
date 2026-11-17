@@ -12,6 +12,7 @@ import {
   contrastRatio,
   markGrounds,
   stateFills,
+  systemAccentHex,
   textGrounds,
   tintedGrounds,
   type Scheme,
@@ -208,4 +209,12 @@ test("renderer code only references CSS variables that theme.css or styles.css d
       assert.ok(declared.has(name), `${file} uses undeclared ${name}`);
     }
   }
+});
+
+test("systemAccentHex reads the macOS accent and refuses anything else", () => {
+  assert.equal(systemAccentHex("0A84FFFF"), "#0a84ff");
+  assert.equal(systemAccentHex("ff9f0a"), "#ff9f0a");
+  assert.equal(systemAccentHex("#0a84ff"), null);
+  assert.equal(systemAccentHex("red; } body { display: none"), null);
+  assert.equal(systemAccentHex(undefined), null);
 });

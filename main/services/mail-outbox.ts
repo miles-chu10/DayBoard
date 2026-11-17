@@ -2,6 +2,18 @@ import { randomUUID } from "node:crypto";
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
+/** Thrown by `drain` when an email it had to send did not go out. */
+export class MailNotSentError extends Error {
+  constructor(readonly failures: string[]) {
+    super(
+      failures.length === 1
+        ? `An email couldn't be sent: ${failures[0]}`
+        : `${failures.length} emails couldn't be sent: ${failures[0]}`,
+    );
+    this.name = "MailNotSentError";
+  }
+}
+
 interface Timers {
   setTimeout: (callback: () => void, ms: number) => unknown;
   clearTimeout: (handle: unknown) => void;
@@ -16,7 +28,8 @@ const systemTimers: Timers = {
 
 /**
  * Holds each outgoing email for an undo window, then sends it. Cancel stops one that hasn't gone;
- * drain sends everything still held at once, so quitting never silently drops an email.
+ * drain sends everything still held at once and throws when one fails, so quitting never
+ * silently drops an email.
  */
 export function createOutbox<T>(options: {
   send: (payload: T) => Promise<void>;
@@ -67,7 +80,9 @@ export function createOutbox<T>(options: {
     },
     async drain(): Promise<void> {
       for (const id of [...held.keys()]) dispatch(id);
-      await Promise.allSettled([...inFlight]);
+      const results = await Promise.all([...inFlight]);
+      const failures = results.flatMap((result) => (result.ok ? [] : [result.error]));
+      if (failures.length) throw new MailNotSentError(failures);
     },
     held: () => held.size,
   };

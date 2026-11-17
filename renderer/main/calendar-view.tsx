@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Button, ScrollArea, SegmentedControl, SegmentedControlItem, Text } from "@renderer/ui";
+import {
+  Button,
+  Callout,
+  ScrollArea,
+  SegmentedControl,
+  SegmentedControlItem,
+  Text,
+} from "@renderer/ui";
 import { cn } from "@renderer/ui/utils";
 import { ChevronLeft, ChevronRight, Circle } from "lucide-react";
 import type { CalendarEventItem } from "@main/shared-types";
@@ -24,8 +31,11 @@ import {
 import { ViewActions } from "../components/view-actions";
 import { HistoryNav } from "../components/history-nav";
 import type { AgendaSearch, CalendarLayout } from "../lib/agenda-search";
-import { groupByDay, startOfWeek, type DayItems } from "../lib/day-items";
+import { groupByDay, monthGridDays, startOfWeek, type DayItems } from "../lib/day-items";
 import { contextItemKey } from "../lib/agent-context";
+import { errorMessage, openSettings } from "../lib/ipc";
+import { layoutDay } from "../lib/week-layout";
+import { sourceHint } from "../components/source-gate";
 import { usePublishViewContext } from "../components/shell";
 import { addDays, formatTimeOfDay, parseISODate, toISODate } from "../lib/dates";
 import {
@@ -98,7 +108,7 @@ function CalendarGrid({
   const anchor = parseISODate(selected);
   const monthStart = toISODate(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
   const rangeStart = view === "month" ? startOfWeek(monthStart) : startOfWeek(selected);
-  const days = view === "month" ? 42 : 7;
+  const days = view === "month" ? monthGridDays(monthStart) : 7;
   const dates = Array.from({ length: days }, (_, index) => addDays(rangeStart, index));
 
   const calendar = useCalendarRange(rangeStart, days);
@@ -120,7 +130,7 @@ function CalendarGrid({
   );
   const byDay = groupByDay(sourceOn(settings, "calendar") ? events : [], todos, dates);
   const messages = mail.data?.state === "ok" ? mail.data.items : [];
-  const detailView = settings?.general.detailView ?? "dialog";
+  const detailView = settings?.general.detailView ?? "sidebar";
   const root = useRef<HTMLDivElement>(null);
   const openedFromSelectedDay = useRef(false);
   const returnFocusKey = useRef<string | undefined>(undefined);
@@ -305,6 +315,7 @@ function CalendarGrid({
                 {title}
               </Text>
             </div>
+            <CalendarProblem calendar={calendar} />
             {view === "month" ? (
               <MonthGrid
                 dates={dates}
@@ -323,6 +334,49 @@ function CalendarGrid({
       </DetailsLayout>
       {detailView === "dialog" ? renderDetail("dialog") : null}
     </div>
+  );
+}
+
+/** Says why events are missing or out of date, so a failed load never looks like a free week. */
+function CalendarProblem({ calendar }: { calendar: ReturnType<typeof useCalendarRange> }) {
+  const retry = (
+    <Button size="small" onClick={() => void calendar.refetch()} disabled={calendar.isFetching}>
+      Retry
+    </Button>
+  );
+  if (calendar.isError)
+    return (
+      <Callout color="red" role="alert" actions={retry}>
+        Couldn’t load your calendar: {errorMessage(calendar.error)}
+      </Callout>
+    );
+  const data = calendar.data;
+  if (!data) return null;
+  if (data.state === "ok") {
+    if (data.refreshError)
+      return (
+        <Callout color="orange" role="status" actions={retry}>
+          Couldn’t refresh your calendar, so these events may be out of date.
+        </Callout>
+      );
+    return data.coverage?.complete === false ? (
+      <Callout color="orange" role="status">
+        Some events in this range couldn’t be loaded.
+      </Callout>
+    ) : null;
+  }
+  return (
+    <Callout
+      color="orange"
+      role="status"
+      actions={
+        <Button size="small" onClick={() => void openSettings()}>
+          Settings
+        </Button>
+      }
+    >
+      {sourceHint(data, "Google Calendar")}
+    </Callout>
   );
 }
 
@@ -530,41 +584,6 @@ function MonthGrid({
 // ── Week ──────────────────────────────────────────────────────────────────────────────────
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-
-/** Places overlapping events side by side (greedy lanes per overlapping cluster). */
-function layoutDay(events: CalendarEventItem[], date: string) {
-  const dayStart = parseISODate(date).getTime();
-  const dayEnd = dayStart + 86_400_000;
-  const items = events
-    .map((event) => {
-      const start = Math.max(new Date(event.start).getTime(), dayStart);
-      const end = Math.min(Math.max(new Date(event.end).getTime(), start + 15 * 60_000), dayEnd);
-      return { event, start, end, lane: 0, lanes: 1 };
-    })
-    .sort((a, b) => a.start - b.start || b.end - a.end);
-  let cluster: typeof items = [];
-  let clusterEnd = 0;
-  const flush = () => {
-    const lanes = Math.max(1, ...cluster.map((item) => item.lane + 1));
-    for (const item of cluster) item.lanes = lanes;
-    cluster = [];
-  };
-  for (const item of items) {
-    if (cluster.length && item.start >= clusterEnd) flush();
-    const taken = new Set(
-      cluster.filter((other) => other.end > item.start).map((other) => other.lane),
-    );
-    while (taken.has(item.lane)) item.lane++;
-    cluster.push(item);
-    clusterEnd = Math.max(clusterEnd, item.end);
-  }
-  flush();
-  return items.map((item) => ({
-    ...item,
-    top: (item.start - dayStart) / 3_600_000,
-    height: (item.end - item.start) / 3_600_000,
-  }));
-}
 
 function WeekGrid({
   dates,

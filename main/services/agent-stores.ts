@@ -25,12 +25,17 @@ function file(name: string) {
 }
 
 /** A demo file that doesn't exist yet starts from the sample data. */
+function onDamaged(copy: string, error: unknown): void {
+  logger.error("agent-stores", `A data file was unreadable; kept a copy at ${copy}`, error);
+}
+
 function fresh(value: unknown): boolean {
   return value === null && isDemoMode();
 }
 
 const activity = createJsonStore<{ entries: AgentActivityEntry[] }>({
   path: file("agent-activity.json"),
+  onDamaged,
   parse: (value) => ({
     entries: fresh(value) ? demoActivity(Date.now()) : parseActivity(value, Date.now()),
   }),
@@ -38,6 +43,7 @@ const activity = createJsonStore<{ entries: AgentActivityEntry[] }>({
 
 const memory = createJsonStore<{ memories: AgentMemory[] }>({
   path: file("agent-memory.json"),
+  onDamaged,
   parse: (value) => ({
     memories: fresh(value) ? demoMemories(Date.now()) : parseMemories(value),
   }),
@@ -45,6 +51,7 @@ const memory = createJsonStore<{ memories: AgentMemory[] }>({
 
 const usage = createJsonStore<{ days: UsageDay[] }>({
   path: file("ai-usage.json"),
+  onDamaged,
   parse: (value) => ({
     days: fresh(value) ? demoUsage(Date.now()) : parseUsage(value, Date.now()),
   }),
@@ -52,6 +59,7 @@ const usage = createJsonStore<{ days: UsageDay[] }>({
 
 const notes = createJsonStore<{ notes: Note[] }>({
   path: file("notes.json"),
+  onDamaged,
   parse: (value) => ({
     notes: fresh(value) ? demoNotes(Date.now()) : parseNotes(value),
   }),

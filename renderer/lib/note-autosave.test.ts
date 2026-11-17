@@ -91,6 +91,20 @@ test("deleting during a save that fails does not bring the note back", async () 
   assert.equal(saves.length, 1);
 });
 
+test("a delete that fails puts the text back and keeps a later failed save", async () => {
+  const { autosave, saves, fixture } = harness("note-1");
+  autosave.change({ title: "", body: "typed before delete" });
+  assert.equal(await autosave.discard(), "note-1");
+  // The delete itself failed, so the editor is still open on this note.
+  autosave.restore({ title: "", body: "typed before delete" });
+  fixture.fail = true;
+  assert.equal(await autosave.flush(), false);
+  assert.equal(autosave.hasPendingChanges(), true);
+  fixture.fail = false;
+  assert.equal(await autosave.flush(), true);
+  assert.deepEqual(saves.at(-1), { id: "note-1", title: "", body: "typed before delete" });
+});
+
 test("navigation waits for newer edits typed while the first save is in flight", async () => {
   let finishFirst!: (value: { id: string }) => void;
   let failSecond!: (error: Error) => void;

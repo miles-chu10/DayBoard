@@ -51,6 +51,9 @@ export function startMailNotifications(enabled: boolean): void {
   if (!enabled || isDemoMode()) return;
   let seen: Set<string> | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Bumped whenever the account or the setting changes, so an inbox fetched before the change
+  // is thrown away instead of notifying about (and remembering) the wrong mail.
+  let epoch = 0;
 
   onMailDue((entry) => {
     void getSettings().then((settings) => {
@@ -64,8 +67,11 @@ export function startMailNotifications(enabled: boolean): void {
       seen = null;
       return;
     }
+    const started = epoch;
     if (!(await getGoogleStatus()).connected) return;
-    const result = newUnread(seen, await listInbox(settings.mail.maxMessages));
+    const inbox = await listInbox(settings.mail.maxMessages);
+    if (started !== epoch) return;
+    const result = newUnread(seen, inbox);
     seen = result.seen;
     for (const notice of newMailNotices(result.fresh)) notify(notice);
   }
@@ -85,11 +91,13 @@ export function startMailNotifications(enabled: boolean): void {
     timer.unref?.();
   }
   function restart() {
+    epoch += 1;
     if (timer) clearTimeout(timer);
     void loop(++generation);
   }
 
   onAccountsChanged(() => {
+    epoch += 1;
     seen = null;
   });
   onSettingsChanged((next, previous) => {

@@ -12,7 +12,9 @@ interface StoreFile {
   accounts: Record<string, MailScheduleEntry[]>;
 }
 
-const MAX_ENTRIES = 500;
+export const MAX_ENTRIES = 500;
+// How soon a change that couldn't be written to disk is tried again.
+const SAVE_RETRY_WAIT = 60_000;
 /** Check at least hourly, so a sleeping Mac or a clock change can't strand an entry. */
 const MAX_WAIT = 60 * 60 * 1000;
 // Longest wait between retries of a failed check, so mail returns soon after the network does.
@@ -72,6 +74,8 @@ export function createMailSchedule(deps: {
   let tail: Promise<unknown> = Promise.resolve();
   let handle: unknown;
   let running = false;
+  // A due check changed the list in memory but the file write failed; the next check retries it.
+  let unsaved = false;
   const retries = new WeakMap<MailScheduleEntry, { attempts: number; at: number }>();
   function defer(entry: MailScheduleEntry) {
     const attempts = (retries.get(entry)?.attempts ?? 0) + 1;
@@ -95,6 +99,23 @@ export function createMailSchedule(deps: {
 
   async function save(): Promise<void> {
     if (file) await deps.write(JSON.stringify(file));
+    unsaved = false;
+  }
+
+  /** Applies a user's change; when it can't be saved, the list goes back to what's on disk. */
+  async function change<T>(mutate: (list: MailScheduleEntry[]) => T): Promise<T> {
+    const list = await entries();
+    const before = [...list];
+    try {
+      const result = mutate(list);
+      await save();
+      return result;
+    } catch (error) {
+      list.splice(0, list.length, ...before);
+      throw error;
+    } finally {
+      reschedule(list);
+    }
   }
 
   async function entries(): Promise<MailScheduleEntry[]> {
@@ -110,8 +131,9 @@ export function createMailSchedule(deps: {
       .filter((entry) => !entry.due)
       .map((entry) => Math.max(entry.dueAt, retries.get(entry)?.at ?? 0));
     const hasDue = list.some((entry) => entry.due);
-    if (!waiting.length && !hasDue) return;
-    const wait = waiting.length ? Math.min(...waiting) - deps.now() : MAX_WAIT;
+    if (!waiting.length && !hasDue && !unsaved) return;
+    let wait = waiting.length ? Math.min(...waiting) - deps.now() : MAX_WAIT;
+    if (unsaved) wait = Math.min(wait, SAVE_RETRY_WAIT);
     handle = timers.setTimeout(
       () => void check().catch(() => undefined),
       Math.min(MAX_WAIT, Math.max(1000, wait)),
@@ -156,7 +178,12 @@ export function createMailSchedule(deps: {
           }
         }
       }
-      if (dirty) await save();
+      try {
+        if (dirty || unsaved) await save();
+      } catch {
+        // Gmail already changed, so keep the list as it is and write it on the next check.
+        unsaved = true;
+      }
       reschedule(list);
       return dirty;
     });
@@ -166,19 +193,24 @@ export function createMailSchedule(deps: {
   return {
     list: () => serial(async () => [...(await entries())]),
 
-    /** Adds or replaces the entry for this message and kind. */
+    /**
+     * Adds or replaces the entry for this message and kind. A full list refuses the new entry:
+     * dropping an old one would leave its snoozed email archived for good.
+     */
     async add(entry: MailScheduleEntry): Promise<void> {
-      await serial(async () => {
-        const list = await entries();
-        const index = list.findIndex(
-          (item) => item.kind === entry.kind && item.messageId === entry.messageId,
-        );
-        if (index >= 0) list.splice(index, 1);
-        list.push(entry);
-        if (list.length > MAX_ENTRIES) list.splice(0, list.length - MAX_ENTRIES);
-        await save();
-        reschedule(list);
-      });
+      await serial(() =>
+        change((list) => {
+          const index = list.findIndex(
+            (item) => item.kind === entry.kind && item.messageId === entry.messageId,
+          );
+          if (index >= 0) list.splice(index, 1);
+          else if (list.length >= MAX_ENTRIES)
+            throw new Error(
+              `You already have ${MAX_ENTRIES} snoozed emails and follow-ups. Clear some before adding another.`,
+            );
+          list.push(entry);
+        }),
+      );
       deps.onChange();
     },
 
@@ -187,10 +219,7 @@ export function createMailSchedule(deps: {
         const list = await entries();
         const index = list.findIndex((item) => item.kind === kind && item.messageId === messageId);
         if (index < 0) return null;
-        const [entry] = list.splice(index, 1);
-        await save();
-        reschedule(list);
-        return entry;
+        return change((current) => current.splice(index, 1)[0]);
       });
       if (removed) deps.onChange();
       return removed;

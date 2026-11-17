@@ -177,6 +177,9 @@ export type MainRoute =
 export interface MainNavigation {
   to: MainRoute;
   prompt?: string;
+  /** An agenda item to select, and the day (YYYY-MM-DD) it is listed under. */
+  item?: string;
+  date?: string;
   /** Also opens the first-run welcome over the view (Help → Welcome to DayBoard…). */
   welcome?: true;
 }

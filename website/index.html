@@ -544,10 +544,23 @@
           </div>
           <p class="c-access rise" style="--i: 4">
             Free, with a 14-day AI trial. DayBoard 1.3.8 for Apple silicon Macs on macOS 14 or
-            later, signed and notarized by Apple. Google hasn't verified DayBoard yet, so Google
-            shows a warning when you connect.
+            later, signed and notarized by Apple.
             <a href="beta.html#install">Read the install guide</a>.
           </p>
+          <ul class="c-points rise" style="--i: 5">
+            <li>
+              <strong>Uses the AI you already pay for.</strong> The Assistant runs on your Claude or
+              ChatGPT subscription through Claude Code or Codex. No API key needed.
+            </li>
+            <li>
+              <strong>Nothing passes through us.</strong> DayBoard talks to Google and Apple
+              Reminders straight from your Mac, and the code is open source.
+            </li>
+            <li>
+              <strong>$5 once, not a subscription.</strong> The app is free. AI is a one-time $5
+              after a 14-day trial.
+            </li>
+          </ul>
         </div>
         <section class="wrap product-demo" id="demo" aria-labelledby="demo-title" tabindex="-1">
           <h2 id="demo-title" class="visually-hidden">Try DayBoard in your browser</h2>
@@ -650,7 +663,9 @@
           <ol class="gs-next" data-reveal>
             <li>
               <strong>Open DayBoard.</strong> A short welcome helps you connect Google Calendar,
-              Google Tasks, Gmail and Apple Reminders. Every step can be skipped.
+              Google Tasks, Gmail and Apple Reminders. Every step can be skipped. Google hasn't
+              verified DayBoard yet, so it shows a warning when you connect; the
+              <a href="beta.html#install">install guide</a> shows what to expect.
             </li>
             <li>
               <strong>Plan your day.</strong> Home shows what needs you, what's due and your next
@@ -792,6 +807,7 @@
                     alt="Calendar month grid with events, tasks and reminders, and today's schedule beside it (fictional sample data)"
                     width="2560"
                     height="1640"
+                    loading="lazy"
                   />
                   <img
                     class="theme-dark"
@@ -799,6 +815,7 @@
                     alt="Calendar month grid with events, tasks and reminders, and today's schedule beside it (fictional sample data)"
                     width="2560"
                     height="1640"
+                    loading="lazy"
                   />
                 </div>
               </div>
@@ -879,6 +896,7 @@
                     alt="Apple Reminders grouped by list, with times and dates (fictional sample data)"
                     width="2560"
                     height="1640"
+                    loading="lazy"
                   />
                   <img
                     class="theme-dark"
@@ -886,6 +904,7 @@
                     alt="Apple Reminders grouped by list, with times and dates (fictional sample data)"
                     width="2560"
                     height="1640"
+                    loading="lazy"
                   />
                 </div>
               </div>
@@ -1037,8 +1056,9 @@
             <div>
               <h3>AI on your terms</h3>
               <p>
-                AI stays off until you pick a provider. When you use it, only the context that
-                request needs goes to that provider.
+                AI stays off until you pick a provider. With each message, the Assistant sends that
+                provider a snapshot of up to 60 events, 80 open tasks and reminders, and your 30
+                latest emails (sender, subject and a short preview).
                 <a href="docs.html#data">Read the data guide</a>
               </p>
             </div>
@@ -1068,10 +1088,7 @@
               </div>
               <div>
                 <dt>Updates</dt>
-                <dd>
-                  Checks GitHub for new versions and installs them when you restart. On a build
-                  before 1.3.0 beta 12? Install 1.3.8 once from its DMG.
-                </dd>
+                <dd>Checks GitHub for new versions and installs them when you restart.</dd>
               </div>
               <div>
                 <dt>Google</dt>
@@ -1226,8 +1243,7 @@
               <p>
                 Yes. The current DayBoard app and its disk image are signed with an Apple Developer
                 ID and notarized by Apple. The <a href="download.html">download page</a> has the
-                install steps. Builds before 1.3.0 beta 12 can't update themselves: install 1.3.8
-                over them once, and later updates arrive in the app.
+                install steps.
               </p>
             </details>
             <details>

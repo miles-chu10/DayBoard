@@ -5,7 +5,8 @@ interface QuitEvent {
 interface SaveQuitOptions {
   drain: () => Promise<void>;
   confirmBeforeDrain?: () => Promise<boolean>;
-  confirmUnfinished: () => Promise<boolean>;
+  /** Asked when draining failed or timed out; gets what went wrong. */
+  confirmUnfinished: (error: unknown) => Promise<boolean>;
   resumeQuit: () => void;
   isUpdateInstallReady?: () => boolean;
   onCancelled?: () => void;
@@ -42,8 +43,8 @@ export function createSaveQuitGuard({
             timer = setTimeout(() => reject(new Error("Changes are still saving.")), timeoutMs);
           }),
         ]);
-      } catch {
-        if (!(await confirmUnfinished())) return;
+      } catch (error) {
+        if (!(await confirmUnfinished(error))) return;
       } finally {
         if (timer) clearTimeout(timer);
       }

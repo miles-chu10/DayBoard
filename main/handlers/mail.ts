@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { app, ipcMain, logger } from "../platform/index.js";
 import { assertNotDemo, demoSubscriptionMessages, isDemoMode } from "../services/demo-data.js";
-import { readFileIfExists, writeFileAtomic } from "../services/file-store.js";
+import { readJsonFile, writeFileAtomic } from "../services/file-store.js";
 import {
   getReplyContext,
   modifyMessage,
@@ -65,16 +65,17 @@ export function parseSendRequest(payload: unknown): MailSendRequest {
   if (!body.trim()) throw new Error("Write a message first");
   const cc = text(input, "cc", channel, 5000);
   if (cc) parseRecipients(cc, "Cc");
+  const expectedScope = required(input, "expectedScope", channel, 400);
   if (input.kind === "reply") {
     const id = text(input, "id", channel, 200);
     if (!id) throw new Error(`${channel}: "id" is required`);
-    return { kind: "reply", id, body, ...(cc ? { cc } : {}) };
+    return { kind: "reply", id, body, expectedScope, ...(cc ? { cc } : {}) };
   }
   if (input.kind !== "new") throw new Error(`${channel}: "kind" must be "reply" or "new"`);
   const to = text(input, "to", channel, 5000);
   if (!parseRecipients(to, "To").length) throw new Error("Add at least one recipient");
   const subject = text(input, "subject", channel, 900);
-  return { kind: "new", to, subject, body, ...(cc ? { cc } : {}) };
+  return { kind: "new", to, subject, body, expectedScope, ...(cc ? { cc } : {}) };
 }
 
 async function send(request: MailSendRequest): Promise<void> {
@@ -145,7 +146,13 @@ const scheduleFile = () =>
   );
 
 export const mailSchedule = createMailSchedule({
-  read: async () => (await readFileIfExists(scheduleFile()))?.toString("utf8") ?? null,
+  // A damaged file is kept as a copy before the schedule starts over; a failed read throws.
+  read: async () => {
+    const value = await readJsonFile(scheduleFile(), (copy, error) =>
+      logger.error("mail", `The mail schedule was unreadable; kept a copy at ${copy}`, error),
+    );
+    return value === null ? null : JSON.stringify(value);
+  },
   write: (contents) => writeFileAtomic(scheduleFile(), contents),
   scope: requireAgendaScope,
   now: () => Date.now(),
@@ -244,6 +251,11 @@ export function registerMailHandlers(): void {
     assertNotDemo("mail:send");
     const request = parseSendRequest(payload);
     const scope = await requireAgendaScope();
+    // The account can change while a draft is open; it must not go out from the new one.
+    if (request.expectedScope !== scope)
+      throw new Error(
+        "Your Google account changed while you were writing, so this email wasn't sent.",
+      );
     const delay = (await getSettings()).mail.undoSendSeconds * 1000;
     const ticket = outbox.queue({ request, scope }, delay);
     if (ticket.sent) {
@@ -270,9 +282,20 @@ export function registerMailHandlers(): void {
       throw new Error(`${channel}: pick a time in the future`);
     if (until > now + 366 * DAY) throw new Error(`${channel}: snooze for at most a year`);
     const entry = scheduleEntry(input, channel, "snooze", until);
-    // Archive first: if that fails, nothing is recorded and the email stays where it was.
-    await trackPendingWrite(() => modifyMessage(entry.messageId, ["INBOX"]));
+    // Record the return time first: an archived email with no saved entry would never come back.
+    const previous = (await mailSchedule.list()).find(
+      (item) => item.kind === "snooze" && item.messageId === entry.messageId,
+    );
     await mailSchedule.add(entry);
+    try {
+      await trackPendingWrite(() => modifyMessage(entry.messageId, ["INBOX"]));
+    } catch (error) {
+      // The email stayed in the inbox, so put the schedule back the way it was.
+      await (
+        previous ? mailSchedule.add(previous) : mailSchedule.remove("snooze", entry.messageId)
+      ).catch((undo: unknown) => logger.warn("mail", "Could not undo a failed snooze", undo));
+      throw error;
+    }
     return entry;
   });
 

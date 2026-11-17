@@ -18,7 +18,7 @@ export function TasksView() {
   const tasks = useTasks();
   const mail = useMail();
   const settings = useSettings().data;
-  const detailView = settings?.general.detailView ?? "dialog";
+  const detailView = settings?.general.detailView ?? "sidebar";
   const [selectedKey, setSelectedKey] = useState<string | undefined>();
   const todos =
     tasks.data?.state === "ok"
@@ -69,8 +69,8 @@ export function TasksView() {
           className="h-full"
           leading={<HistoryNav />}
           viewportClassName="[&>div]:block!"
-          title={<SourceHeading source="tasks" />}
-          subtitle={tasks.data?.state === "ok" ? `${open} open` : undefined}
+          title={<SourceHeading source="tasks">Tasks</SourceHeading>}
+          subtitle={tasks.data?.state === "ok" ? `Google Tasks · ${open} open` : "Google Tasks"}
           actions={
             <ViewActions onRefresh={() => void tasks.refetch()} refreshing={tasks.isFetching} />
           }

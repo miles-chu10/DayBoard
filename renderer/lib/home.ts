@@ -1,4 +1,4 @@
-import type { MailItem } from "@main/shared-types";
+import type { AccountsStatus, MailItem } from "@main/shared-types";
 
 import type { TriageMap } from "./triage-types";
 
@@ -108,6 +108,13 @@ export function suggestedTasks(input: {
     const key = `suggest:${message.id}`;
     return title && !handled.has(key) ? [{ key, title, mail: message }] : [];
   });
+}
+
+/** True once it is known that no account is connected, so Home can say how to start. */
+export function nothingConnected(accounts: AccountsStatus | undefined): boolean {
+  return (
+    accounts !== undefined && !accounts.google.connected && accounts.reminders !== "full-access"
+  );
 }
 
 export function greeting(hour: number): string {

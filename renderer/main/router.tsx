@@ -53,14 +53,14 @@ const tasksRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tasks",
   component: TasksView,
-  staticData: { title: "Google Tasks" },
+  staticData: { title: "Tasks" },
 });
 
 const remindersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reminders",
   component: RemindersView,
-  staticData: { title: "Apple Reminders" },
+  staticData: { title: "Reminders" },
 });
 
 const mailRoute = createRoute({
@@ -71,7 +71,7 @@ const mailRoute = createRoute({
   validateSearch: (search: Record<string, unknown>): { item?: string } => ({
     item: typeof search.item === "string" && search.item ? search.item : undefined,
   }),
-  staticData: { title: "Gmail" },
+  staticData: { title: "Inbox" },
 });
 
 const calendarRoute = createRoute({

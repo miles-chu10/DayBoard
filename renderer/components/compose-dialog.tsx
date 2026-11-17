@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, Field, FieldGroup, Input, Text, Textarea, toast } from "@renderer/ui";
 import type { MailSendRequest, MailSendResult, MailSendTicket } from "@main/shared-types";
 
 import { errorMessage, invoke } from "../lib/ipc";
+import { queryKeys } from "../lib/queries";
 
 export interface ComposeDraft {
   /** Set for a reply: the message it answers. */
@@ -13,6 +15,8 @@ export interface ComposeDraft {
   cc: string;
   subject: string;
   body: string;
+  /** The account this was written in; a draft never goes out from another one. */
+  scope?: string;
 }
 
 type SendMail = (request: MailSendRequest, restore: () => void) => Promise<void>;
@@ -38,9 +42,11 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
   const activeDraft = useRef(false);
   const waitingDrafts = useRef<ComposeDraft[]>([]);
   const tickets = useRef(new Map<string, { toastId: string | number; restore: () => void }>());
+  const queryClient = useQueryClient();
+  const currentScope = () => queryClient.getQueryData<string>(queryKeys.agendaScope);
 
   function openCompose(next?: Partial<ComposeDraft>, options?: { recovered?: boolean }) {
-    const opened = { ...EMPTY, ...next };
+    const opened = { ...EMPTY, ...next, scope: next?.scope ?? currentScope() };
     if (activeDraft.current) {
       // Never replace the email being written. A blank request has nothing worth queueing.
       const hasContent = Boolean(opened.to || opened.cc || opened.subject || opened.body);
@@ -66,12 +72,13 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
         const ticket = tickets.current.get(result.id);
         if (!ticket) return;
         tickets.current.delete(result.id);
-        if (result.ok) toast.success("Sent", { id: ticket.toastId, duration: 2500 });
-        else
-          toast.error(`Couldn't send: ${result.error}`, {
-            id: ticket.toastId,
-            action: { label: "Edit", onClick: ticket.restore },
-          });
+        if (result.ok) {
+          toast.success("Sent", { id: ticket.toastId, duration: 2500 });
+          return;
+        }
+        // Reopen it straight away: the text lives nowhere else once this toast is gone.
+        toast.error(`Couldn't send: ${result.error}`, { id: ticket.toastId });
+        ticket.restore();
       }),
     [],
   );
@@ -122,6 +129,7 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
           }}
           sendMail={sendMail}
           reopen={openCompose}
+          currentScope={currentScope}
         />
       ) : null}
     </ComposeContext.Provider>
@@ -133,11 +141,13 @@ function ComposeDialog({
   onClose,
   sendMail,
   reopen,
+  currentScope,
 }: {
   initial: ComposeDraft;
   onClose: () => void;
   sendMail: SendMail;
   reopen: (draft: ComposeDraft, options?: { recovered?: boolean }) => void;
+  currentScope: () => string | undefined;
 }) {
   const [value, setValue] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +166,26 @@ function ComposeDialog({
 
   async function send() {
     if (sending.current || !value.body.trim() || (!reply && !value.to.trim())) return;
+    const current = currentScope();
+    const expectedScope = value.scope ?? current;
+    if (!expectedScope) {
+      setError("Your account is still loading. Try again in a moment.");
+      return;
+    }
+    if (current && current !== expectedScope) {
+      if (reply) {
+        setError(
+          "This reply was started in a different Google account. Switch back to that account to send it.",
+        );
+        return;
+      }
+      // Sending from the new account has to be a deliberate second press.
+      setValue((draft) => ({ ...draft, scope: current }));
+      setError(
+        "Your Google account changed while you were writing. Press Send again to send this from the account that's connected now.",
+      );
+      return;
+    }
     sending.current = true;
     setBusy(true);
     setError(null);
@@ -165,6 +195,7 @@ function ComposeDialog({
           id: value.replyToId,
           body: value.body,
           cc: value.cc || undefined,
+          expectedScope,
         }
       : {
           kind: "new",
@@ -172,9 +203,10 @@ function ComposeDialog({
           subject: value.subject,
           body: value.body,
           cc: value.cc || undefined,
+          expectedScope,
         };
     try {
-      const snapshot = value;
+      const snapshot = { ...value, scope: expectedScope };
       await sendMail(request, () => reopen(snapshot, { recovered: true }));
       if (alive.current) onClose();
     } catch (cause) {
