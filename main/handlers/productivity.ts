@@ -5,23 +5,28 @@ import { ipcMain, logger, shell } from "../platform/index.js";
 import {
   createEvent,
   createAgendaEvent,
-  createReplyDraft,
   findAgendaEvent,
   getTaskInList,
   createTask,
-  getMessageBody,
   listCalendars,
   listCompletedTasks,
   listEventsBetween,
-  listInbox,
   listTasksWithCoverage,
   listTaskLists,
   listEventsWithCoverage,
   listEventsBetweenWithCoverage,
-  modifyMessage,
-  searchRelatedMail,
   setTaskCompleted,
 } from "../services/google-api.js";
+import {
+  connectGmail,
+  createReplyDraft,
+  disconnectGmail,
+  getGmailStatus,
+  getMessageBody,
+  listInbox,
+  modifyMessage,
+  searchRelatedMail,
+} from "../services/gmail-imap.js";
 import {
   GoogleAuthError,
   authorizeGoogle,
@@ -192,8 +197,12 @@ function requireUUID(value: unknown, channel: string): string {
 
 export async function getAccountsStatus(): Promise<AccountsStatus> {
   if (isDemoMode()) return demoAccounts;
-  const [google, reminders] = await Promise.all([getGoogleStatus(), getRemindersAccess()]);
-  return { google, reminders };
+  const [google, gmail, reminders] = await Promise.all([
+    getGoogleStatus(),
+    getGmailStatus(),
+    getRemindersAccess(),
+  ]);
+  return { google, gmail, reminders };
 }
 
 async function agendaScope(): Promise<string | null> {
@@ -576,7 +585,30 @@ export function registerProductivityHandlers(): void {
 
   ipcMain.handle("google:disconnect", async () => {
     assertNotDemo("google:disconnect");
-    return changeAccount(disconnectGoogle);
+    // The Gmail app password belongs to this account, so it goes with it.
+    return changeAccount(async () => {
+      await disconnectGoogle();
+      await disconnectGmail();
+    });
+  });
+
+  ipcMain.handle("gmail:connect", async (_event, payload: unknown) => {
+    const channel = "gmail:connect";
+    assertNotDemo(channel);
+    const password = requireString(asObject(payload, channel), "appPassword", channel);
+    if (password.length > 100) throw new Error(`${channel}: "appPassword" is too long`);
+    await googleMutation(channel, () => connectGmail(password));
+    const status = await broadcastAccounts();
+    ipcMain.broadcast("data:changed", { source: "mail" });
+    return status;
+  });
+
+  ipcMain.handle("gmail:disconnect", async () => {
+    assertNotDemo("gmail:disconnect");
+    await disconnectGmail();
+    const status = await broadcastAccounts();
+    ipcMain.broadcast("data:changed", { source: "mail" });
+    return status;
   });
 
   // Google Tasks

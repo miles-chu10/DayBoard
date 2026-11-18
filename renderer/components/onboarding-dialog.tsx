@@ -39,6 +39,7 @@ import {
 import { shortcutKeys, SHORTCUTS } from "../lib/shortcuts";
 import { useStartAtLogin } from "../lib/use-start-at-login";
 import { AIConsentDialog } from "./ai-consent-dialog";
+import { GmailConnect } from "./gmail-connect";
 import { GoogleConnect } from "./google-sign-in";
 import { ProviderMark } from "./provider-logo";
 import { SourceIcon } from "./source-dot";
@@ -289,14 +290,13 @@ function ConnectStep() {
   return (
     <>
       <StepHeading title="Connect your accounts">
-        Both are optional. You can change them later in Settings → Sources.
+        All are optional. You can change them later in Settings → Sources.
       </StepHeading>
       <div className="flex flex-col gap-2">
         <AccountRow
           icon={
             <>
               <GoogleTasksLogo className="size-3 text-support-blue" />
-              <GmailLogo className="size-3 text-support-red" />
               <GoogleCalendarLogo className="size-3 text-support-green" />
             </>
           }
@@ -306,7 +306,7 @@ function ConnectStep() {
               ? (google.email ?? "Signed in")
               : google && !google.hasCredentials
                 ? "Google sign-in isn’t available in this build."
-                : "Tasks, Gmail and Calendar. You finish signing in in your browser."
+                : "Tasks and Calendar. You finish signing in in your browser."
           }
         >
           {!google ? (
@@ -319,6 +319,19 @@ function ConnectStep() {
             <Status variant="neutral">Unavailable</Status>
           )}
         </AccountRow>
+        {google?.connected ? (
+          <AccountRow
+            icon={<GmailLogo className="size-4 text-support-red" />}
+            title="Gmail"
+            description={
+              accounts?.gmail.connected
+                ? (accounts.gmail.email ?? "Connected")
+                : "Your inbox, with an app password from your Google account."
+            }
+          >
+            {accounts?.gmail.connected ? <Connected>Connected</Connected> : <GmailConnect />}
+          </AccountRow>
+        ) : null}
         <AccountRow
           icon={<AppleRemindersLogo className="size-4 text-support-orange" />}
           title="Apple Reminders"
@@ -511,7 +524,7 @@ interface ExampleItem {
   source: SourceId;
   title: string;
   meta: string;
-  account: "google" | "reminders";
+  account: "google" | "gmail" | "reminders";
 }
 
 /** Fictional items: the welcome shows what a day looks like before anything is connected. */
@@ -521,7 +534,7 @@ const EXAMPLE_DAY: ExampleItem[] = [
     source: "mail",
     title: "Contract redlines from Jordan",
     meta: "Waiting on you",
-    account: "google",
+    account: "gmail",
   },
   { source: "tasks", title: "Send the Q4 plan", meta: "Due today", account: "google" },
   { source: "reminders", title: "Pick up dry cleaning", meta: "6:00 PM", account: "reminders" },
@@ -544,6 +557,7 @@ function DayPreview({ step, assistant }: { step: OnboardingStep; assistant: AIPr
   );
   const connected = {
     google: Boolean(accounts?.google.connected),
+    gmail: Boolean(accounts?.gmail.connected),
     reminders: accounts?.reminders === "full-access",
   };
   const showAll = step === "welcome";
@@ -591,7 +605,11 @@ function DayPreview({ step, assistant }: { step: OnboardingStep; assistant: AIPr
                 <SourceIcon source={item.source} className="opacity-50" />
                 <span className="h-1.5 flex-1 rounded-full bg-control" aria-hidden="true" />
                 <Text variant="small" color="tertiary" className="shrink-0">
-                  {item.account === "google" ? "Connect Google" : "Allow Reminders"}
+                  {item.account === "google"
+                    ? "Connect Google"
+                    : item.account === "gmail"
+                      ? "Connect Gmail"
+                      : "Allow Reminders"}
                 </Text>
               </li>
             ),

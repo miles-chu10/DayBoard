@@ -323,7 +323,7 @@ export type ProviderStatus =
     };
 
 /** A Google source that needs its own permission on Google's consent screen. */
-export type GoogleAccess = "tasks" | "mail" | "calendar";
+export type GoogleAccess = "tasks" | "calendar";
 
 export interface GoogleAccountStatus {
   hasCredentials: boolean;
@@ -334,8 +334,18 @@ export interface GoogleAccountStatus {
   missingAccess: GoogleAccess[];
 }
 
+/** Gmail connects over IMAP and SMTP with an app password for the signed-in Google account. */
+export interface GmailAccountStatus {
+  connected: boolean;
+  /** The address the app password belongs to; always the signed-in Google account. */
+  email: string | null;
+  /** Gmail turned the saved app password down, for example after a Google password change. */
+  rejected: boolean;
+}
+
 export interface AccountsStatus {
   google: GoogleAccountStatus;
+  gmail: GmailAccountStatus;
   reminders: RemindersAccess;
 }
 
@@ -363,6 +373,8 @@ export type SourceResult<T> =
   | { state: "not-connected" }
   /** Signed in, but the user left this source's permission unticked at Google. */
   | { state: "not-granted" }
+  /** Signed in with Google, but Gmail has no working app password yet. */
+  | { state: "mail-not-connected" }
   | { state: "no-access"; access: RemindersAccess }
   | { state: "disabled" };
 

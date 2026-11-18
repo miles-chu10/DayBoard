@@ -82,16 +82,22 @@ export async function listTasksWithCoverage() { return { items: [], coverage: { 
 export async function listTaskLists() { return []; }
 export async function listEventsWithCoverage() { return { items: [], coverage: { complete: true, loaded: 0 } }; }
 export async function createEvent() {}
-export async function createReplyDraft() { return { draftId: "draft" }; }
 export async function createTask() {}
-export async function getMessageBody() { return ""; }
 export async function listCalendars() { return { calendars: [], limited: false }; }
 export async function listCompletedTasks() { return []; }
 export async function listEventsBetween() { return []; }
+export async function setTaskCompleted() {}
+`;
+
+const gmailStub = `
+export async function getGmailStatus() { return { connected: false, email: null, rejected: false }; }
+export async function connectGmail() {}
+export async function disconnectGmail() {}
+export async function createReplyDraft() { return { draftId: "draft" }; }
+export async function getMessageBody() { return ""; }
 export async function listInbox() { return []; }
 export async function modifyMessage() {}
 export async function searchRelatedMail() { return []; }
-export async function setTaskCompleted() {}
 `;
 
 const authStub = `
@@ -146,6 +152,7 @@ function providerPlugin() {
   const stubs = new Map([
     ["dayboard:platform", backendStub],
     ["../services/google-api.js", googleStub],
+    ["../services/gmail-imap.js", gmailStub],
     ["../services/google-auth.js", authStub],
     ["../services/apple-reminders.js", remindersStub],
     ["../services/settings-store.js", settingsStub],

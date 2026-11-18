@@ -19,8 +19,11 @@ function stubPlugin(stubs) {
   return {
     name: "synthetic-startup-interfaces",
     setup(api) {
+      // Only DayBoard's own imports are replaced; a library's "./logger.js" is its own file.
       api.onResolve({ filter: /.*/ }, (args) =>
-        stubs.has(args.path) ? { path: args.path, namespace: "synthetic" } : undefined,
+        stubs.has(args.path) && !args.importer.includes(`${path.sep}node_modules${path.sep}`)
+          ? { path: args.path, namespace: "synthetic" }
+          : undefined,
       );
       api.onLoad({ filter: /.*/, namespace: "synthetic" }, (args) => ({
         contents: stubs.get(args.path),

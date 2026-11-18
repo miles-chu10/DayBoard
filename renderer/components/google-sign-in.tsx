@@ -20,11 +20,10 @@ export const PRIVACY_POLICY_URL = "https://getdayboard.com/privacy.html";
 
 const ACCESS_LABEL: Record<GoogleAccess, string> = {
   tasks: "Google Tasks",
-  mail: "Gmail",
   calendar: "Google Calendar",
 };
 
-/** "Gmail is off because…" style sentence for permissions left unticked on Google's screen. */
+/** "Google Tasks is off because…" style sentence for permissions left unticked on Google's screen. */
 export function missingAccessText(missing: readonly GoogleAccess[]): string {
   const names = missing.map((access) => ACCESS_LABEL[access]);
   const list =
@@ -101,12 +100,11 @@ function GoogleDataDisclosure() {
           <span className="font-medium text-primary">Tasks:</span> see, add, edit, complete and
           delete your tasks.
         </li>
-        <li>
-          <span className="font-medium text-primary">Gmail:</span> read your mail, save reply
-          drafts, archive messages and mark them read. DayBoard never sends or deletes mail,
-          although Google’s screen describes this permission as read, compose and send.
-        </li>
       </ul>
+      <p>
+        Gmail isn’t part of this sign-in. You connect it afterwards with an app password, the way
+        Apple Mail does.
+      </p>
       <p>
         You can leave any of these unticked on Google’s screen. DayBoard turns off the parts it
         wasn’t given.

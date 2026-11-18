@@ -8,16 +8,11 @@ import { readJsonFile, writeFileAtomic } from "../services/file-store.js";
 import {
   getReplyContext,
   modifyMessage,
-  sendRawMessage,
+  sendMail,
   listSubscriptionMessages,
   threadHasReplyAfter,
-} from "../services/google-api.js";
-import {
-  MAX_BODY,
-  buildRawMessage,
-  parseRecipients,
-  replySubject,
-} from "../services/mail-compose.js";
+} from "../services/gmail-imap.js";
+import { MAX_BODY, parseRecipients, replySubject } from "../services/mail-compose.js";
 import { createOutbox } from "../services/mail-outbox.js";
 import {
   groupSubscriptions,
@@ -81,28 +76,23 @@ export function parseSendRequest(payload: unknown): MailSendRequest {
 async function send(request: MailSendRequest): Promise<void> {
   const cc = request.cc ? parseRecipients(request.cc, "Cc") : undefined;
   if (request.kind === "new") {
-    await sendRawMessage(
-      buildRawMessage({
-        to: parseRecipients(request.to, "To"),
-        cc,
-        subject: request.subject,
-        body: request.body,
-      }),
-    );
+    await sendMail({
+      to: parseRecipients(request.to, "To"),
+      cc,
+      subject: request.subject,
+      body: request.body,
+    });
     return;
   }
   const context = await getReplyContext(request.id);
-  await sendRawMessage(
-    buildRawMessage({
-      to: [context.to],
-      cc,
-      subject: replySubject(context.subject),
-      body: request.body,
-      inReplyTo: context.messageId || undefined,
-      references: context.references || undefined,
-    }),
-    context.threadId,
-  );
+  await sendMail({
+    to: parseRecipients(context.to, "To"),
+    cc,
+    subject: replySubject(context.subject),
+    body: request.body,
+    inReplyTo: context.messageId || undefined,
+    references: context.references || undefined,
+  });
 }
 
 /** A held email keeps the account it was written in, so a later sign-in can't send it. */
@@ -231,13 +221,11 @@ async function unsubscribe(method: UnsubscribeMethod): Promise<UnsubscribeResult
   const mailto = method.mailto ? parseMailto(method.mailto) : null;
   if (mailto) {
     await trackPendingWrite(() =>
-      sendRawMessage(
-        buildRawMessage({
-          to: [mailto.to],
-          subject: mailto.subject,
-          body: mailto.body,
-        }),
-      ),
+      sendMail({
+        to: [mailto.to],
+        subject: mailto.subject,
+        body: mailto.body,
+      }),
     );
     return { method: "email" };
   }

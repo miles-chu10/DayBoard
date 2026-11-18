@@ -1,4 +1,4 @@
-/** Composing raw RFC 5322 messages for Gmail's send and draft endpoints. Electron-free. */
+/** Composing RFC 5322 messages to send over SMTP or save as Gmail drafts. Electron-free. */
 
 export const MAX_RECIPIENTS = 50;
 export const MAX_BODY = 200_000;
@@ -49,11 +49,21 @@ export interface ComposedMessage {
   references?: string;
 }
 
-/** base64url of a plain-text UTF-8 message, ready for `raw`. */
-export function buildRawMessage(message: ComposedMessage): string {
+/** Headers DayBoard adds itself, because SMTP and IMAP don't fill them in the way Gmail's API did. */
+export interface MessageOrigin {
+  from: string;
+  date: Date;
+  messageId: string;
+}
+
+/** A plain-text UTF-8 message with CRLF line endings. */
+export function buildMessage(message: ComposedMessage, origin: MessageOrigin): string {
   if (!message.to.length) throw new Error("Add at least one recipient");
   if (message.body.length > MAX_BODY) throw new Error("The message is too long to send");
   const lines = [
+    `From: ${oneLine(origin.from)}`,
+    `Date: ${origin.date.toUTCString()}`,
+    `Message-ID: ${oneLine(origin.messageId)}`,
     `To: ${message.to.join(", ")}`,
     ...(message.cc?.length ? [`Cc: ${message.cc.join(", ")}`] : []),
     `Subject: ${encodeHeaderValue(message.subject.slice(0, MAX_SUBJECT))}`,
@@ -65,11 +75,19 @@ export function buildRawMessage(message: ComposedMessage): string {
       : []),
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
+    // Base64 keeps every line under SMTP's 998-byte limit, however long a paragraph is.
+    "Content-Transfer-Encoding: base64",
     "",
-    message.body.replace(/\r?\n/g, "\r\n"),
+    ...(Buffer.from(message.body.replace(/\r?\n/g, "\r\n"), "utf8")
+      .toString("base64")
+      .match(/.{1,76}/g) ?? []),
   ];
-  return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+  return lines.join("\r\n");
+}
+
+/** The bare address of a recipient from `parseRecipients`, for the SMTP envelope. */
+export function recipientAddress(recipient: string): string {
+  return (recipient.match(/<([^<>]+)>\s*$/)?.[1] ?? recipient).trim();
 }
 
 export function replySubject(subject: string): string {

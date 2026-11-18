@@ -5,6 +5,7 @@ import type { SourceResult } from "@main/shared-types";
 
 import { errorMessage, invoke, openSettings } from "../lib/ipc";
 import { useRequestRemindersAccess } from "../lib/queries";
+import { GmailConnect } from "./gmail-connect";
 import { GoogleConnect, GoogleReconnectButton } from "./google-sign-in";
 import { RowsSkeleton } from "./section-card";
 
@@ -79,6 +80,15 @@ function SourceEmptyState({ result, label }: { result: UnavailableResult; label:
           actions={<GoogleReconnectButton />}
         />
       );
+    case "mail-not-connected":
+      return (
+        <EmptyState
+          placement="viewport"
+          title="Connect Gmail"
+          description={`Add a Gmail app password to show your ${label}. It takes about a minute.`}
+          actions={<GmailConnect />}
+        />
+      );
     case "no-access":
       return result.access === "not-determined" ? (
         <EmptyState
@@ -116,6 +126,7 @@ export function sourceHint(
   if (result.state === "needs-setup")
     return `Google sign-in isn't available for ${label} in this build.`;
   if (result.state === "not-granted") return `Sign in again and allow ${label} on Google’s screen.`;
+  if (result.state === "mail-not-connected") return `Connect Gmail in Settings to see ${label}.`;
   return `Sign in with Google to see ${label}.`;
 }
 
@@ -126,5 +137,6 @@ export function sourceStatusShort(result: SourceResult<unknown> | undefined): st
   if (result.state === "needs-setup") return "Sign-in unavailable";
   if (result.state === "disabled") return "Turned off";
   if (result.state === "not-granted") return "Needs permission";
+  if (result.state === "mail-not-connected") return "Connect Gmail";
   return "Not signed in";
 }

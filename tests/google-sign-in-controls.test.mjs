@@ -37,6 +37,15 @@ const { GoogleSettings } = await loadTs("renderer/settings/account-settings.tsx"
         export const AlertDialogFooter = Hidden;
         export const AlertDialogHeader = Hidden;
         export const AlertDialogTitle = Hidden;
+        export const Callout = Hidden;
+        export const Dialog = Hidden;
+        export const DialogBody = Hidden;
+        export const DialogContent = Hidden;
+        export const DialogDescription = Hidden;
+        export const DialogFooter = Hidden;
+        export const DialogHeader = Hidden;
+        export const DialogTitle = Hidden;
+        export const Input = Hidden;
         export const FieldSet = Field;
         export const Status = Field;
         export const toast = { success() {}, error() {} };`
@@ -48,6 +57,7 @@ const { GoogleSettings } = await loadTs("renderer/settings/account-settings.tsx"
                 ? `
         export const useConnectGoogle = () => ({ isPending: true, mutate() {} });
         export const useRequestRemindersAccess = () => ({});
+        export const useAccounts = () => ({ data: undefined });
         export const queryKeys = {};`
                 : `export const invoke = () => {}; export const errorMessage = () => ""; export const openExternal = () => {};`,
       }));
@@ -81,10 +91,10 @@ test("unconfigured builds still disable Google sign-in", () => {
 });
 
 test("names the Google permissions the user didn't grant", () => {
-  const html = render({ connected: true, missingAccess: ["mail", "calendar"] });
+  const html = render({ connected: true, missingAccess: ["tasks", "calendar"] });
   assert.match(
     html,
-    /Gmail and Google Calendar are off because DayBoard wasn’t given permission\. Sign in again and tick them/,
+    /Google Tasks and Google Calendar are off because DayBoard wasn’t given permission\. Sign in again and tick them/,
   );
   assert.doesNotMatch(render({ connected: true }), /wasn’t given permission/);
 });
