@@ -6,7 +6,7 @@
     <title>Guide — DayBoard</title>
     <meta
       name="description"
-      content="Get started with DayBoard 1.3.9: Home, mail, Ask Assistant, Notes, keyboard shortcuts, source connections and optional MCP."
+      content="Get started with DayBoard 1.3.10: Home, mail, Ask Assistant, Notes, keyboard shortcuts, source connections and optional MCP."
     />
     <meta name="theme-color" content="#f6f2ea" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#151412" media="(prefers-color-scheme: dark)" />
@@ -506,8 +506,14 @@
           <p>Open Settings (<span class="kbd">⌘ ,</span>) and choose <strong>Sources</strong>.</p>
           <ul>
             <li>
-              <strong>Google Calendar, Google Tasks and Gmail:</strong> click
+              <strong>Google Calendar and Google Tasks:</strong> click
               <strong>Sign in with Google</strong> and approve access in your browser.
+            </li>
+            <li>
+              <strong>Gmail:</strong> click <strong>Connect Gmail</strong>, follow the three steps
+              to make an app password in your Google account, and paste it in. App passwords need
+              2-Step Verification; some work and school accounts don't allow them. The password is
+              kept encrypted in your Mac's Keychain, and <strong>Disconnect</strong> deletes it.
             </li>
             <li><strong>Apple Reminders:</strong> turn it on and allow access when macOS asks.</li>
             <li>Turn any source off at any time, and pick the color each one uses.</li>
@@ -692,8 +698,9 @@
               macOS's built-in protection.
             </li>
             <li>
-              <strong>Google:</strong> DayBoard talks directly to Google's APIs for Calendar, Tasks
-              and Gmail. Google stores that data under its own terms.
+              <strong>Google:</strong> DayBoard talks directly to Google's APIs for Calendar and
+              Tasks, and to Gmail's mail servers with your app password. Google stores that data
+              under its own terms.
             </li>
             <li><strong>Apple Reminders:</strong> read and changed on your Mac through macOS.</li>
             <li>
@@ -713,7 +720,7 @@
 
           <h2 id="updates">Getting updates</h2>
           <p>
-            Builds before 1.3.0 beta 12 don't update themselves. Install 1.3.9 over them once from
+            Builds before 1.3.0 beta 12 don't update themselves. Install 1.3.10 over them once from
             the <a href="download.html">download page</a>: quit DayBoard, then replace the app in
             Applications. Your DayBoard data stays in place.
           </p>
