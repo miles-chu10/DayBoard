@@ -18,7 +18,7 @@
   <a href="LICENSE">GPL-3.0-only</a>
 </p>
 
-[![DayBoard beta 17 Home: Needs you, Suggested, Meetings and Your tasks, using fictional demo data](docs/screenshots/light-home.png)](https://getdayboard.com)
+[![DayBoard 1.3.9 Home: Needs you, Suggested, Meetings and Your tasks, using fictional demo data](docs/screenshots/light-home.png)](https://getdayboard.com)
 
 DayBoard brings your tasks, reminders, calendar, and inbox into a standalone macOS app. Home shows
 what needs your attention, suggested tasks, meetings and your to-dos for today or this week. Open
