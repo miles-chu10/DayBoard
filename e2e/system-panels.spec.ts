@@ -231,7 +231,8 @@ test("File → Menu Bar Agenda shows today's panel", async ({
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    await expect(panel.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+    await expect(panel.getByRole("radio", { name: "Day" })).toBeChecked();
+    await expect(panel.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(panel.getByRole("region", { name: "Today's items" })).toBeVisible();
     await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(true);
 
@@ -261,7 +262,7 @@ test("File → Menu Bar Agenda shows today's panel", async ({
   }
 });
 
-test("the menu-bar panel lists the mail waiting on you and opens Home from it", async () => {
+test("the menu-bar panel lists the mail waiting on you and opens it in place", async () => {
   const demo = await launchDemo();
   try {
     // Home triages the demo inbox; the panel reads the same saved triage.
@@ -271,6 +272,7 @@ test("the menu-bar panel lists the mail waiting on you and opens Home from it", 
         .getByRole("button", { name: /^Sam Patel: Lunch today\?/ }),
     ).toBeVisible();
     const panel = await openMenuBarAgenda(demo.app);
+    await hideMainWindow(demo.app);
     const waiting = panel.getByRole("region", { name: "Waiting on you" });
     // The same two emails as Home's Needs you: Sam's question and Priya's decision request.
     await expect(waiting.getByRole("heading", { name: "Waiting on you · 2" })).toBeVisible();
@@ -284,9 +286,12 @@ test("the menu-bar panel lists the mail waiting on you and opens Home from it", 
       }),
     ).toBeVisible();
     await expect(waiting.getByRole("button")).toHaveCount(2);
+    // The row opens where it is: the panel stays and the main window stays hidden.
     await sam.click();
-    await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(false);
-    await expect(demo.page.getByRole("region", { name: "Needs you" })).toBeVisible();
+    await expect(sam).toHaveAttribute("aria-expanded", "true");
+    await expect(waiting.getByText("Still good for 12:30?", { exact: false })).toBeVisible();
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    expect(await mainWindowVisible(demo.app)).toBe(false);
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
@@ -376,7 +381,7 @@ test("Escape hides a freshly shown menu-bar panel", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    await expect(panel.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+    await expect(panel.getByRole("region", { name: "Today's items" })).toBeVisible();
     await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(true);
     await recordKeys(panel);
     const focusWhenShown = await panelFocus(demo.app, panel, "#menubar");
@@ -438,24 +443,26 @@ test("the panels follow the design system's ground, input, row and copy rules", 
 
     const menubar = await openMenuBarAgenda(demo.app);
     expect(await opaque(menubar)).toMatch(/^rgb\(/);
-    await expect(menubar.getByRole("textbox", { name: "Add or ask" })).toHaveAttribute(
+    await expect(menubar.getByRole("textbox", { name: "Add, ask or search" })).toHaveAttribute(
       "placeholder",
       /^.{1,32}…$/,
     );
-    const row = menubar.getByRole("region", { name: "Today's items" }).getByRole("button").first();
-    const title = row.locator("span").last();
+    const today = menubar.getByRole("region", { name: "Today's items" });
+    const row = today.getByRole("button").first();
+    const title = row.locator("span").first();
     await expect(title).toHaveAttribute("title", (await title.textContent()) ?? "");
+    // The time column lines up down the day.
     expect(
-      await row
-        .locator("span")
-        .nth(1)
+      await today
+        .locator("li > div > span")
+        .first()
         .evaluate(
           (node) => (globalThis as unknown as DomGlobal).getComputedStyle(node).fontVariantNumeric,
         ),
     ).toContain("tabular-nums");
 
     // Rows take an inset 2px keyboard ring, like the app's other list rows (ListRow).
-    for (let step = 0; step < 12; step += 1) {
+    for (let step = 0; step < 30; step += 1) {
       if (
         await row.evaluate(
           (node) => node === (globalThis as unknown as DomGlobal).document.activeElement,
@@ -483,27 +490,53 @@ test("the panels follow the design system's ground, input, row and copy rules", 
   }
 });
 
-test("Open DayBoard from the menu-bar panel shows the main window", async () => {
+test("nothing in the menu-bar panel opens the main window", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    await demo.app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()
-        .find((window) => window.webContents.getURL().includes("main-window.html"))
-        ?.hide();
+    await hideMainWindow(demo.app);
+    await expect(panel.getByRole("region", { name: "Today's items" })).toBeVisible();
+    await expect(
+      panel.getByRole("button", { name: /Open DayBoard|Open Main Window|more in DayBoard/ }),
+    ).toHaveCount(0);
+
+    // An event opens where it sits, with its own fields.
+    const today = panel.getByRole("region", { name: "Today's items" });
+    await today.getByRole("button", { name: /^Lunch with Sam/ }).click();
+    const eventEditor = panel.getByRole("group", { name: "Edit “Lunch with Sam”" });
+    await expect(eventEditor.getByRole("textbox", { name: "Title" })).toHaveValue("Lunch with Sam");
+    await expect(eventEditor.getByRole("button", { name: "Move to tomorrow" })).toBeVisible();
+    // Esc closes the editor first and leaves the panel open.
+    await panel.keyboard.press("Escape");
+    await expect(eventEditor).toHaveCount(0);
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+
+    // So does a to-do. Demo mode never writes; the refusal proves Save reached the write.
+    await today.getByRole("button", { name: /^Pick up dry cleaning/ }).click();
+    const editor = panel.getByRole("group", { name: "Edit “Pick up dry cleaning”" });
+    await expect(editor.getByRole("button", { name: "Save" })).toBeDisabled();
+    await editor.getByRole("textbox", { name: "Title" }).fill("Pick up dry cleaning today");
+    await editor.getByRole("button", { name: "Save" }).click();
+    await expect(panel.getByText(/Demo content is read-only/)).toBeVisible();
+    await expect(editor).toBeVisible();
+    await editor.getByRole("button", { name: "Tomorrow", exact: true }).click();
+    await expect(panel.getByText(/Demo content is read-only/).first()).toBeVisible();
+
+    // The old ⌘O shortcut is gone, and the panel has no channel left that shows the main window.
+    await panel.keyboard.press("Meta+o");
+    const refused = await panel.evaluate(() => {
+      const { dayboard } = globalThis as unknown as {
+        dayboard: { ipc: { invoke(channel: string, ...args: unknown[]): Promise<unknown> } };
+      };
+      return dayboard.ipc.invoke("panel:openMain", { route: "/" }).then(
+        () => "allowed",
+        (error: Error) => error.message,
+      );
     });
-    await panel.getByRole("button", { name: "Open DayBoard" }).click();
-    await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(false);
-    await expect
-      .poll(() =>
-        demo.app.evaluate(({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows().some(
-            (window) =>
-              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
-          ),
-        ),
-      )
-      .toBe(true);
+    expect(refused).not.toBe("allowed");
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    expect(await mainWindowVisible(demo.app)).toBe(false);
+    expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
   }
@@ -670,7 +703,7 @@ for (const surface of ["capture", "menubar"] as const) {
           ? await openQuickCapture(demo.app)
           : await openMenuBarAgenda(demo.app);
       const input = panel.getByRole("textbox", {
-        name: surface === "capture" ? "Quick Capture" : "Add or ask",
+        name: surface === "capture" ? "Quick Capture" : "Add, ask or search",
       });
       await input.fill("Private account A submission");
       await input.press("Enter");
@@ -868,31 +901,35 @@ test("a notes-changed notification refreshes Agenda and Menubar together", async
   }
 });
 
-test("menu bar switches date groups without losing capture or footer navigation", async () => {
+test("the menu bar switches views and days without losing what is typed", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
-    const input = panel.getByRole("textbox", { name: "Add or ask" });
-    // Read the active color only once the tab's color transition (e.g. into Dark mode) settles.
-    const activeTab = await navigation
-      .getByRole("button", { name: "Today", exact: true })
-      .evaluate(async (node) => {
-        const element = node as { getAnimations(): { finished: Promise<unknown> }[] };
-        await Promise.all(element.getAnimations().map((animation) => animation.finished));
-        return (globalThis as unknown as DomGlobal).getComputedStyle(node).color;
-      });
+    const view = (name: string) => panel.getByRole("radio", { name, exact: true });
+    const input = panel.getByRole("textbox", { name: "Add, ask or search" });
     await input.fill("Unsent idea");
-    await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
-    await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
-    await expect(panel.getByRole("region", { name: "Upcoming items", exact: true })).toBeVisible();
+    await view("Lists").click();
+    await expect(panel.getByRole("heading", { name: "Lists", exact: true })).toBeVisible();
+    await expect(view("Lists")).toBeChecked();
+    await view("Month").click();
+    await expect(panel.getByRole("region", { name: "Month", exact: true })).toBeVisible();
     await expect(input).toHaveValue("Unsent idea");
-    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await navigation.getByRole("button", { name: "Today", exact: true }).click();
+    await view("Day").click();
     await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toBeVisible();
+
+    // The week strip moves the line to another day; overdue work stays with today.
+    const strip = panel.getByRole("group", { name: "Next seven days" });
+    await expect(strip.getByRole("button")).toHaveCount(7);
+    await expect(strip.getByRole("button").first()).toHaveAttribute("aria-pressed", "true");
+    await strip.getByRole("button").nth(2).click();
+    await expect(strip.getByRole("button").nth(2)).toHaveAttribute("aria-pressed", "true");
+    await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toHaveCount(0);
+    await expect(panel.getByRole("region", { name: "Overdue items" })).toHaveCount(0);
+    await expect(input).toHaveValue("Unsent idea");
+    await panel.screenshot({ path: "test-results/menubar-day-line-other-day.png" });
+    await strip.getByRole("button").first().click();
+
+    // The command bar stays at the bottom, under the feed, inside the window.
     const layout = await panel.evaluate(() => {
       const { document, innerHeight } = globalThis as unknown as {
         innerHeight: number;
@@ -902,35 +939,126 @@ test("menu bar switches date groups without losing capture or footer navigation"
           ): { getBoundingClientRect(): { bottom: number; top: number } } | null;
         };
       };
-      const nav = document.querySelector("nav")!.getBoundingClientRect();
       const input = document.querySelector("input")!.getBoundingClientRect();
       const feed = document.querySelector('[aria-label="Agenda feed"]')!.getBoundingClientRect();
+      return { height: innerHeight, inputTop: input.top, inputBottom: input.bottom, feed };
+    });
+    expect(layout.inputBottom).toBeLessThanOrEqual(layout.height);
+    expect(layout.feed.bottom).toBeLessThanOrEqual(layout.inputTop);
+    await panel.screenshot({ path: "test-results/menubar-day-line.png" });
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("the menu-bar day scrolls through every item and marks now", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    await atTodayTime(panel, 12, 5);
+    const today = panel.getByRole("region", { name: "Today's items", exact: true });
+    await expect(today.getByRole("listitem", { name: "Now" })).toHaveCount(1);
+    // Every event and to-do of the day is in the list; none is held back for the main window.
+    const rows = await today.getByRole("listitem").count();
+    expect(rows).toBeGreaterThanOrEqual(10);
+    await expect(panel.getByText(/more in DayBoard/)).toHaveCount(0);
+    const feed = panel.getByLabel("Agenda feed");
+    const scroll = await feed.evaluate((node) => {
+      const element = node as unknown as {
+        scrollHeight: number;
+        clientHeight: number;
+        scrollTop: number;
+        scrollTo(x: number, y: number): void;
+      };
+      element.scrollTo(0, element.scrollHeight);
       return {
-        navBottom: nav.bottom,
-        height: innerHeight,
-        inputBottom: input.bottom,
-        feedTop: feed.top,
+        overflows: element.scrollHeight > element.clientHeight,
+        scrolled: element.scrollTop > 0,
       };
     });
-    expect(layout.navBottom).toBeLessThanOrEqual(layout.height);
-    expect(layout.inputBottom).toBeLessThanOrEqual(layout.feedTop);
-    await panel.screenshot({ path: "test-results/menubar-refined-today.png" });
-    await navigation.getByRole("button", { name: "Upcoming", exact: true }).click();
-    await expect(panel.getByRole("heading", { name: "Upcoming", exact: true })).toBeVisible();
-    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveAttribute(
+    expect(scroll).toEqual({ overflows: true, scrolled: true });
+    await expect(today.getByRole("listitem").last()).toBeInViewport();
+    await panel.screenshot({ path: "test-results/menubar-day-line-bottom.png" });
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("Catch up goes through overdue items one at a time inside the panel", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    await hideMainWindow(demo.app);
+    await panel
+      .getByRole("region", { name: "Overdue items" })
+      .getByRole("button", { name: "Catch up" })
+      .click();
+    const catchUp = panel.getByRole("region", { name: "Catch up" });
+    await expect(catchUp.getByRole("status")).toHaveText("1 of 3");
+    await expect(catchUp.getByRole("heading", { level: 3 })).toHaveText(
+      "Follow up with design agency",
+    );
+    await expect(catchUp.getByRole("button", { name: /^(Today|Tomorrow|No date)/ })).toHaveCount(3);
+    await panel.screenshot({ path: "test-results/menubar-catch-up.png" });
+    // S skips; a move in demo mode is refused and the item stays put.
+    await panel.keyboard.press("s");
+    await expect(catchUp.getByRole("status")).toHaveText("2 of 3");
+    await panel.keyboard.press("2");
+    await expect(panel.getByText(/Demo content is read-only/)).toBeVisible();
+    await expect(catchUp.getByRole("status")).toHaveText("2 of 3");
+    await panel.keyboard.press("s");
+    await panel.keyboard.press("s");
+    await expect(catchUp.getByRole("heading", { name: "All Caught Up" })).toBeVisible();
+    // Esc steps back to the day, not out of the panel.
+    await panel.keyboard.press("Escape");
+    await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toBeVisible();
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
+    expect(await mainWindowVisible(demo.app)).toBe(false);
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("the menu-bar month opens a day's line in place and the command bar searches", async () => {
+  const demo = await launchDemo();
+  try {
+    const panel = await openMenuBarAgenda(demo.app);
+    await panel.getByRole("radio", { name: "Month", exact: true }).click();
+    const month = panel.getByRole("region", { name: "Month", exact: true });
+    await expect(month.getByRole("gridcell")).toHaveCount(42);
+    await expect(month.locator('button[aria-current="date"]')).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    // The active tab takes the accent color the Today tab had while it was active.
-    await expect(navigation.getByRole("button", { name: "Upcoming", exact: true })).toHaveCSS(
-      "color",
-      activeTab,
-    );
-    await expect(navigation.getByRole("button", { name: "Today", exact: true })).not.toHaveCSS(
-      "color",
-      activeTab,
-    );
-    await panel.screenshot({ path: "test-results/menubar-refined-upcoming.png" });
+    await expect(month.getByRole("button", { name: /^Team standup/ })).toBeVisible();
+    await month.getByRole("button", { name: /^Team standup/ }).click();
+    await expect(panel.getByRole("group", { name: "Edit “Team standup”" })).toBeVisible();
+    await panel.keyboard.press("Escape");
+    const title = await month.getByRole("heading", { level: 2 }).textContent();
+    await month.getByRole("button", { name: "Next month" }).click();
+    await expect(month.getByRole("heading", { level: 2 })).not.toHaveText(title ?? "");
+    await month.getByRole("button", { name: "Today", exact: true }).click();
+    await expect(month.getByRole("heading", { level: 2 })).toHaveText(title ?? "");
+    await panel.screenshot({ path: "test-results/menubar-month.png" });
+
+    // Typing looks through the week; the matches open in place like any other row.
+    const input = panel.getByRole("textbox", { name: "Add, ask or search" });
+    await input.fill("launch");
+    const matches = panel.getByRole("region", { name: "Matches" });
+    await expect(matches.getByRole("button", { name: /^Launch week/ })).toBeVisible();
+    await expect(
+      matches.getByRole("button", { name: /^Finalize launch announcement/ }),
+    ).toBeVisible();
+    await expect(matches.getByText("Team standup")).toHaveCount(0);
+    await panel.screenshot({ path: "test-results/menubar-search.png" });
+    // Esc clears what is typed before it would close the panel.
+    await input.press("Escape");
+    await expect(input).toHaveValue("");
+    await expect(matches).toHaveCount(0);
+    expect(await panelVisible(demo.app, "#menubar")).toBe(true);
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
@@ -941,8 +1069,8 @@ test("the menu-bar quick add aims at a chosen list and remembers it", async () =
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
-    const input = () => panel.getByRole("textbox", { name: "Add or ask" });
-    await expect(input()).toHaveAttribute("placeholder", "Add or ask…");
+    const input = () => panel.getByRole("textbox", { name: "Add, ask or search" });
+    await expect(input()).toHaveAttribute("placeholder", "Add, ask or search…");
     await panel.getByRole("button", { name: "Add to: Let AI decide" }).click();
     await expect(panel.getByRole("menuitemcheckbox", { name: "Let AI decide" })).toBeChecked();
     await expect(panel.getByText("Google Tasks", { exact: true })).toBeVisible();
@@ -979,6 +1107,14 @@ async function mainWindowFocused(app: ElectronApplication): Promise<boolean> {
   );
 }
 
+async function mainWindowVisible(app: ElectronApplication): Promise<boolean> {
+  return app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().some(
+      (window) => window.webContents.getURL().includes("main-window.html") && window.isVisible(),
+    ),
+  );
+}
+
 async function hideMainWindow(app: ElectronApplication) {
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()
@@ -987,17 +1123,13 @@ async function hideMainWindow(app: ElectronApplication) {
   });
 }
 
-test("the menu-bar task list stays in the panel, grouped by list, and aims the quick add", async () => {
+test("the menu-bar lists stay in the panel, grouped by list, and edit in place", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
     await hideMainWindow(demo.app);
-    const navigation = panel.getByRole("navigation", { name: "Menu bar navigation" });
-    await navigation.getByRole("button", { name: "All tasks", exact: true }).click();
-    await expect(panel.getByRole("heading", { name: "All tasks", exact: true })).toBeVisible();
-    await expect(
-      navigation.getByRole("button", { name: "All tasks", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await panel.getByRole("radio", { name: "Lists", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Lists", exact: true })).toBeVisible();
     const list = panel.getByRole("region", { name: "All tasks", exact: true });
     // Google Tasks lists lead, then Reminders lists; each header counts its open items.
     await expect(list.getByRole("button", { name: /, \d+ open$/ })).toHaveText([
@@ -1010,11 +1142,11 @@ test("the menu-bar task list stays in the panel, grouped by list, and aims the q
     const work = list.getByRole("region", { name: "Work", exact: true });
     await expect(work.getByText("Follow up with design agency")).toBeVisible();
     await expect(work.getByText("Update team wiki")).toBeVisible();
-    await panel.screenshot({ path: "test-results/menubar-all-tasks.png" });
+    await panel.screenshot({ path: "test-results/menubar-lists.png" });
 
-    // A list's + aims the quick add at it and focuses the field, still inside the panel.
+    // A list's + aims the command bar at it and focuses the field, still inside the panel.
     await list.getByRole("button", { name: "Add to Errands" }).click();
-    const input = panel.getByRole("textbox", { name: "Add or ask" });
+    const input = panel.getByRole("textbox", { name: "Add, ask or search" });
     await expect(input).toHaveAttribute("placeholder", "Add to “Errands”…");
     await expect(input).toBeFocused();
 
@@ -1022,10 +1154,7 @@ test("the menu-bar task list stays in the panel, grouped by list, and aims the q
     await list.getByRole("button", { name: /^Personal, \d+ open$/ }).click();
     await expect(list.getByText("Book flights for conference")).toHaveCount(0);
     await panel.reload();
-    await panel
-      .getByRole("navigation", { name: "Menu bar navigation" })
-      .getByRole("button", { name: "All tasks", exact: true })
-      .click();
+    await panel.getByRole("radio", { name: "Lists", exact: true }).click();
     await expect(panel.getByText("Update team wiki")).toBeVisible();
     await expect(panel.getByText("Book flights for conference")).toHaveCount(0);
 
@@ -1033,6 +1162,23 @@ test("the menu-bar task list stays in the panel, grouped by list, and aims the q
     await panel.getByRole("checkbox", { name: "Complete “Update team wiki”" }).click();
     await expect(panel.getByText(/Couldn't update “Update team wiki”/)).toBeVisible();
     await expect(panel.getByText("Update team wiki", { exact: true })).toBeVisible();
+
+    // A row opens in place to edit, move or delete; delete asks once more before it writes.
+    await panel.getByRole("button", { name: "Update team wiki", exact: true }).click();
+    const editor = panel.getByRole("group", { name: "Edit “Update team wiki”" });
+    await expect(editor.getByRole("textbox", { name: "Notes" })).toBeVisible();
+    await expect(editor.getByRole("group", { name: "Move to" }).getByRole("button")).toHaveText([
+      "Today",
+      "Tomorrow",
+      /weekend$/,
+      "Next week",
+    ]);
+    await editor.getByRole("button", { name: "Delete “Update team wiki”" }).click();
+    await expect(editor.getByRole("button", { name: "Keep" })).toBeVisible();
+    await panel.screenshot({ path: "test-results/menubar-edit-in-place.png" });
+    await editor.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(panel.getByText(/Demo content is read-only/)).toBeVisible();
+    await expect(panel.getByText("Update team wiki", { exact: true }).first()).toBeVisible();
 
     expect(await panelVisible(demo.app, "#menubar")).toBe(true);
     expect(await mainWindowFocused(demo.app)).toBe(false);
@@ -1042,7 +1188,7 @@ test("the menu-bar task list stays in the panel, grouped by list, and aims the q
   }
 });
 
-test("the menu-bar gear opens an in-panel menu instead of Settings", async () => {
+test("the menu-bar gear opens settings inside the panel", async () => {
   const demo = await launchDemo();
   try {
     const panel = await openMenuBarAgenda(demo.app);
@@ -1053,63 +1199,50 @@ test("the menu-bar gear opens an in-panel menu instead of Settings", async () =>
           (window) => window.webContents.getURL().includes("settings-window") && window.isVisible(),
         ),
       );
-    await panel.getByRole("button", { name: "DayBoard menu" }).click();
-    const menu = panel.getByRole("menu");
-    await expect(menu.getByRole("menuitem")).toHaveText([
-      /^Sync⌘R$/,
-      /^Settings…⌘,$/,
-      /^Open Main Window⌘O$/,
-      /^Keyboard shortcuts$/,
-      /^Quit DayBoard⌘Q$/,
-    ]);
-    await expect(menu).toHaveCSS("opacity", "1");
+    await panel.getByRole("button", { name: "Panel settings" }).click();
+    const settings = panel.getByRole("region", { name: "Panel settings" });
+    await expect(settings.getByRole("switch")).toHaveCount(5);
+    await expect(settings.getByRole("region", { name: "Keyboard shortcuts" })).toContainText(
+      "Back, then close",
+    );
     expect(await settingsOpen()).toBe(false);
     expect(await panelVisible(demo.app, "#menubar")).toBe(true);
-    await panel.screenshot({ path: "test-results/menubar-gear-menu.png" });
+    await panel.screenshot({ path: "test-results/menubar-panel-settings.png" });
 
-    // Shortcuts replace the items in place, inside the panel, and Back returns to them.
-    await menu.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
-    await expect(menu.getByText("Keyboard shortcuts", { exact: true })).toBeVisible();
-    await expect(menu.getByRole("menuitem").filter({ hasText: "Close panel" })).toHaveText(
-      "Close panelEsc",
-    );
-    await expect(menu.getByRole("menuitem", { name: /^Quick Capture/ })).toBeVisible();
-    const bounds = await menu.boundingBox();
-    const width = await panel.evaluate(
-      () => (globalThis as unknown as { innerWidth: number }).innerWidth,
-    );
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
-    await panel.screenshot({ path: "test-results/menubar-gear-shortcuts.png" });
-    await menu.getByRole("menuitem", { name: "Back" }).click();
-    await expect(menu.getByRole("menuitem", { name: /^Sync/ })).toBeVisible();
-    // A click elsewhere in the panel dismisses the menus and leaves the panel open.
-    await panel.mouse.click(20, 20);
-    await expect(panel.getByRole("menu")).toHaveCount(0);
-
-    // Sync re-reads the sources without leaving the panel.
-    await panel.getByRole("button", { name: "DayBoard menu" }).click();
-    await panel.getByRole("menuitem", { name: /^Sync/ }).click();
-    await expect(panel.getByRole("menu")).toHaveCount(0);
-    await expect(panel.getByRole("region", { name: "Today's items", exact: true })).toBeVisible();
+    // Hiding a source applies to this panel at once and survives a fresh renderer.
+    await settings.getByRole("switch", { name: "Calendar", exact: true }).click();
+    await settings.getByRole("button", { name: "Sync", exact: true }).click();
+    // Esc steps back to the day; the panel stays open.
+    await panel.keyboard.press("Escape");
+    await expect(settings).toHaveCount(0);
+    const today = panel.getByRole("region", { name: "Today's items", exact: true });
+    await expect(today).toBeVisible();
+    await expect(today.getByText("Team standup")).toHaveCount(0);
+    await expect(today.getByText("Pick up dry cleaning")).toBeVisible();
+    await panel.reload();
+    await expect(
+      panel.getByRole("region", { name: "Today's items", exact: true }).getByText("Team standup"),
+    ).toHaveCount(0);
+    await panel.keyboard.press("Meta+,");
+    await panel
+      .getByRole("region", { name: "Panel settings" })
+      .getByRole("switch", { name: "Calendar", exact: true })
+      .click();
+    await panel.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(
+      panel.getByRole("region", { name: "Today's items", exact: true }).getByText("Team standup"),
+    ).toBeVisible();
     expect(await panelVisible(demo.app, "#menubar")).toBe(true);
     expect(await settingsOpen()).toBe(false);
     expect(await mainWindowFocused(demo.app)).toBe(false);
 
-    // Open Main Window is the one item that leaves the panel.
-    await panel.getByRole("button", { name: "DayBoard menu" }).click();
-    await panel.getByRole("menuitem", { name: /^Open Main Window/ }).click();
-    await expect.poll(() => panelVisible(demo.app, "#menubar")).toBe(false);
-    await expect
-      .poll(() =>
-        demo.app.evaluate(({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows().some(
-            (window) =>
-              window.webContents.getURL().includes("main-window.html") && window.isVisible(),
-          ),
-        ),
-      )
-      .toBe(true);
+    // Accounts, AI and the license are the one thing that opens a window, and it says so.
+    await panel.getByRole("button", { name: "Panel settings" }).click();
+    const accounts = panel.getByRole("button", { name: /^Accounts, AI and license/ });
+    await expect(accounts).toContainText("Opens the Settings window");
+    await accounts.click();
+    await expect.poll(settingsOpen).toBe(true);
+    expect(await mainWindowVisible(demo.app)).toBe(false);
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();

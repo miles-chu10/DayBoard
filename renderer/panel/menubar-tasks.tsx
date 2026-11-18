@@ -2,7 +2,6 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import {
   Button,
-  Checkbox,
   CollapsibleChevron,
   CollapsibleContent,
   CollapsibleRoot,
@@ -11,8 +10,8 @@ import {
 } from "@renderer/ui";
 
 import { SourceDot } from "../components/source-dot";
-import { useToggleTodo } from "../lib/queries";
 import { readStored, writeStored } from "../lib/storage";
+import { TodoItem } from "./panel-rows";
 import type { TaskGroup } from "./task-groups";
 
 const COLLAPSED_LISTS_KEY = "menubar:collapsedLists:v1";
@@ -21,7 +20,7 @@ const isKeyList = (value: unknown): value is string[] =>
 
 /**
  * Every open to-do, grouped by list, inside the menu bar. A list folds to its header (the panel
- * remembers which); its + aims the quick add at that list; the circle checks an item off.
+ * remembers which); its + aims the command bar at that list; each row opens in place.
  */
 export function MenuBarTasks({
   groups,
@@ -29,11 +28,10 @@ export function MenuBarTasks({
   onAddTo,
 }: {
   groups: TaskGroup[];
-  /** Whether the quick add can write to this list right now. */
+  /** Whether the command bar can write to this list right now. */
   canAddTo: (key: string) => boolean;
   onAddTo: (key: string) => void;
 }) {
-  const toggle = useToggleTodo();
   const [collapsed, setCollapsed] = useState(
     () => new Set(readStored(COLLAPSED_LISTS_KEY, isKeyList) ?? []),
   );
@@ -82,37 +80,8 @@ export function MenuBarTasks({
             </div>
             <CollapsibleContent>
               <ul className="flex flex-col">
-                {group.rows.map(({ todo, due, overdue }) => (
-                  <li
-                    key={todo.key}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
-                  >
-                    <Checkbox
-                      className="rounded-full"
-                      checked={todo.completed}
-                      onCheckedChange={() => toggle.mutate(todo)}
-                      aria-label={`Complete “${todo.title}”`}
-                    />
-                    <Text
-                      as="span"
-                      variant="regular"
-                      truncate
-                      title={todo.title}
-                      className="min-w-0 flex-1"
-                    >
-                      {todo.title}
-                    </Text>
-                    {due ? (
-                      <Text
-                        as="span"
-                        variant="small"
-                        color={overdue ? "red" : "secondary"}
-                        className="shrink-0 tabular-nums"
-                      >
-                        {due}
-                      </Text>
-                    ) : null}
-                  </li>
+                {group.rows.map(({ todo }) => (
+                  <TodoItem key={todo.key} todo={todo} due plain />
                 ))}
               </ul>
             </CollapsibleContent>

@@ -19,7 +19,7 @@ import {
   toast,
 } from "@renderer/ui";
 import { Pencil } from "lucide-react";
-import type { CalendarEventItem, ReminderItem, SourceResult, TaskItem } from "@main/shared-types";
+import type { CalendarEventItem, ReminderItem, TaskItem } from "@main/shared-types";
 
 import { isRendererDemoMode } from "../lib/demo";
 import {
@@ -35,6 +35,7 @@ import {
 } from "../lib/item-editor-form";
 import { errorMessage, invoke } from "../lib/ipc";
 import { queryKeys } from "../lib/queries";
+import { removeSourceItem, replaceSourceItem, sourceKey } from "../lib/source-cache";
 import type { Todo } from "../lib/todos";
 
 type EditableItem = Todo | CalendarEventItem;
@@ -72,103 +73,6 @@ function initialFields(item: EditableItem): ItemEditorFields {
     end: "",
     location: "",
   };
-}
-
-function sourceKey(kind: ItemKind) {
-  return kind === "task"
-    ? queryKeys.tasks
-    : kind === "reminder"
-      ? queryKeys.reminders
-      : queryKeys.calendar;
-}
-
-function replaceSourceItem(
-  queryClient: ReturnType<typeof useQueryClient>,
-  kind: ItemKind,
-  original: EditableItem,
-  updated: TaskItem | ReminderItem | CalendarEventItem,
-) {
-  if (kind === "task") {
-    const task = updated as TaskItem;
-    queryClient.setQueryData<SourceResult<TaskItem>>(queryKeys.tasks, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.map((item) =>
-              item.id === (original as Todo).task?.id && item.listId === task.listId ? task : item,
-            ),
-          }
-        : previous,
-    );
-  } else if (kind === "reminder") {
-    const reminder = updated as ReminderItem;
-    queryClient.setQueryData<SourceResult<ReminderItem>>(queryKeys.reminders, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.map((item) =>
-              item.ref === (original as Todo).reminder?.ref ? reminder : item,
-            ),
-          }
-        : previous,
-    );
-  } else {
-    const event = updated as CalendarEventItem;
-    queryClient.setQueryData<SourceResult<CalendarEventItem>>(queryKeys.calendar, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.map((item) =>
-              item.id === (original as CalendarEventItem).id && item.calendarId === event.calendarId
-                ? event
-                : item,
-            ),
-          }
-        : previous,
-    );
-  }
-}
-
-function removeSourceItem(
-  queryClient: ReturnType<typeof useQueryClient>,
-  kind: ItemKind,
-  item: EditableItem,
-) {
-  if (kind === "task") {
-    const task = (item as Todo).task!;
-    queryClient.setQueryData<SourceResult<TaskItem>>(queryKeys.tasks, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.filter(
-              (candidate) => candidate.id !== task.id || candidate.listId !== task.listId,
-            ),
-          }
-        : previous,
-    );
-  } else if (kind === "reminder") {
-    const reminder = (item as Todo).reminder!;
-    queryClient.setQueryData<SourceResult<ReminderItem>>(queryKeys.reminders, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.filter((candidate) => candidate.ref !== reminder.ref),
-          }
-        : previous,
-    );
-  } else {
-    const event = item as CalendarEventItem;
-    queryClient.setQueryData<SourceResult<CalendarEventItem>>(queryKeys.calendar, (previous) =>
-      previous?.state === "ok"
-        ? {
-            ...previous,
-            items: previous.items.filter(
-              (candidate) => candidate.id !== event.id || candidate.calendarId !== event.calendarId,
-            ),
-          }
-        : previous,
-    );
-  }
 }
 
 export function ItemEditButton({

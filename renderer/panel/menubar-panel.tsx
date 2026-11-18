@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronDown, ChevronUp, ListTodo, Plus, Settings, Sun } from "lucide-react";
+import { ChevronDown, CornerDownLeft, Plus, RefreshCw, Settings } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import {
@@ -16,7 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
+  SegmentedControl,
+  SegmentedControlItem,
   Text,
+  cn,
 } from "@renderer/ui";
 
 import { formatAccelerator } from "@shared/accelerator";
@@ -26,31 +29,35 @@ import { MeetingCard } from "../components/meeting-card";
 import { SourceDot } from "../components/source-dot";
 import { buildAgenda } from "../lib/agenda";
 import { identifyCalendarEvents } from "../lib/calendar-identity";
-import { dayHeading, longToday, todayISO } from "../lib/dates";
+import { dayHeading, parseISODate, toISODate } from "../lib/dates";
 import { ageLabel, isStale, needsYou } from "../lib/home";
 import { errorMessage, invoke, openSettings } from "../lib/ipc";
 import { useLicenseSnapshot } from "../lib/license";
 import { dueFollowUps, useMailSchedule } from "../lib/mail-schedule";
 import {
+  queryKeys,
   useAccounts,
   useAgendaState,
   useCalendarRange,
   useItemLists,
   useMail,
-  queryKeys,
   useReminders,
   useTasks,
+  useToggleTodo,
 } from "../lib/queries";
 import { featureOn, sourceOn, useSettings } from "../lib/settings";
-import { buildTodos, mergeLinkedTodos } from "../lib/todos";
 import { readStored, writeStored } from "../lib/storage";
+import { buildTodos, mergeLinkedTodos, type Todo } from "../lib/todos";
 import { readTriageMap } from "../lib/triage";
 import { useAgendaClock } from "../lib/use-agenda-clock";
 import { panelAiCapture, type CaptureRecordView } from "./capture-panel-state";
 import { chooseTarget, targetOptions } from "./capture-target";
+import { CatchUp } from "./catch-up";
+import { dayLine, matchGroups, overdueLine, weekStrip, type StripDay } from "./day-line";
 import { afterRejection } from "./menubar-capture";
 import { MenuBarTasks } from "./menubar-tasks";
-import { taskGroups } from "./task-groups";
+import { MonthView } from "./month-view";
+import { PanelAsk, usePanelAsk } from "./panel-ask";
 import {
   hidePanel,
   showPanel,
@@ -58,188 +65,26 @@ import {
   usePanelEscape,
   usePanelShown,
 } from "./panel-ipc";
-import { upcomingItems, todayItems, type TodayItem } from "./today-items";
+import { usePanelPrefs } from "./use-panel-prefs";
+import { DayRows, EventItem, RowsProvider, TodoItem } from "./panel-rows";
+import { PanelSettings } from "./panel-settings";
+import { ALL, usePanelWrites, type PanelWrites } from "./panel-writes";
+import { taskGroups } from "./task-groups";
+import { canEditTodo } from "./todo-edit";
 
-type MenuBarView = "today" | "upcoming" | "tasks";
-const VIEW_TITLE: Record<MenuBarView, string> = {
-  today: "Today",
-  upcoming: "Upcoming",
-  tasks: "All tasks",
-};
+type MenuBarView = "day" | "lists" | "month";
+type MenuBarPage = "settings" | "ask" | "catch-up";
+const VIEWS: { id: MenuBarView; label: string }[] = [
+  { id: "day", label: "Day" },
+  { id: "lists", label: "Lists" },
+  { id: "month", label: "Month" },
+];
 
 const OVERDUE_OPEN_KEY = "menubar:overdueOpen:v1";
-const COLLAPSED_DAYS_KEY = "menubar:collapsedEventDays:v1";
 const DESTINATION_KEY = "menubar:captureDestination:v1";
 const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
-const isDayMap = (value: unknown): value is Record<string, boolean> =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value) &&
-  Object.values(value).every(isBoolean);
-
-function rowClass(extra = "") {
-  return `flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${extra}`;
-}
-
-/** A to-do: its source dot, the title, then its due time or age on the right (red once late). */
-function TodoRow({ item }: { item: TodayItem }) {
-  return (
-    <button type="button" className={rowClass()} onClick={() => void openItem("/agenda", item)}>
-      <SourceDot source={item.source} />
-      <Text as="span" variant="regular" truncate title={item.title} className="min-w-0 flex-1">
-        {item.title}
-      </Text>
-      {item.time ? (
-        <Text
-          as="span"
-          variant="small"
-          color={item.overdue ? "red" : "secondary"}
-          className="shrink-0 tabular-nums"
-        >
-          {item.time}
-        </Text>
-      ) : null}
-    </button>
-  );
-}
-
-function eventTime(item: TodayItem) {
-  if (!item.end || item.end === item.time) return item.time ?? "";
-  return `${item.time}–${item.end}`;
-}
-
-/**
- * A day's events in one card, each with its calendar bar. The chevron folds the card to a
- * one-line count; the panel remembers that per day.
- */
-function EventGroup({
-  events,
-  collapsed,
-  onCollapsedChange,
-}: {
-  events: TodayItem[];
-  collapsed: boolean;
-  onCollapsedChange: (collapsed: boolean) => void;
-}) {
-  if (!events.length) return null;
-  const label = `${events.length} ${events.length === 1 ? "event" : "events"}`;
-  return (
-    <div
-      role="group"
-      aria-label="Events"
-      className="flex items-start gap-1 rounded-lg bg-control-subtle p-1"
-    >
-      <div className="flex min-w-0 flex-1 flex-col">
-        {collapsed ? (
-          <button type="button" className={rowClass()} onClick={() => onCollapsedChange(false)}>
-            <SourceDot source="calendar" className="h-4 w-0.5 rounded-full" />
-            <Text as="span" variant="small" color="secondary">
-              {label}
-            </Text>
-          </button>
-        ) : (
-          events.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={rowClass()}
-              onClick={() => void openItem("/calendar", item)}
-            >
-              <SourceDot
-                source={item.source}
-                className={`h-4 w-0.5 rounded-full ${item.past ? "opacity-50" : ""}`}
-              />
-              <Text
-                as="span"
-                variant="small"
-                color={item.past ? "tertiary" : "secondary"}
-                className="shrink-0 tabular-nums"
-              >
-                {eventTime(item)}
-              </Text>
-              <Text
-                as="span"
-                variant="small"
-                color={item.past ? "tertiary" : undefined}
-                truncate
-                title={item.title}
-                data-past={item.past ? "" : undefined}
-                className="min-w-0 flex-1"
-              >
-                {item.title}
-              </Text>
-            </button>
-          ))
-        )}
-      </div>
-      <Button
-        size="small"
-        variant="transparent"
-        iconOnly
-        aria-expanded={!collapsed}
-        aria-label={collapsed ? `Show ${label}` : `Hide ${label}`}
-        onClick={() => onCollapsedChange(!collapsed)}
-      >
-        {collapsed ? <ChevronDown aria-hidden="true" /> : <ChevronUp aria-hidden="true" />}
-      </Button>
-    </div>
-  );
-}
-
-/** Small-caps section label with its count, as "TODAY 3"; overdue reads red. */
-function SectionLabel({ label, count }: { label: string; count: number }) {
-  return (
-    <>
-      <span className="text-[11px] font-semibold tracking-wide uppercase">{label}</span>
-      <span className="ml-1.5 text-[11px] font-medium tabular-nums opacity-70">{count}</span>
-    </>
-  );
-}
-
-function SectionHeading({ label, count }: { label: string; count: number }) {
-  return (
-    <Text
-      as="h2"
-      variant="small"
-      color="secondary"
-      className="px-2 pb-0.5"
-      aria-label={`${label} · ${count}`}
-    >
-      <SectionLabel label={label} count={count} />
-    </Text>
-  );
-}
-
-/** A day's events (one foldable card) and then its open to-dos. */
-function DayItems({
-  items,
-  collapsed,
-  onCollapsedChange,
-}: {
-  items: TodayItem[];
-  collapsed: boolean;
-  onCollapsedChange: (collapsed: boolean) => void;
-}) {
-  const events = items.filter((item) => item.kind === "event");
-  const todos = items.filter((item) => item.kind === "todo");
-  return (
-    <>
-      <EventGroup events={events} collapsed={collapsed} onCollapsedChange={onCollapsedChange} />
-      {todos.map((item) => (
-        <TodoRow key={item.key} item={item} />
-      ))}
-    </>
-  );
-}
-
-function openMain(route: string, prompt?: string) {
-  return invoke("panel:openMain", prompt ? { route, prompt } : { route });
-}
-
-/** Opens the dashboard on the row's own item and day rather than the top of the view. */
-function openItem(route: string, item: TodayItem) {
-  return invoke("panel:openMain", { route, item: item.key, ...(item.date && { date: item.date }) });
-}
+/** Typing this much starts looking for matches; less is still just a draft. */
+const SEARCH_FROM = 2;
 
 function useRecentCaptures(): CaptureRecordView[] {
   const [records, setRecords] = useState<CaptureRecordView[]>([]);
@@ -271,11 +116,27 @@ function useRecentCaptures(): CaptureRecordView[] {
   return records;
 }
 
-/** HeroSpace's menu-bar feed: the emails and follow-ups waiting on you, newest worries first. */
+function SectionHeading({ label, count }: { label: string; count: number }) {
+  return (
+    <Text
+      as="h2"
+      variant="small-strong"
+      color="secondary"
+      className="px-2 pb-0.5"
+      aria-label={`${label} · ${count}`}
+    >
+      {label}
+      <span className="ml-1.5 font-normal tabular-nums opacity-70">{count}</span>
+    </Text>
+  );
+}
+
+/** The emails and follow-ups waiting on you. A row opens in place to show what it says. */
 function WaitingOnYou({ now }: { now: Date }) {
   const settings = useSettings().data;
   const mail = useMail();
   const schedule = useMailSchedule();
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const waiting = needsYou({
     messages: mail.data?.state === "ok" ? mail.data.items : [],
     triage: featureOn(settings, "triage") ? readTriageMap() : {},
@@ -286,46 +147,229 @@ function WaitingOnYou({ now }: { now: Date }) {
   return (
     <section aria-label="Waiting on you" className="flex flex-col">
       <SectionHeading label="Waiting on you" count={waiting.length} />
-      {waiting.slice(0, 3).map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-          onClick={() => void openMain("/")}
-        >
-          <SourceDot source="mail" />
-          <Text as="span" variant="regular" truncate className="min-w-0 flex-1" title={item.detail}>
-            {item.title} · {item.detail}
-          </Text>
-          <Text
-            as="span"
-            variant="small"
-            color={isStale(item.since, now.getTime()) ? "orange" : "secondary"}
-            className="shrink-0 tabular-nums"
-          >
-            {ageLabel(item.since, now.getTime())}
-          </Text>
-        </button>
-      ))}
+      <ul className="flex flex-col">
+        {waiting.slice(0, 3).map((item) => {
+          const open = openKey === item.key;
+          return (
+            <li key={item.key}>
+              <button
+                type="button"
+                aria-expanded={open}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                onClick={() => setOpenKey(open ? null : item.key)}
+              >
+                <SourceDot source="mail" />
+                <Text
+                  as="span"
+                  variant="regular"
+                  truncate
+                  className="min-w-0 flex-1"
+                  title={item.detail}
+                >
+                  {item.title} · {item.detail}
+                </Text>
+                <Text
+                  as="span"
+                  variant="small"
+                  color={isStale(item.since, now.getTime()) ? "orange" : "secondary"}
+                  className="shrink-0 tabular-nums"
+                >
+                  {ageLabel(item.since, now.getTime())}
+                </Text>
+              </button>
+              {open ? (
+                <div className="mt-1 mb-2 flex flex-col gap-1 rounded-xl bg-well p-2.5">
+                  <Text as="p" variant="small-strong">
+                    {item.detail}
+                  </Text>
+                  <Text as="p" variant="small" color="secondary">
+                    {item.mail.from} · {item.chip}
+                  </Text>
+                  {item.mail.snippet ? (
+                    <Text as="p" variant="small" color="secondary" className="line-clamp-5">
+                      {item.mail.snippet}
+                    </Text>
+                  ) : null}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
+
+/** Seven days across the top: pick one and the line below becomes that day. */
+function WeekStrip({
+  days,
+  selected,
+  onSelect,
+}: {
+  days: StripDay[];
+  selected: string;
+  onSelect: (date: string) => void;
+}) {
+  return (
+    <div role="group" aria-label="Next seven days" className="grid shrink-0 grid-cols-7">
+      {days.map((day) => {
+        const isSelected = day.date === selected;
+        return (
+          <button
+            key={day.date}
+            type="button"
+            aria-label={parseISODate(day.date).toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+            aria-pressed={isSelected}
+            aria-current={day.today ? "date" : undefined}
+            onClick={() => onSelect(day.date)}
+            className="group flex flex-col items-center gap-0.5 rounded-lg py-1 hover:bg-list-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+          >
+            <Text as="span" variant="mini" color={day.today ? "accent" : "tertiary"}>
+              {day.weekday}
+            </Text>
+            <span
+              className={cn(
+                "flex size-7 items-center justify-center rounded-full text-regular tabular-nums",
+                isSelected
+                  ? "bg-accent font-semibold text-accent-contrast"
+                  : day.today && "font-semibold text-accent",
+              )}
+            >
+              {day.day}
+            </span>
+            <span className="flex h-1 gap-0.5" aria-hidden="true">
+              {day.events ? <SourceDot source="calendar" className="size-1" /> : null}
+              {day.todos ? <span className="size-1 rounded-full bg-tertiary" /> : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Everything overdue, behind one row so today stays in view. Open, it is the whole list, each
+ * item movable where it sits; Catch up goes through them one at a time.
+ */
+function OverdueCard({
+  todos,
+  oldest,
+  today,
+  writes,
+  onCatchUp,
+}: {
+  todos: Todo[];
+  oldest: string | null;
+  today: string;
+  writes: PanelWrites;
+  onCatchUp: () => void;
+}) {
+  const [open, setOpenState] = useState(() => readStored(OVERDUE_OPEN_KEY, isBoolean) ?? false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    writeStored(OVERDUE_OPEN_KEY, next);
+  };
+  const [confirming, setConfirming] = useState(false);
+  const movable = todos.filter(canEditTodo);
+  const moving = writes.busy === ALL;
+  return (
+    <section aria-label="Overdue items" className="rounded-xl border border-separator bg-well p-1">
+      <CollapsibleRoot open={open} onOpenChange={setOpen}>
+        <div className="flex items-center gap-1">
+          <CollapsibleTrigger
+            aria-label={`${todos.length} overdue ${todos.length === 1 ? "task" : "tasks"}`}
+            className="min-w-0 flex-1 rounded-lg px-2 py-1 hover:bg-list-hover"
+          >
+            <CollapsibleChevron />
+            <Text as="span" variant="small-strong" color="red">
+              Overdue
+            </Text>
+            <Text as="span" variant="small" color="red" className="tabular-nums">
+              {todos.length}
+            </Text>
+            {oldest ? (
+              <Text as="span" variant="small" color="tertiary" truncate className="min-w-0">
+                · oldest {oldest.toLowerCase()}
+              </Text>
+            ) : null}
+          </CollapsibleTrigger>
+          <Button size="small" variant="accent" onClick={onCatchUp}>
+            Catch up
+          </Button>
+        </div>
+        <CollapsibleContent>
+          <ul className="flex flex-col pt-1">
+            {todos.map((todo) => (
+              <TodoItem key={todo.key} todo={todo} due />
+            ))}
+          </ul>
+          {movable.length > 1 ? (
+            <div className="flex items-center gap-1 px-1 pt-1">
+              {confirming ? (
+                <>
+                  <Text as="span" variant="small" color="secondary" className="flex-1 px-1">
+                    Move {movable.length} to today?
+                  </Text>
+                  <Button
+                    size="small"
+                    variant="accent"
+                    disabled={moving}
+                    onClick={() =>
+                      void writes.moveAll(movable, today, "Today").then(() => setConfirming(false))
+                    }
+                  >
+                    {moving ? "Moving…" : "Move"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="transparent"
+                    disabled={moving}
+                    onClick={() => setConfirming(false)}
+                  >
+                    Keep
+                  </Button>
+                </>
+              ) : (
+                <Button size="small" variant="transparent" onClick={() => setConfirming(true)}>
+                  Move all to today
+                </Button>
+              )}
+            </div>
+          ) : null}
+        </CollapsibleContent>
+      </CollapsibleRoot>
+    </section>
+  );
+}
+
+const MATCH_LABEL: Record<string, string> = { overdue: "Overdue", undated: "No date" };
 
 export function MenuBarPanel() {
   const container = useFitPanelHeight<HTMLDivElement>("menubar");
   const settings = useSettings().data;
   const now = useAgendaClock();
-  const today = todayISO();
+  const today = toISODate(now);
   const calendar = useCalendarRange(today, 7);
-  const [view, setView] = useState<MenuBarView>("today");
+  const [view, setView] = useState<MenuBarView>("day");
+  const [page, setPage] = useState<MenuBarPage | null>(null);
+  const [picked, setPicked] = useState(today);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [prefs, setPrefs] = usePanelPrefs();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [shortcutsShown, setShortcutsShown] = useState(false);
   const tasks = useTasks();
   const reminders = useReminders();
+  const mail = useMail();
   const planning = useAgendaState();
   const records = useRecentCaptures();
   const accounts = useAccounts().data;
+  const toggle = useToggleTodo();
+  const writes = usePanelWrites();
   const [savedDestination, setSavedDestination] = useState(() =>
     readStored(DESTINATION_KEY, (value): value is string => typeof value === "string"),
   );
@@ -338,27 +382,25 @@ export function MenuBarPanel() {
     latestText.current = text;
   }, [text]);
   const [error, setError] = useState<string | null>(null);
-  // Overdue starts collapsed so today stays in view; the panel remembers if you expand it.
-  const [overdueOpen, setOverdueOpenState] = useState(
-    () => readStored(OVERDUE_OPEN_KEY, isBoolean) ?? false,
-  );
-  const setOverdueOpen = (next: boolean) => {
-    setOverdueOpenState(next);
-    writeStored(OVERDUE_OPEN_KEY, next);
+
+  const on = {
+    tasks: sourceOn(settings, "tasks") && prefs.tasks,
+    reminders: sourceOn(settings, "reminders") && prefs.reminders,
+    calendar: sourceOn(settings, "calendar") && prefs.calendar,
   };
-  // Folded event cards, by date; past dates drop out the next time one changes.
-  const [collapsedDays, setCollapsedDays] = useState(
-    () => readStored(COLLAPSED_DAYS_KEY, isDayMap) ?? {},
+  const todos = mergeLinkedTodos(
+    buildTodos(tasks.data, reminders.data),
+    planning.data?.duplicateLinks,
+    on,
   );
-  const setDayCollapsed = (date: string, next: boolean) => {
-    const updated = Object.fromEntries(
-      Object.entries({ ...collapsedDays, [date]: next }).filter(
-        ([day, folded]) => folded && day >= today,
-      ),
-    );
-    setCollapsedDays(updated);
-    writeStored(COLLAPSED_DAYS_KEY, updated);
-  };
+  const ask = usePanelAsk(() => ({
+    todos,
+    todosAvailable: tasks.data?.state === "ok" || reminders.data?.state === "ok",
+    calendar: calendar.data,
+    mail: mail.data,
+    triage: featureOn(settings, "triage") ? readTriageMap() : {},
+    userEmail: accounts?.google.email ?? null,
+  }));
 
   useEffect(
     () =>
@@ -367,6 +409,8 @@ export function MenuBarPanel() {
         latestText.current = "";
         setText("");
         setError(null);
+        setOpenKey(null);
+        setPage(null);
       }),
     [],
   );
@@ -375,18 +419,19 @@ export function MenuBarPanel() {
     setError(null);
     void refetchLicense();
   });
-  usePanelEscape("menubar");
-
-  const on = {
-    tasks: sourceOn(settings, "tasks"),
-    reminders: sourceOn(settings, "reminders"),
-    calendar: sourceOn(settings, "calendar"),
+  const closePage = () => {
+    if (page === "ask") ask.reset();
+    setPage(null);
   };
-  const todos = mergeLinkedTodos(
-    buildTodos(tasks.data, reminders.data),
-    planning.data?.duplicateLinks,
-    on,
-  );
+  // Esc steps back one layer at a time; with nothing open it closes the panel.
+  usePanelEscape("menubar", () => {
+    if (openKey) setOpenKey(null);
+    else if (page) closePage();
+    else if (text) setText("");
+    else return false;
+    return true;
+  });
+
   const scheduleLoading =
     (on.calendar && calendar.isPending) ||
     (on.tasks && tasks.isPending) ||
@@ -397,11 +442,35 @@ export function MenuBarPanel() {
     (on.reminders && reminders.isError);
   const events = identifyCalendarEvents(calendar.data?.state === "ok" ? calendar.data.items : []);
   const agenda = buildAgenda({ events, todos, startDate: today, days: 7, now, sources: on });
-  const { overdueCount, overdue, items, hiddenCount } = todayItems(agenda, now);
-  const upcoming = upcomingItems(agenda, now);
+  const strip = weekStrip(agenda, now);
+  // A day picked before midnight may have left the strip since.
+  const selected = agenda.days.some((day) => day.date === picked) ? picked : today;
+  const line = dayLine(
+    agenda.days.find((day) => day.date === selected),
+    now,
+    prefs.completed ? todos : [],
+  );
+  const overdue = overdueLine(agenda, now);
+  const query = text.trim();
+  const matches =
+    !page && query.length >= SEARCH_FROM
+      ? matchGroups(
+          buildAgenda({
+            events,
+            todos,
+            startDate: today,
+            days: 7,
+            now,
+            search: query,
+            sources: on,
+          }),
+          now,
+        )
+      : [];
+
   // The AI-only box would only fail while the license locks AI; the manual form stays free.
   const ai = panelAiCapture(settings, license?.status);
-  const canAsk = featureOn(settings, "assistant");
+  const canAsk = ai.available && featureOn(settings, "assistant");
   const shown = records.filter((record) => record.state !== "processing").slice(0, 3);
   const kinds =
     settings && accounts
@@ -443,22 +512,36 @@ export function MenuBarPanel() {
   const quickCaptureKeys = settings?.system.quickCapture.enabled
     ? formatAccelerator(settings.system.quickCapture.hotkey)
     : null;
+  const show = (next: MenuBarView) => {
+    setView(next);
+    setPage(null);
+    setOpenKey(null);
+  };
+
+  function startAsk() {
+    if (!canAsk || !query) return;
+    setText("");
+    setOpenKey(null);
+    setPage("ask");
+    ask.ask(query);
+  }
 
   // The panel holds key focus without activating DayBoard, so the app menu's key equivalents
-  // never reach it; the gear menu's shortcuts are handled here instead.
+  // never reach it; its shortcuts are handled here instead.
   const onShortcut = useEffectEvent((event: KeyboardEvent) => {
     if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     if (event.defaultPrevented || event.isComposing) return;
     const key = event.key.toLowerCase();
+    const views: Record<string, MenuBarView> = { "1": "day", "2": "lists", "3": "month" };
     const action =
       key === "r"
         ? sync
         : key === ","
-          ? () => void openSettings()
-          : key === "o"
-            ? () => void openMain("/")
-            : key === "q"
-              ? quit
+          ? () => setPage(page === "settings" ? null : "settings")
+          : key === "q"
+            ? quit
+            : views[key]
+              ? () => show(views[key])
               : null;
     if (!action) return;
     event.preventDefault();
@@ -469,13 +552,14 @@ export function MenuBarPanel() {
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, []);
+
   const addPlaceholder = !destination
     ? "Connect a list to add here…"
     : destination.target
       ? `Add to “${destination.title}”…`
       : canAsk
-        ? "Add or ask…"
-        : "Add…";
+        ? "Add, ask or search…"
+        : "Add or search…";
 
   function capture() {
     const started = accountRevision.current;
@@ -509,342 +593,318 @@ export function MenuBarPanel() {
     });
   }
 
-  return (
-    <div ref={container} className="flex max-h-[560px] flex-col gap-3 p-3">
-      <div className="flex shrink-0 items-baseline justify-between gap-2">
-        <div>
-          <Text as="h1" variant="large-strong">
-            {VIEW_TITLE[view]}
-          </Text>
-          <Text as="p" variant="small" color="secondary">
-            {view === "tasks"
-              ? `${openCount} open${overdueCount ? ` · ${overdueCount} overdue` : ""}`
-              : `${longToday()}${overdueCount ? ` · ${overdueCount} overdue` : ""}`}
-          </Text>
-        </div>
-        <Button size="small" variant="transparent" onClick={() => void openMain("/")}>
-          Open DayBoard
-        </Button>
-      </div>
+  const dayTitle = parseISODate(selected).toLocaleDateString([], {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const eventCount = line.rows.filter((row) => row.kind === "event").length;
+  const todoCount = line.rows.length - eventCount;
+  const summary =
+    view === "lists"
+      ? `${openCount} open${overdue.todos.length ? ` · ${overdue.todos.length} overdue` : ""}`
+      : [
+          eventCount ? `${eventCount} ${eventCount === 1 ? "event" : "events"}` : null,
+          todoCount ? `${todoCount} to do` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "Nothing scheduled";
 
-      {error ? <Callout color="red">{error}</Callout> : null}
-      <div className="flex shrink-0 gap-2">
-        <div className="flex min-w-0 flex-1 items-center rounded-md bg-control-subtle pl-2 focus-within:outline-2 focus-within:outline-accent">
-          <Plus className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
-          <Input
-            ref={inputRef}
-            aria-label={ai.available ? "Add or ask" : "Quick add"}
-            className="flex-1 border-0 bg-transparent focus-visible:outline-none"
-            placeholder={addPlaceholder}
-            value={text}
-            disabled={!ai.available && !destination}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                capture();
-              }
+  return (
+    <RowsProvider value={{ now, openKey, setOpenKey, writes, toggle: toggle.mutate }}>
+      <div ref={container} className="flex max-h-[620px] flex-col gap-2.5 p-3">
+        <header className="flex shrink-0 items-center gap-1">
+          <SegmentedControl
+            size="small"
+            aria-label="View"
+            value={page ? "" : view}
+            onValueChange={(next: string) => show(next as MenuBarView)}
+          >
+            {VIEWS.map(({ id, label }) => (
+              <SegmentedControlItem key={id} value={id}>
+                {label}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+          <span className="flex-1" />
+          <Button
+            size="small"
+            variant="transparent"
+            iconOnly
+            aria-label="Sync"
+            title="Sync (⌘R)"
+            onClick={sync}
+          >
+            <RefreshCw aria-hidden="true" />
+          </Button>
+          <Button
+            size="small"
+            variant="transparent"
+            iconOnly
+            aria-label="Panel settings"
+            title="Panel settings (⌘,)"
+            aria-pressed={page === "settings"}
+            className={page === "settings" ? "text-accent" : undefined}
+            onClick={() => setPage(page === "settings" ? null : "settings")}
+          >
+            <Settings aria-hidden="true" />
+          </Button>
+        </header>
+
+        {!page && view !== "month" && !matches.length ? (
+          <div className="flex shrink-0 items-baseline justify-between gap-2 px-1">
+            <Text as="h1" variant="large-strong" truncate>
+              {view === "lists" ? "Lists" : dayTitle}
+            </Text>
+            <Text as="p" variant="small" color="secondary" className="shrink-0 tabular-nums">
+              {summary}
+            </Text>
+          </div>
+        ) : null}
+        {!page && view === "day" && !matches.length ? (
+          <WeekStrip
+            days={strip}
+            selected={selected}
+            onSelect={(date) => {
+              setPicked(date);
+              setOpenKey(null);
             }}
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="small"
-                variant="transparent"
-                iconOnly
-                aria-label={`Add to: ${destination?.title ?? "choose a list"}`}
-                title="Choose where to add"
-              >
-                <ChevronDown aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-              {destinations.map((option, index) => (
-                <Fragment key={option.key}>
-                  {option.group && option.group !== destinations[index - 1]?.group ? (
-                    <>
-                      {index ? <DropdownMenuSeparator /> : null}
-                      <DropdownMenuLabel>{option.group}</DropdownMenuLabel>
-                    </>
-                  ) : null}
-                  <DropdownMenuCheckboxItem
-                    checked={option.key === destination?.key}
-                    onCheckedChange={() => chooseDestination(option.key)}
-                  >
-                    {option.title}
-                  </DropdownMenuCheckboxItem>
-                </Fragment>
-              ))}
-              {destinations.length ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuItem
-                onSelect={() => {
-                  void hidePanel("menubar");
-                  void showPanel("capture");
-                }}
-              >
-                Add with details…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {ai.available && canAsk ? (
-          <Button disabled={!text.trim()} onClick={() => void openMain("/assistant", text.trim())}>
-            Ask
-          </Button>
         ) : null}
-        {ai.lock ? (
-          <Button variant="transparent" onClick={() => void openSettings("license")}>
-            Unlock AI
-          </Button>
-        ) : null}
-      </div>
 
-      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-label="Agenda feed">
-        {scheduleLoading ? (
-          <Text as="p" variant="small" color="secondary" role="status">
-            Loading schedule…
-          </Text>
-        ) : null}
-        {schedulePartial ? (
-          <Text as="p" variant="small" color="secondary" role="status">
-            Some sources are unavailable. Open DayBoard to check connections.
-          </Text>
-        ) : null}
-        {view === "tasks" ? (
-          groups.length ? (
-            <MenuBarTasks
-              groups={groups}
-              canAddTo={(key) => destinations.some((option) => option.key === key)}
-              onAddTo={(key) => {
-                chooseDestination(key);
-                inputRef.current?.focus();
-              }}
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
+          aria-label="Agenda feed"
+        >
+          {page === "settings" ? (
+            <PanelSettings
+              settings={settings}
+              prefs={prefs}
+              onPrefs={setPrefs}
+              destinations={destinations}
+              destination={destination}
+              onDestination={chooseDestination}
+              quickCaptureKeys={quickCaptureKeys}
+              onSync={sync}
+              onQuit={quit}
+              onClose={closePage}
+            />
+          ) : page === "ask" ? (
+            <PanelAsk state={ask} onClose={closePage} />
+          ) : page === "catch-up" ? (
+            <CatchUp
+              todos={overdue.todos}
+              now={now}
+              writes={writes}
+              toggle={toggle.mutate}
+              onExit={closePage}
             />
           ) : (
-            <Text as="p" variant="small" color="secondary" className="px-2">
-              {scheduleLoading ? "" : "No open tasks in available lists."}
-            </Text>
-          )
-        ) : view === "today" ? (
-          <>
-            <MeetingCard surface="menubar" />
-
-            {sourceOn(settings, "mail") ? <WaitingOnYou now={now} /> : null}
-
-            <section aria-label="Today's items" className="flex flex-col gap-1">
-              <SectionHeading label="Today" count={items.length + hiddenCount} />
-              {items.length ? (
-                <DayItems
-                  items={items}
-                  collapsed={collapsedDays[today] ?? false}
-                  onCollapsedChange={(next) => setDayCollapsed(today, next)}
+            <>
+              {scheduleLoading ? (
+                <Text as="p" variant="small" color="secondary" role="status" className="px-2">
+                  Loading schedule…
+                </Text>
+              ) : null}
+              {schedulePartial ? (
+                <Text as="p" variant="small" color="secondary" role="status" className="px-2">
+                  Some sources are unavailable. Check accounts from Panel settings.
+                </Text>
+              ) : null}
+              {matches.length ? (
+                <section aria-label="Matches" className="flex flex-col gap-2">
+                  {matches.map((group) => (
+                    <section key={group.id} className="flex flex-col">
+                      <SectionHeading
+                        label={MATCH_LABEL[group.id] ?? dayHeading(group.id)}
+                        count={group.rows.length}
+                      />
+                      <ul className="flex flex-col">
+                        {group.rows.map((row) =>
+                          row.kind === "event" ? (
+                            <EventItem key={row.key} row={row} />
+                          ) : (
+                            <TodoItem key={row.key} todo={row.todo} due />
+                          ),
+                        )}
+                      </ul>
+                    </section>
+                  ))}
+                </section>
+              ) : view === "lists" ? (
+                groups.length ? (
+                  <MenuBarTasks
+                    groups={groups}
+                    canAddTo={(key) => destinations.some((option) => option.key === key)}
+                    onAddTo={(key) => {
+                      chooseDestination(key);
+                      inputRef.current?.focus();
+                    }}
+                  />
+                ) : (
+                  <Text as="p" variant="small" color="secondary" className="px-2">
+                    {scheduleLoading ? "" : "No open tasks in available lists."}
+                  </Text>
+                )
+              ) : view === "month" ? (
+                <MonthView
+                  todos={todos}
+                  sources={on}
+                  now={now}
+                  completed={prefs.completed ? todos : []}
                 />
               ) : (
-                <Text as="p" variant="small" color="secondary" className="px-2">
-                  {scheduleLoading ? "" : "Nothing else today in available sources."}
-                </Text>
-              )}
-              {hiddenCount ? (
-                <Button
-                  size="small"
-                  variant="transparent"
-                  className="self-start"
-                  onClick={() => void openMain("/agenda")}
-                >
-                  {hiddenCount} more in DayBoard
-                </Button>
-              ) : null}
-            </section>
-
-            {overdueCount ? (
-              <section aria-label="Overdue items" className="flex flex-col gap-1">
-                <CollapsibleRoot open={overdueOpen} onOpenChange={setOverdueOpen}>
-                  <CollapsibleTrigger
-                    aria-label={`${overdueCount} overdue ${overdueCount === 1 ? "task" : "tasks"}`}
-                    className="w-full rounded-md px-2 py-0.5 text-support-red hover:bg-list-hover"
+                <>
+                  {selected === today ? (
+                    <>
+                      {on.calendar ? <MeetingCard surface="menubar" /> : null}
+                      {sourceOn(settings, "mail") && prefs.mail ? <WaitingOnYou now={now} /> : null}
+                      {overdue.todos.length ? (
+                        <OverdueCard
+                          todos={overdue.todos}
+                          oldest={overdue.oldest}
+                          today={today}
+                          writes={writes}
+                          onCatchUp={() => {
+                            setOpenKey(null);
+                            setPage("catch-up");
+                          }}
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
+                  <section
+                    aria-label={selected === today ? "Today's items" : dayHeading(selected)}
+                    className="flex flex-col"
                   >
-                    <SectionLabel label="Overdue" count={overdueCount} />
-                    <CollapsibleChevron className="ml-auto" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="flex flex-col pt-1">
-                      {overdue.map((item) => (
-                        <TodoRow key={item.key} item={item} />
-                      ))}
-                      {overdueCount > overdue.length ? (
-                        <Button
-                          size="small"
-                          variant="transparent"
-                          className="self-start"
-                          onClick={() => void openMain("/agenda")}
-                        >
-                          {overdueCount - overdue.length} more in DayBoard
+                    <DayRows
+                      line={line}
+                      empty={
+                        scheduleLoading
+                          ? ""
+                          : selected === today
+                            ? "Nothing else today in available sources."
+                            : "Nothing on this day in available sources."
+                      }
+                    />
+                  </section>
+                </>
+              )}
+
+              {shown.length ? (
+                <section aria-label="Recent captures" className="flex flex-col gap-1 px-2">
+                  <Text as="h2" variant="small-strong" color="secondary">
+                    Recently added
+                  </Text>
+                  {shown.map((record) => (
+                    <div key={record.id} className="flex items-center gap-2">
+                      <Text as="span" variant="small" truncate className="flex-1">
+                        {record.state === "undone" ? `Undone: ${record.text}` : record.text}
+                        {record.error ? ` · ${record.error}` : ""}
+                      </Text>
+                      {record.canUndo ? (
+                        <Button size="small" variant="transparent" onClick={() => undo(record.id)}>
+                          Undo
                         </Button>
                       ) : null}
                     </div>
-                  </CollapsibleContent>
-                </CollapsibleRoot>
-              </section>
-            ) : null}
-          </>
-        ) : (
-          <section aria-label="Upcoming items" className="flex flex-col gap-4">
-            {upcoming.length ? (
-              upcoming.map((day) => (
-                <section
-                  key={day.date}
-                  aria-label={dayHeading(day.date)}
-                  className="flex flex-col gap-1"
-                >
-                  <SectionHeading
-                    label={dayHeading(day.date)}
-                    count={day.items.length + day.hiddenCount}
-                  />
-                  <DayItems
-                    items={day.items}
-                    collapsed={collapsedDays[day.date] ?? false}
-                    onCollapsedChange={(next) => setDayCollapsed(day.date, next)}
-                  />
-                  {day.hiddenCount ? (
-                    <Button
-                      size="small"
-                      variant="transparent"
-                      className="self-start"
-                      onClick={() => void openMain("/agenda")}
-                    >
-                      {day.hiddenCount} more in DayBoard
-                    </Button>
-                  ) : null}
+                  ))}
                 </section>
-              ))
-            ) : (
-              <Text as="p" variant="small" color="secondary" className="px-2">
-                {scheduleLoading
-                  ? ""
-                  : "No scheduled items in the next six days in available sources."}
-              </Text>
-            )}
-          </section>
-        )}
+              ) : null}
+            </>
+          )}
+        </div>
 
-        {shown.length ? (
-          <section aria-label="Recent captures" className="flex flex-col gap-1">
-            <Text as="h2" variant="small" color="secondary">
-              Recently added
-            </Text>
-            {shown.map((record) => (
-              <div key={record.id} className="flex items-center gap-2">
-                <Text as="span" variant="small" truncate className="flex-1">
-                  {record.state === "undone" ? `Undone: ${record.text}` : record.text}
-                  {record.error ? ` — ${record.error}` : ""}
-                </Text>
-                {record.canUndo ? (
-                  <Button size="small" variant="transparent" onClick={() => undo(record.id)}>
-                    Undo
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-          </section>
-        ) : null}
-      </div>
-      <nav
-        aria-label="Menu bar navigation"
-        className="-mx-3 -mb-3 grid shrink-0 grid-cols-4 border-t border-separator px-3 py-1"
-      >
-        {(
-          [
-            { id: "today", label: "Today", Icon: Sun },
-            { id: "upcoming", label: "Upcoming", Icon: CalendarDays },
-            { id: "tasks", label: "All tasks", Icon: ListTodo },
-          ] as const
-        ).map(({ id, label, Icon }) => (
-          <Button
-            key={id}
-            variant="transparent"
-            iconOnly
-            className={`justify-self-center ${view === id ? "text-accent" : "text-secondary"}`}
-            aria-label={label}
-            title={label}
-            aria-pressed={view === id}
-            onClick={() => setView(id)}
-          >
-            <Icon aria-hidden="true" />
-          </Button>
-        ))}
-        <DropdownMenu onOpenChange={(open) => open && setShortcutsShown(false)}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="transparent"
-              iconOnly
-              className="justify-self-center text-secondary data-[state=open]:text-accent"
-              aria-label="DayBoard menu"
-              title="DayBoard menu"
-            >
-              <Settings aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          {/* Shortcuts replace the menu's items in place: a side submenu would leave the panel. */}
-          <DropdownMenuContent side="top" align="end" className="min-w-52">
-            {shortcutsShown ? (
-              <>
-                <DropdownMenuLabel>Keyboard shortcuts</DropdownMenuLabel>
-                {[
-                  ...(quickCaptureKeys ? [["Quick Capture", quickCaptureKeys]] : []),
-                  ["Add", "↩"],
-                  ["Close panel", "Esc"],
-                  ["Sync", "⌘R"],
-                  ["Settings", "⌘,"],
-                  ["Open Main Window", "⌘O"],
-                  ["Quit DayBoard", "⌘Q"],
-                ].map(([label, keys]) => (
-                  <DropdownMenuItem
-                    key={label}
-                    accelerator={keys}
-                    onSelect={(event) => event.preventDefault()}
+        {error ? <Callout color="red">{error}</Callout> : null}
+        <div className="flex shrink-0 flex-col gap-1">
+          <div className="flex gap-2">
+            <div className="flex min-w-0 flex-1 items-center rounded-xl bg-control-subtle pl-2.5 focus-within:outline-2 focus-within:outline-accent">
+              <Plus className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
+              <Input
+                ref={inputRef}
+                aria-label={canAsk ? "Add, ask or search" : "Add or search"}
+                className="flex-1 border-0 bg-transparent focus-visible:outline-none"
+                placeholder={addPlaceholder}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+                  event.preventDefault();
+                  if (event.metaKey) startAsk();
+                  else capture();
+                }}
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="small"
+                    variant="transparent"
+                    iconOnly
+                    aria-label={`Add to: ${destination?.title ?? "choose a list"}`}
+                    title="Choose where to add"
                   >
-                    {label}
+                    <ChevronDown aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" className="max-h-80 overflow-y-auto">
+                  {destinations.map((option, index) => (
+                    <Fragment key={option.key}>
+                      {option.group && option.group !== destinations[index - 1]?.group ? (
+                        <>
+                          {index ? <DropdownMenuSeparator /> : null}
+                          <DropdownMenuLabel>{option.group}</DropdownMenuLabel>
+                        </>
+                      ) : null}
+                      <DropdownMenuCheckboxItem
+                        checked={option.key === destination?.key}
+                        onCheckedChange={() => chooseDestination(option.key)}
+                      >
+                        {option.title}
+                      </DropdownMenuCheckboxItem>
+                    </Fragment>
+                  ))}
+                  {destinations.length ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      void hidePanel("menubar");
+                      void showPanel("capture");
+                    }}
+                  >
+                    Add with details…
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    setShortcutsShown(false);
-                  }}
-                >
-                  Back
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem accelerator="⌘R" onSelect={sync}>
-                  Sync
-                </DropdownMenuItem>
-                <DropdownMenuItem accelerator="⌘," onSelect={() => void openSettings()}>
-                  Settings…
-                </DropdownMenuItem>
-                <DropdownMenuItem accelerator="⌘O" onSelect={() => void openMain("/")}>
-                  Open Main Window
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    setShortcutsShown(true);
-                  }}
-                >
-                  Keyboard shortcuts
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem accelerator="⌘Q" onSelect={quit}>
-                  Quit DayBoard
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </nav>
-    </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {ai.lock ? (
+              <Button
+                variant="transparent"
+                title="Opens the Settings window"
+                onClick={() => void openSettings("license")}
+              >
+                Unlock AI
+              </Button>
+            ) : null}
+          </div>
+          {query ? (
+            <Text
+              as="p"
+              variant="small"
+              color="tertiary"
+              className="flex items-center gap-1 px-1"
+              role="status"
+            >
+              <CornerDownLeft className="size-3" aria-hidden="true" />
+              {destination
+                ? destination.target
+                  ? `Add to “${destination.title}”`
+                  : "Add"
+                : "Connect a list to add"}
+              {canAsk ? " · ⌘↩ Ask" : ""}
+              {matches.length ? " · matches above" : ""}
+            </Text>
+          ) : null}
+        </div>
+      </div>
+    </RowsProvider>
   );
 }

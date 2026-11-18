@@ -46,15 +46,19 @@ export function usePanelShown(onShown: () => void) {
   }, []);
 }
 
-/** Esc hides the panel wherever focus is, including right after it opens with nothing focused. */
-export function usePanelEscape(surface: PanelSurface) {
+/**
+ * Esc hides the panel wherever focus is, including right after it opens with nothing focused.
+ * `back` runs first and returns true when it used the key to step back inside the panel.
+ */
+export function usePanelEscape(surface: PanelSurface, back?: () => boolean) {
+  const stepBack = useEffectEvent(() => back?.() ?? false);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       // An Escape during IME composition cancels the composition, not the panel.
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (event.isComposing || event.keyCode === 229) return;
       event.preventDefault();
-      void hidePanel(surface);
+      if (!stepBack()) void hidePanel(surface);
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);

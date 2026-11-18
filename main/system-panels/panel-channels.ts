@@ -1,5 +1,6 @@
 // The only app channels the floating panels may invoke or stream (enforced in platform/ipc.ts).
-// Settings writes, account changes, MCP configuration and deletes stay with the main windows.
+// Settings writes, account changes, MCP configuration and event creation or deletion stay with
+// the main windows. Nothing here opens the main window: the menu bar does its work in place.
 
 export const PANEL_CHANNELS: ReadonlySet<string> = new Set([
   // Startup, theme and source reads
@@ -38,11 +39,17 @@ export const PANEL_CHANNELS: ReadonlySet<string> = new Set([
   "tasks:setCompleted",
   "reminders:setCompleted",
   "agenda:setFocus",
+  // Edit in place: retitle, re-date and delete a to-do; retitle and move an event. Each handler
+  // validates its payload and the account scope the edit started under.
+  "tasks:update",
+  "reminders:update",
+  "tasks:delete",
+  "reminders:delete",
+  "calendar:update",
   // Panel control
   "panel:hide",
   "panel:show",
   "panel:resize",
-  "panel:openMain",
   "panel:quit",
   "window:openSettings",
   "app:openExternal",
