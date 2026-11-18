@@ -5,12 +5,7 @@ import { app, globalShortcut, type WebContents } from "electron";
 
 import { ipcMain, logger } from "../platform/index.js";
 import { getSettings, onSettingsChanged } from "../services/settings-store.js";
-import {
-  focusMainWindow,
-  isMainRoute,
-  openSettingsWindow,
-  takePendingNavigation,
-} from "../window.js";
+import { focusMainWindow, openSettingsWindow, takePendingNavigation } from "../window.js";
 import { createHotkeyManager, type HotkeyStatus } from "./hotkey.js";
 import { hidePanel, isPanelSurface, resizePanel, showPanel, togglePanel } from "./panel-window.js";
 import { readSymbolicHotkeys } from "./symbolic-hotkeys.js";
@@ -21,9 +16,6 @@ import { startMeetingNotifications } from "./meeting-notifications.js";
 import { registerBadgeHandler, startMailNotifications } from "./mail-notifications.js";
 
 declare const __DAYBOARD_TEST_BUILD__: boolean;
-
-const MAX_PROMPT = 4_000;
-const MAX_ITEM_KEY = 1_000;
 
 /** Automated test builds never grab a system-wide shortcut or add a menu-bar icon. */
 export function nativeIntegrationsEnabled(): boolean {
@@ -93,30 +85,6 @@ export function startSystemPanels(): void {
     if (typeof input.height !== "number" || !Number.isFinite(input.height))
       throw new Error("panel:resize: height must be a number");
     resizePanel(target, input.height);
-  });
-  ipcMain.handle("panel:openMain", async (_event, value: unknown) => {
-    const input = payload(value ?? {}, "panel:openMain");
-    const route = input.route ?? "/";
-    if (!isMainRoute(route)) throw new Error("panel:openMain: unknown view");
-    if (input.prompt !== undefined && (typeof input.prompt !== "string" || !input.prompt.trim()))
-      throw new Error("panel:openMain: prompt must be text");
-    const prompt = typeof input.prompt === "string" ? input.prompt.slice(0, MAX_PROMPT) : undefined;
-    if (input.item !== undefined && (typeof input.item !== "string" || !input.item))
-      throw new Error("panel:openMain: item must be text");
-    if (
-      input.date !== undefined &&
-      (typeof input.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.date))
-    )
-      throw new Error("panel:openMain: date must be YYYY-MM-DD");
-    const item = typeof input.item === "string" ? input.item.slice(0, MAX_ITEM_KEY) : undefined;
-    hidePanel("capture");
-    hidePanel("menubar");
-    await focusMainWindow({
-      to: route,
-      prompt,
-      ...(item && { item }),
-      ...(typeof input.date === "string" && { date: input.date }),
-    });
   });
   // The menu bar's own Quit, for a panel that holds key focus without activating DayBoard.
   ipcMain.handle("panel:quit", () => {

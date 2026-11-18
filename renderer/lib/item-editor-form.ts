@@ -39,8 +39,16 @@ export function dateTimeInputToIso(value: string): string {
 export function plainCalendarDescription(html: string | null): string {
   if (!html) return "";
   const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li)>/gi, "\n");
-  if (typeof DOMParser !== "undefined") {
-    const text = new DOMParser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
+  // Read from globalThis so this module also type-checks where there is no DOM (unit tests).
+  const Parser = (
+    globalThis as {
+      DOMParser?: new () => {
+        parseFromString(text: string, type: string): { body: { textContent: string | null } };
+      };
+    }
+  ).DOMParser;
+  if (Parser) {
+    const text = new Parser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
     return text.replace(/\n{3,}/g, "\n\n").trim();
   }
   return withBreaks

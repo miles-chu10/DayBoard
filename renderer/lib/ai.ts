@@ -1,6 +1,6 @@
 import type { RequestUsage } from "../../shared/ai-usage";
 import { useEffect, useRef, useState } from "react";
-import type { AIStreamChunk } from "@main/shared-types";
+import type { AIStreamChunk, AssistantModelInfo } from "@main/shared-types";
 
 import { errorMessage } from "./ipc";
 
@@ -26,6 +26,8 @@ interface CliState {
 export function useAITask() {
   const [output, setOutput] = useState("");
   const [usage, setUsage] = useState<RequestUsage | null>(null);
+  // The model the provider reports for this reply; null until (and unless) it says.
+  const [model, setModel] = useState<AssistantModelInfo | null>(null);
   const [cli, setCli] = useState<CliState>({ status: "idle", error: null });
   const streamRef = useRef<string | null>(null);
 
@@ -48,6 +50,7 @@ export function useAITask() {
     stop();
     setOutput("");
     setUsage(null);
+    setModel(null);
     const id = crypto.randomUUID();
     streamRef.current = id;
     setCli({ status: "loading", error: null });
@@ -61,6 +64,7 @@ export function useAITask() {
         },
         (chunk) => {
           if (streamRef.current === id && chunk.type === "usage") setUsage(chunk.usage);
+          if (streamRef.current === id && chunk.type === "meta") setModel(chunk.model);
           if (streamRef.current === id && chunk.type === "delta")
             setOutput((current) => current + chunk.text);
         },
@@ -80,12 +84,14 @@ export function useAITask() {
     stop();
     setOutput("");
     setUsage(null);
+    setModel(null);
     setCli({ status: "idle", error: null });
   }
 
   return {
     output,
     usage,
+    model,
     run,
     stop,
     clear,

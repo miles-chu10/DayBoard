@@ -16,9 +16,10 @@ export function isPanelSurface(value: unknown): value is PanelSurface {
 }
 
 const WIDTH: Record<PanelSurface, number> = { capture: 560, menubar: 360 };
-const INITIAL_HEIGHT: Record<PanelSurface, number> = { capture: 76, menubar: 520 };
+const INITIAL_HEIGHT: Record<PanelSurface, number> = { capture: 76, menubar: 560 };
 export const MIN_PANEL_HEIGHT = 48;
-export const MAX_PANEL_HEIGHT = 560;
+// The menu bar scrolls a whole day, so it may stand taller than the capture panel.
+const MAX_HEIGHT: Record<PanelSurface, number> = { capture: 560, menubar: 620 };
 
 const panels = new Map<PanelSurface, BrowserWindow>();
 const shownAt = new WeakMap<BrowserWindow, number>();
@@ -139,7 +140,7 @@ export async function togglePanel(
 export function resizePanel(surface: PanelSurface, height: number): void {
   const window = panels.get(surface);
   if (!window || window.isDestroyed()) return;
-  const clamped = Math.round(Math.min(Math.max(height, MIN_PANEL_HEIGHT), MAX_PANEL_HEIGHT));
+  const clamped = Math.round(Math.min(Math.max(height, MIN_PANEL_HEIGHT), MAX_HEIGHT[surface]));
   const bounds = window.getBounds();
   if (bounds.height !== clamped) window.setBounds({ ...bounds, height: clamped });
 }
