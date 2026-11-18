@@ -171,6 +171,7 @@ export const demoAccounts: AccountsStatus = {
     clientIdHint: null,
     missingAccess: [],
   },
+  gmail: { connected: true, email: "alex.rivera@example.com", rejected: false },
   reminders: "full-access",
 };
 

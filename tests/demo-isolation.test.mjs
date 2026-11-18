@@ -634,6 +634,7 @@ test("demo MCP endpoints reject before any source service can run", async () => 
           `export const ipcMain = { broadcast() {} }; export const logger = { error() {}, warn() {}, info() {} };`,
         ],
         ["./google-api.js", sourceStub],
+        ["./gmail-imap.js", sourceStub],
         [
           "./google-auth.js",
           `export class GoogleAuthError extends Error {}; export const getGoogleStatus = async () => ({ connected: false, email: null });`,

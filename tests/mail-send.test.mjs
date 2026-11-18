@@ -5,7 +5,7 @@ import test from "node:test";
 import { loadTs } from "./helpers/load-ts.mjs";
 
 const { createOutbox } = await loadTs("main/services/mail-outbox.ts");
-const { buildRawMessage, parseRecipients, replySubject } = await loadTs(
+const { buildMessage, parseRecipients, recipientAddress, replySubject } = await loadTs(
   "main/services/mail-compose.ts",
 );
 
@@ -136,9 +136,11 @@ test("no undo window sends at once and returns the failure", async () => {
   assert.deepEqual(await ticket.sent, { ok: false, error: "Gmail said no" });
 });
 
-function decode(raw) {
-  return Buffer.from(raw, "base64url").toString("utf8");
-}
+const origin = {
+  from: "Me <me@example.com>",
+  date: new Date(Date.UTC(2026, 10, 18, 17, 0, 0)),
+  messageId: "<id-1@dayboard>",
+};
 
 test("recipients accept plain and named addresses and reject the rest", () => {
   assert.deepEqual(parseRecipients("a@x.com, Sam Patel <sam@y.org>; b@z.co", "To"), [
@@ -156,18 +158,22 @@ test("recipients accept plain and named addresses and reject the rest", () => {
 });
 
 test("a reply carries threading headers and can't inject headers through its subject", () => {
-  const message = decode(
-    buildRawMessage({
+  const message = buildMessage(
+    {
       to: ["Sam <sam@y.org>"],
       cc: ["a@x.com"],
       subject: "Lunch\r\nBcc: evil@x.com",
       body: "Sounds good.\nSee you.",
       inReplyTo: "<abc@mail>",
       references: "<root@mail> <abc@mail>",
-    }),
+    },
+    origin,
   );
   const [head, body] = message.split("\r\n\r\n");
   assert.deepEqual(head.split("\r\n"), [
+    "From: Me <me@example.com>",
+    "Date: Wed, 18 Nov 2026 17:00:00 GMT",
+    "Message-ID: <id-1@dayboard>",
     "To: Sam <sam@y.org>",
     "Cc: a@x.com",
     "Subject: Lunch Bcc: evil@x.com",
@@ -175,21 +181,31 @@ test("a reply carries threading headers and can't inject headers through its sub
     "References: <root@mail> <abc@mail>",
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
+    "Content-Transfer-Encoding: base64",
   ]);
-  assert.equal(body, "Sounds good.\r\nSee you.");
+  assert.equal(
+    Buffer.from(body.replace(/\r\n/g, ""), "base64").toString("utf8"),
+    "Sounds good.\r\nSee you.",
+  );
+  assert.ok(body.split("\r\n").every((line) => line.length <= 76));
   assert.equal(replySubject("Lunch"), "Re: Lunch");
   assert.equal(replySubject("RE: Lunch"), "RE: Lunch");
 });
 
 test("a new email needs a recipient and encodes a non-ASCII subject", () => {
-  assert.throws(() => buildRawMessage({ to: [], subject: "x", body: "y" }), /recipient/);
-  const message = decode(buildRawMessage({ to: ["a@x.com"], subject: "Café", body: "Hi" }));
-  assert.match(message, /^To: a@x\.com\r\nSubject: =\?UTF-8\?B\?Q2Fmw6k=\?=\r\n/);
+  assert.throws(() => buildMessage({ to: [], subject: "x", body: "y" }, origin), /recipient/);
+  const message = buildMessage({ to: ["a@x.com"], subject: "Café", body: "Hi" }, origin);
+  assert.match(message, /\r\nTo: a@x\.com\r\nSubject: =\?UTF-8\?B\?Q2Fmw6k=\?=\r\n/);
+});
+
+test("the SMTP envelope uses the bare address of each recipient", () => {
+  assert.equal(recipientAddress('"Sam Patel" <sam@y.org>'), "sam@y.org");
+  assert.equal(recipientAddress("=?UTF-8?B?Wm/DqyA=?= <z@x.com>"), "z@x.com");
+  assert.equal(recipientAddress("a@x.com"), "a@x.com");
 });
 
 // The handler, with Gmail, settings and the platform replaced.
-const sentRaw = [];
+const sent = [];
 const broadcasts = [];
 const handlers = new Map();
 globalThis.__mailFixture = { demo: false, undoSeconds: 0 };
@@ -217,13 +233,12 @@ const stubs = {
       };
       export const isDemoMode = () => globalThis.__mailFixture.demoData !== false;
       export const demoSubscriptionMessages = () => [];`,
-      "../services/google-api.js": `export const getReplyContext = async (id) => ({
+      "../services/gmail-imap.js": `export const getReplyContext = async (id) => ({
         to: "Sam Patel <sam@y.org>", subject: "Lunch today?", messageId: "<m-" + id + "@mail>",
         references: "<m-" + id + "@mail>", threadId: "t-" + id,
       });
-      export const sendRawMessage = async (raw, threadId) => {
-        globalThis.__mailSent.push([raw, threadId]);
-        return { id: "sent", threadId: threadId ?? "new" };
+      export const sendMail = async (message) => {
+        globalThis.__mailSent.push(message);
       };
       export const modifyMessage = async (id, remove, add = []) => {
         if (globalThis.__mailFixture.failModify) throw new Error("Gmail is unreachable");
@@ -247,7 +262,7 @@ const stubs = {
 };
 globalThis.__mailHandlers = handlers;
 globalThis.__mailBroadcasts = broadcasts;
-globalThis.__mailSent = sentRaw;
+globalThis.__mailSent = sent;
 const modified = [];
 globalThis.__mailModified = modified;
 const mail = await loadTs("main/handlers/mail.ts", [stubs]);
@@ -275,7 +290,7 @@ test("mail:send validates before anything is queued", async () => {
     /Cc: “nope”/,
   );
   await assert.rejects(invoke("mail:send", { kind: "reply", body: "hi" }), /"id" is required/);
-  assert.equal(sentRaw.length, 0);
+  assert.equal(sent.length, 0);
 });
 
 test("demo mode refuses to send", async () => {
@@ -293,19 +308,19 @@ test("demo mode refuses to send", async () => {
 test("a reply sends in its thread to the original sender", async () => {
   const ticket = await invoke("mail:send", { kind: "reply", id: "m6", body: "See you at 12:30" });
   assert.equal(ticket.held, false);
-  const [raw, threadId] = sentRaw.at(-1);
-  assert.equal(threadId, "t-m6");
-  const message = decode(raw);
-  assert.match(message, /^To: Sam Patel <sam@y\.org>\r\n/);
-  assert.match(message, /\r\nSubject: Re: Lunch today\?\r\n/);
-  assert.match(message, /\r\nIn-Reply-To: <m-m6@mail>\r\n/);
+  const message = sent.at(-1);
+  assert.deepEqual(message.to, ['"Sam Patel" <sam@y.org>']);
+  assert.equal(message.subject, "Re: Lunch today?");
+  assert.equal(message.inReplyTo, "<m-m6@mail>");
+  assert.equal(message.references, "<m-m6@mail>");
+  assert.equal(message.body, "See you at 12:30");
   assert.ok(broadcasts.some(([channel]) => channel === "data:changed"));
 });
 
 test("with an undo window the email is held and Undo cancels it", async () => {
   globalThis.__mailFixture.undoSeconds = 5;
   try {
-    const before = sentRaw.length;
+    const before = sent.length;
     const ticket = await invoke("mail:send", {
       kind: "new",
       to: "a@x.com",
@@ -317,7 +332,7 @@ test("with an undo window the email is held and Undo cancels it", async () => {
     assert.deepEqual(await invoke("mail:cancelSend", { id: ticket.id }), { cancelled: true });
     assert.deepEqual(await invoke("mail:cancelSend", { id: ticket.id }), { cancelled: false });
     await mail.drainMailOutbox();
-    assert.equal(sentRaw.length, before);
+    assert.equal(sent.length, before);
   } finally {
     globalThis.__mailFixture.undoSeconds = 0;
   }
@@ -326,7 +341,7 @@ test("with an undo window the email is held and Undo cancels it", async () => {
 test("a held email is not sent from a different account than the one that wrote it", async () => {
   globalThis.__mailFixture.undoSeconds = 5;
   try {
-    const before = sentRaw.length;
+    const before = sent.length;
     const ticket = await invoke("mail:send", {
       kind: "new",
       to: "a@x.com",
@@ -338,7 +353,7 @@ test("a held email is not sent from a different account than the one that wrote 
     globalThis.__mailFixture.scope = "google:other";
     // Quitting hears about it too, instead of exiting as if the email had gone.
     await assert.rejects(mail.drainMailOutbox(), /account changed/i);
-    assert.equal(sentRaw.length, before);
+    assert.equal(sent.length, before);
     const result = broadcasts.findLast(
       ([channel, params]) => channel === "mail:sendResult" && params.id === ticket.id,
     );
@@ -351,7 +366,7 @@ test("a held email is not sent from a different account than the one that wrote 
 });
 
 test("a draft is refused when the account changed while it was being written", async () => {
-  const before = sentRaw.length;
+  const before = sent.length;
   await assert.rejects(
     call("mail:send", { kind: "new", to: "a@x.com", subject: "s", body: "b" }),
     /"expectedScope" is required/,
@@ -366,7 +381,7 @@ test("a draft is refused when the account changed while it was being written", a
     }),
     /account changed while you were writing/,
   );
-  assert.equal(sentRaw.length, before);
+  assert.equal(sent.length, before);
 });
 
 const lunch = {
@@ -512,14 +527,13 @@ test("subscriptions unsubscribe by one-click POST, then by email, then in the br
     });
     assert.deepEqual(posts, [["https://one.example/u?id=1", "POST", "List-Unsubscribe=One-Click"]]);
 
-    const before = sentRaw.length;
+    const before = sent.length;
     assert.deepEqual(await invoke("mail:unsubscribe", { email: "list@two.example" }), {
       method: "email",
     });
-    assert.match(
-      decode(sentRaw.slice(before)[0][0]),
-      /^To: leave@two\.example\r\nSubject: stop\r\n/,
-    );
+    const unsubscribe = sent.slice(before)[0];
+    assert.deepEqual(unsubscribe.to, ["leave@two.example"]);
+    assert.equal(unsubscribe.subject, "stop");
 
     assert.deepEqual(await invoke("mail:unsubscribe", { email: "deals@three.example" }), {
       method: "browser",

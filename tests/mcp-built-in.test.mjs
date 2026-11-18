@@ -64,6 +64,7 @@ function mcpPlugin() {
   const stubs = new Map([
     ["dayboard:platform", backendStub],
     ["./google-api.js", googleStub],
+    ["./gmail-imap.js", googleStub],
     ["./google-auth.js", authStub],
     ["./apple-reminders.js", remindersStub],
     ["./settings-store.js", settingsStub],

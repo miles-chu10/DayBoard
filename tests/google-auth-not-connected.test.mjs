@@ -59,8 +59,10 @@ const GMAIL = "https://www.googleapis.com/auth/gmail.modify";
 const CALENDAR = "https://www.googleapis.com/auth/calendar.events";
 
 test("lists the Google sources whose permission was left unticked", () => {
-  assert.deepEqual(auth.missingGoogleAccess(`openid email ${TASKS} ${CALENDAR}`), ["mail"]);
-  assert.deepEqual(auth.missingGoogleAccess("openid email"), ["tasks", "mail", "calendar"]);
+  assert.deepEqual(auth.missingGoogleAccess(`openid email ${TASKS}`), ["calendar"]);
+  assert.deepEqual(auth.missingGoogleAccess("openid email"), ["tasks", "calendar"]);
+  assert.deepEqual(auth.missingGoogleAccess(`${TASKS} ${CALENDAR}`), []);
+  // Gmail is read over IMAP now; a token from before that still carrying the Gmail scope is fine.
   assert.deepEqual(auth.missingGoogleAccess(`${TASKS} ${GMAIL} ${CALENDAR}`), []);
   // Tokens saved before scopes were recorded count as fully granted.
   assert.deepEqual(auth.missingGoogleAccess(undefined), []);
@@ -69,14 +71,14 @@ test("lists the Google sources whose permission was left unticked", () => {
 test("refuses a source the user didn't grant, before refreshing the token", async () => {
   let refreshed = false;
   const oauth = {
-    getTokens: async () => ({ accessToken: "t", scope: `openid ${TASKS} ${CALENDAR}` }),
+    getTokens: async () => ({ accessToken: "t", scope: `openid ${TASKS}` }),
     getAccessToken: async () => {
       refreshed = true;
       return "token";
     },
   };
   await assert.rejects(
-    accessWith(oauth, "mail"),
+    accessWith(oauth, "calendar"),
     (error) => error instanceof auth.GoogleAuthError && error.reason === "not-granted",
   );
   assert.equal(refreshed, false);

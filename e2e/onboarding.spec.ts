@@ -65,6 +65,7 @@ async function standInFreshMac(app: ElectronApplication, page: Page) {
         clientIdHint: null,
         missingAccess: [],
       },
+      gmail: { connected: false, email: null, rejected: false },
       reminders,
     });
     for (const channel of ["accounts:getStatus", "google:connect", "reminders:requestAccess"]) {
@@ -123,7 +124,8 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
       await expect(dialog.getByRole("button", { name: "Allow Access" })).toBeVisible();
       // The example day beside the steps waits for each account.
-      await expect(preview.getByText("Connect Google")).toHaveCount(3);
+      await expect(preview.getByText("Connect Google")).toHaveCount(2);
+      await expect(preview.getByText("Connect Gmail")).toBeVisible();
       await expect(preview.getByText("Allow Reminders")).toBeVisible();
       await expect(preview).not.toContainText("Design review");
       await shot("2-connect");
@@ -131,12 +133,15 @@ for (const theme of ["light", "dark"] as const) {
       await dialog.getByRole("button", { name: "Sign in with Google" }).click();
       // Google sign-in always starts from the data disclosure.
       const disclosure = page.getByTestId("google-disclosure");
-      await expect(disclosure).toContainText("DayBoard never sends or deletes mail");
+      await expect(disclosure).toContainText("Gmail isn’t part of this sign-in.");
       await disclosure.getByRole("button", { name: "Continue with Google" }).click();
       await expect(disclosure).toHaveCount(0);
       await expect(dialog.getByText("you@example.com")).toBeVisible();
       await expect(preview).toContainText("Design review");
       await expect(preview.getByText("Connect Google")).toHaveCount(0);
+      // Gmail is its own step, with an app password, once Google is connected.
+      await expect(dialog.getByText("Gmail", { exact: true })).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Connect Gmail" })).toBeVisible();
       await dialog.getByRole("button", { name: "Allow Access" }).click();
       await expect(dialog.getByText("Allowed", { exact: true })).toBeVisible();
       await expect(preview).toContainText("Pick up dry cleaning");

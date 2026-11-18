@@ -6,17 +6,15 @@ import type {
   GoogleAccess,
   GoogleCalendarInfo,
   ItemListInfo,
-  MailItem,
   SourceCoverage,
   TaskItem,
 } from "../shared-types.js";
 import type { UpdateEventInput, UpdateTaskInput } from "../../shared/item-edits.js";
 import { GoogleAuthError, getGoogleAccessToken } from "./google-auth.js";
 import { agendaEventId } from "./agenda-utils.js";
-import type { SubscriptionMessage } from "./mail-subscriptions.js";
+import { decodeEntities } from "./mail-text.js";
 
 const TASKS = "https://tasks.googleapis.com/tasks/v1";
-const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const CALENDAR = "https://www.googleapis.com/calendar/v3";
 
 const enc = encodeURIComponent;
@@ -47,7 +45,6 @@ function describeGoogleError(body: string): string {
 
 function accessForUrl(url: string): GoogleAccess | undefined {
   if (url.startsWith(TASKS)) return "tasks";
-  if (url.startsWith(GMAIL)) return "mail";
   if (url.startsWith(CALENDAR)) return "calendar";
   return undefined;
 }
@@ -298,263 +295,6 @@ export async function deleteTask(listId: string, taskId: string): Promise<void> 
   await googleFetch(`${TASKS}/lists/${enc(listId)}/tasks/${enc(taskId)}`, {
     method: "DELETE",
   });
-}
-
-// ── Gmail ───────────────────────────────────────────────────────────────
-
-interface GHeader {
-  name: string;
-  value: string;
-}
-
-interface GMessagePart {
-  mimeType?: string;
-  headers?: GHeader[];
-  body?: { data?: string };
-  parts?: GMessagePart[];
-}
-
-interface GMessage {
-  id: string;
-  threadId: string;
-  snippet?: string;
-  labelIds?: string[];
-  internalDate?: string;
-  payload?: GMessagePart;
-}
-
-function header(message: GMessage, name: string): string {
-  const lower = name.toLowerCase();
-  return message.payload?.headers?.find((h) => h.name.toLowerCase() === lower)?.value ?? "";
-}
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&");
-}
-
-function parseAddress(value: string): { name: string; email: string } {
-  const match = value.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
-  if (match) return { name: match[1].trim() || match[2], email: match[2].trim() };
-  return { name: value.trim(), email: value.trim() };
-}
-
-async function listMessages(query: string, max: number): Promise<MailItem[]> {
-  const list = await googleFetch<{ messages?: { id: string }[] }>(
-    `${GMAIL}/messages?maxResults=${max}&q=${enc(query)}`,
-  );
-  const messages = await mapWithConcurrency(list.messages ?? [], 5, (m) =>
-    googleFetch<GMessage>(
-      `${GMAIL}/messages/${enc(m.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
-    ),
-  );
-  return messages.map((message) => {
-    const from = parseAddress(header(message, "From"));
-    return {
-      id: message.id,
-      threadId: message.threadId,
-      from: from.name,
-      fromEmail: from.email,
-      subject: header(message, "Subject") || "(no subject)",
-      snippet: decodeEntities(message.snippet ?? ""),
-      date: new Date(Number(message.internalDate ?? Date.now())).toISOString(),
-      unread: message.labelIds?.includes("UNREAD") ?? false,
-    };
-  });
-}
-
-export function listInbox(max: number): Promise<MailItem[]> {
-  return listMessages("in:inbox", max);
-}
-
-/** Recent mail involving any of the given people, or mentioning the keywords when there are none. */
-export function searchRelatedMail(emails: string[], keywords: string): Promise<MailItem[]> {
-  const people = emails
-    .map((email) => email.replace(/["()\s]/g, ""))
-    .filter((email) => email.includes("@"));
-  const terms = keywords.replace(/["()]/g, " ").trim();
-  const query = people.length
-    ? `(${people.map((email) => `from:${email} OR to:${email}`).join(" OR ")}) newer_than:60d`
-    : terms
-      ? `"${terms}" newer_than:60d`
-      : "";
-  return query ? listMessages(query, 8) : Promise.resolve([]);
-}
-
-function findPart(part: GMessagePart | undefined, mimeType: string): GMessagePart | null {
-  if (!part) return null;
-  if (part.mimeType === mimeType && part.body?.data) return part;
-  for (const child of part.parts ?? []) {
-    const found = findPart(child, mimeType);
-    if (found) return found;
-  }
-  return null;
-}
-
-export async function getMessageBody(id: string): Promise<string> {
-  const message = await googleFetch<GMessage>(`${GMAIL}/messages/${enc(id)}?format=full`);
-  const plain = findPart(message.payload, "text/plain");
-  let text: string;
-  if (plain?.body?.data) {
-    text = Buffer.from(plain.body.data, "base64url").toString("utf8");
-  } else {
-    const html = findPart(message.payload, "text/html");
-    text = html?.body?.data
-      ? decodeEntities(
-          Buffer.from(html.body.data, "base64url")
-            .toString("utf8")
-            .replace(/<(style|script)[\s\S]*?<\/\1>/gi, "")
-            .replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n")
-            .replace(/<[^>]+>/g, ""),
-        )
-      : decodeEntities(message.snippet ?? "");
-  }
-  return text
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, 6000);
-}
-
-function encodeHeaderValue(value: string): string {
-  const clean = value.replace(/[\r\n]+/g, " ");
-  return /^[\x20-\x7e]*$/.test(clean)
-    ? clean
-    : `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
-}
-
-export async function createReplyDraft(id: string, body: string): Promise<{ draftId: string }> {
-  const original = await googleFetch<GMessage>(
-    `${GMAIL}/messages/${enc(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`,
-  );
-  const to = (header(original, "Reply-To") || header(original, "From")).replace(/[\r\n]+/g, " ");
-  const subject = header(original, "Subject");
-  const replySubject = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
-  const messageId = header(original, "Message-ID").replace(/[\r\n]+/g, "");
-  const references = [header(original, "References").replace(/[\r\n]+/g, " "), messageId]
-    .filter(Boolean)
-    .join(" ");
-
-  const lines = [
-    `To: ${to}`,
-    `Subject: ${encodeHeaderValue(replySubject)}`,
-    ...(messageId ? [`In-Reply-To: ${messageId}`, `References: ${references}`] : []),
-    "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    body,
-  ];
-  const raw = Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
-  const draft = await googleFetch<{ id: string }>(`${GMAIL}/drafts`, {
-    method: "POST",
-    body: { message: { raw, threadId: original.threadId } },
-  });
-  return { draftId: draft.id };
-}
-
-export async function modifyMessage(
-  id: string,
-  removeLabelIds: string[],
-  addLabelIds: string[] = [],
-): Promise<void> {
-  await googleFetch(`${GMAIL}/messages/${enc(id)}/modify`, {
-    method: "POST",
-    body: { removeLabelIds, ...(addLabelIds.length ? { addLabelIds } : {}) },
-  });
-}
-
-export interface ReplyContext {
-  /** Reply-To, else From, as the header carried it. */
-  to: string;
-  subject: string;
-  messageId: string;
-  references: string;
-  threadId: string;
-}
-
-/** The headers a reply to `id` needs to thread in Gmail and the recipient's client. */
-export async function getReplyContext(id: string): Promise<ReplyContext> {
-  const original = await googleFetch<GMessage>(
-    `${GMAIL}/messages/${enc(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`,
-  );
-  const messageId = header(original, "Message-ID").replace(/[\r\n]+/g, "");
-  return {
-    to: (header(original, "Reply-To") || header(original, "From")).replace(/[\r\n]+/g, " "),
-    subject: header(original, "Subject"),
-    messageId,
-    references: [header(original, "References").replace(/[\r\n]+/g, " "), messageId]
-      .filter(Boolean)
-      .join(" "),
-    threadId: original.threadId,
-  };
-}
-
-export function sendRawMessage(
-  raw: string,
-  threadId?: string,
-): Promise<{ id: string; threadId: string }> {
-  return googleFetch<{ id: string; threadId: string }>(`${GMAIL}/messages/send`, {
-    method: "POST",
-    body: { raw, ...(threadId ? { threadId } : {}) },
-  });
-}
-
-/** The last 90 days of received mail with its list headers, for the subscriptions manager. */
-export async function listSubscriptionMessages(max = 300): Promise<SubscriptionMessage[]> {
-  const ids: string[] = [];
-  let pageToken: string | undefined;
-  do {
-    const page = await googleFetch<{
-      messages?: { id: string }[];
-      nextPageToken?: string;
-    }>(
-      `${GMAIL}/messages?maxResults=100&q=${enc("newer_than:90d -in:sent -in:chats -in:drafts")}${
-        pageToken ? `&pageToken=${enc(pageToken)}` : ""
-      }`,
-    );
-    ids.push(...(page.messages ?? []).map((message) => message.id));
-    pageToken = page.nextPageToken;
-  } while (pageToken && ids.length < max);
-  const messages = await mapWithConcurrency(ids.slice(0, max), 5, (id) =>
-    googleFetch<GMessage>(
-      `${GMAIL}/messages/${enc(id)}?format=metadata&metadataHeaders=From&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`,
-    ),
-  );
-  return messages.map((message) => {
-    const from = parseAddress(header(message, "From"));
-    return {
-      from: from.name,
-      fromEmail: from.email,
-      listUnsubscribe: header(message, "List-Unsubscribe"),
-      listUnsubscribePost: header(message, "List-Unsubscribe-Post"),
-      unread: message.labelIds?.includes("UNREAD") ?? false,
-      date: Number(message.internalDate ?? 0),
-    };
-  });
-}
-
-/** True when someone other than `userEmail` wrote in the thread after `after` (ms). */
-export async function threadHasReplyAfter(
-  threadId: string,
-  after: number,
-  userEmail: string | null,
-): Promise<boolean> {
-  const thread = await googleFetch<{ messages?: GMessage[] }>(
-    `${GMAIL}/threads/${enc(threadId)}?format=metadata&metadataHeaders=From`,
-  );
-  const me = userEmail?.toLowerCase() ?? null;
-  return (thread.messages ?? []).some(
-    (message) =>
-      Number(message.internalDate ?? 0) > after &&
-      !message.labelIds?.includes("SENT") &&
-      parseAddress(header(message, "From")).email.toLowerCase() !== me,
-  );
 }
 
 // ── Google Calendar ─────────────────────────────────────────────────────

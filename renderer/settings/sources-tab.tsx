@@ -6,7 +6,7 @@ import { SourceHeading } from "../components/source-dot";
 import { useAccounts, useCalendars, useConnectGoogle, useItemLists } from "../lib/queries";
 import { useSettingsEditor } from "../lib/settings";
 import { COLOR_OPTIONS, SOURCE_IDS, SOURCE_META } from "../lib/sources";
-import { GoogleSettings, RemindersSettings } from "./account-settings";
+import { GmailSettings, GoogleSettings, RemindersSettings } from "./account-settings";
 import { SettingSelect } from "./setting-select";
 
 function CalendarsSettings() {
@@ -169,6 +169,7 @@ export function SourcesTab() {
       </FieldSet>
 
       <GoogleSettings status={accounts.data?.google} />
+      {accounts.data?.google.connected ? <GmailSettings status={accounts.data.gmail} /> : null}
       {accounts.data?.google.connected ? <CalendarsSettings /> : null}
       {accounts.data?.google.connected ? <ListsSettings source="tasks" /> : null}
       <RemindersSettings access={accounts.data?.reminders} />

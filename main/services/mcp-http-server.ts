@@ -11,17 +11,14 @@ import { z } from "zod";
 
 import {
   createEvent,
-  createReplyDraft,
   createTask,
-  getMessageBody,
   listCompletedTasks,
   listEvents,
   listEventsBetween,
-  listInbox,
   listTasks,
-  modifyMessage,
   setTaskCompleted,
 } from "./google-api.js";
+import { createReplyDraft, getMessageBody, listInbox, modifyMessage } from "./gmail-imap.js";
 import { GoogleAuthError, getGoogleStatus } from "./google-auth.js";
 import {
   createReminder,
@@ -188,7 +185,9 @@ function run<A>(source: SourceId, body: (args: A) => Promise<ToolResult>) {
             ? "Google isn't set up in DayBoard. Add the Google account in the app's Settings."
             : error.reason === "not-granted"
               ? "DayBoard wasn't given this Google permission. Sign in again in the app's Settings and allow it."
-              : "DayBoard's Google account isn't connected. Reconnect it in the app's Settings.",
+              : error.reason === "mail-not-connected"
+                ? "Gmail isn't connected in DayBoard. Add a Gmail app password in the app's Settings."
+                : "DayBoard's Google account isn't connected. Reconnect it in the app's Settings.",
         );
       }
       logger.error("mcp", `${source} tool failed`, error);

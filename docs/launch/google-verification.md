@@ -4,6 +4,29 @@ Get DayBoard 1.0 verified for Calendar and Tasks in a new production Google Clou
 
 Prepared 2026-09-23 from this repo's code and the pages listed at the end, all read that day. Not legal advice. The consent screen was observed in **Testing** on 2026-09-22 (100 test users at most; sign-ins expire after 7 days). No verification request is confirmed submitted.
 
+## Update 2026-11-18: Gmail moves to app passwords; verify Calendar and Tasks only
+
+This replaces the Gmail parts of the plan below. Miles chose the free route on 2026-11-18.
+
+- **Why:** `gmail.modify` is restricted. A restricted scope needs a yearly CASA security assessment whenever Google data can pass through a third-party server, and DayBoard's optional AI features count. There is no free path for the Gmail API.
+- **What changed in the app:** Google sign-in now asks only for `openid`, `email`, `tasks`, `calendar.events` and `calendar.calendarlist.readonly`. Gmail is read over IMAP (`imap.gmail.com:993`) and sent over SMTP (`smtp.gmail.com:465`) with an app password the user creates in their Google account, as Apple Mail does. The password is stored with `safeStorage` (Keychain). App passwords need 2-Step Verification, and some Workspace or Advanced Protection accounts can't make them; changing the Google password revokes them, which DayBoard reports as "Needs a new password".
+- **Existing users:** a token that already carries `gmail.modify` keeps working for Calendar and Tasks, but Gmail now needs the app password. Release notes for the build that ships this must say so.
+- **Order:** ship the app release that drops `gmail.modify`, deploy the updated privacy page, then submit verification. Submitting while a shipped build still asks for `gmail.modify` would put a restricted scope in front of the reviewer.
+
+### Verification prep (nothing submitted; each Console change and the submission need Miles's OK)
+
+Project: "Dashboard" (`dashboard-508902`) under milesdchu@gmail.com only. No new project.
+
+1. **Data Access:** remove `gmail.modify`; declare exactly `tasks`, `calendar.events` and `calendar.calendarlist.readonly` (plus the non-sensitive `openid` and `email`).
+2. **Branding:** app name DayBoard, the Sunbeam logo (120x120 PNG), support email support@getdayboard.com, homepage `https://getdayboard.com`, privacy policy `https://getdayboard.com/privacy.html`.
+3. **Authorized domains:** `getdayboard.com` only. Remove `glaze.app`, which Miles doesn't own. Verify `getdayboard.com` in Google Search Console as a Domain property (DNS TXT record in Cloudflare) while signed in as milesdchu@gmail.com.
+4. **Scope justifications:**
+   - `calendar.events`: shows the user's events on the DayBoard agenda and creates, edits and deletes events the user makes in DayBoard.
+   - `calendar.calendarlist.readonly`: lists the user's calendars so they can choose which to show and see each calendar's color.
+   - `tasks`: shows the user's Google Tasks and lets them add, edit, complete and delete tasks.
+5. **Demo video** (unlisted YouTube, about 2 minutes, English UI): show the address bar with the OAuth client ID on Google's consent screen; sign in from DayBoard's "Before you sign in with Google" disclosure; show each scope in use (agenda with events and a calendar picker, add and complete a task, create and delete an event); show sign-out revoking access.
+6. **Submit** from Verification Center once 1 to 5 are done. Sensitive-scope review is free and typically takes days to a few weeks; Google may email questions to milesdchu@gmail.com.
+
 ## Key points
 
 - **1.0 scopes:** `openid`, `email`, `calendar.events`, `calendar.calendarlist.readonly` and `tasks`. None is on Google's restricted list ([restricted scopes](https://support.google.com/cloud/answer/13464325)), so 1.0 needs brand verification and sensitive-scope verification for whichever scopes Google marks sensitive (probably at least `calendar.events`; the exact labels are provisional, see 1.1), but no security assessment, which Google ties to restricted scopes ([requirements](https://support.google.com/cloud/answer/13464321)). Dropping `gmail.modify` is what takes the assessment question out of 1.0.

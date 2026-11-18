@@ -7,7 +7,7 @@ import { onAccountsChanged } from "../handlers/productivity.js";
 import { ipcMain, logger } from "../platform/index.js";
 import { isDemoMode } from "../services/demo-data.js";
 import { getGoogleStatus } from "../services/google-auth.js";
-import { listInbox } from "../services/google-api.js";
+import { listInbox } from "../services/gmail-imap.js";
 import {
   badgeText,
   dueNotice,

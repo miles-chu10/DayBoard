@@ -1,9 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Field, FieldSet, Status, toast } from "@renderer/ui";
-import type { AccountsStatus, GoogleAccountStatus, RemindersAccess } from "@main/shared-types";
+import type {
+  AccountsStatus,
+  GmailAccountStatus,
+  GoogleAccountStatus,
+  RemindersAccess,
+} from "@main/shared-types";
 
 import { errorMessage, invoke } from "../lib/ipc";
 import { queryKeys, useRequestRemindersAccess } from "../lib/queries";
+import { GmailConnect } from "../components/gmail-connect";
 import {
   GoogleConnect,
   GoogleReconnectButton,
@@ -39,7 +45,7 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
     return (
       <FieldSet
         title="Google Account"
-        description="Signs in with Google in your browser for Tasks, Gmail, and Calendar."
+        description="Signs in with Google in your browser for Tasks and Calendar."
       >
         <Field label="Account" description={status.email ?? "Signed in"}>
           <Status variant="success">Connected</Status>
@@ -65,7 +71,7 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
   return (
     <FieldSet
       title="Google Account"
-      description="Connect your Google account in the browser to use Tasks, Gmail, and Calendar."
+      description="Connect your Google account in the browser to use Tasks and Calendar, then Gmail."
     >
       <Field
         label="Account"
@@ -79,6 +85,54 @@ export function GoogleSettings({ status }: { status: GoogleAccountStatus | undef
       </Field>
       <Field>
         <GoogleConnect disabled={!status.hasCredentials} />
+      </Field>
+    </FieldSet>
+  );
+}
+
+export function GmailSettings({ status }: { status: GmailAccountStatus }) {
+  const queryClient = useQueryClient();
+  const disconnect = useMutation({
+    mutationFn: () => invoke<AccountsStatus>("gmail:disconnect"),
+    onSuccess: (next) => {
+      queryClient.setQueryData(queryKeys.accounts, next);
+      toast.success("Gmail disconnected");
+    },
+    onError: (error) => toast.error(`Couldn't disconnect Gmail: ${errorMessage(error)}`),
+  });
+
+  return (
+    <FieldSet
+      title="Gmail"
+      description="Connects with an app password from your Google account, the way Apple Mail does."
+    >
+      <Field
+        label="Account"
+        description={
+          status.rejected
+            ? "Gmail stopped accepting the app password, which happens after a Google password change. Enter a new one."
+            : status.connected
+              ? (status.email ?? "Connected")
+              : "Add an app password to show your inbox."
+        }
+      >
+        {status.rejected ? (
+          <Status variant="warning">Needs a new password</Status>
+        ) : status.connected ? (
+          <Status variant="success">Connected</Status>
+        ) : (
+          <Status variant="neutral">Not connected</Status>
+        )}
+      </Field>
+      <Field>
+        <GmailConnect
+          label={status.connected || status.rejected ? "Change App Password" : "Connect Gmail"}
+        />
+        {status.connected || status.rejected ? (
+          <Button onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
+            Disconnect
+          </Button>
+        ) : null}
       </Field>
     </FieldSet>
   );

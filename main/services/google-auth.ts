@@ -23,15 +23,16 @@ const SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/tasks",
-  "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 
-/** The scope each Google source can't work without. */
+/**
+ * The scope each Google source can't work without. Gmail isn't here: it uses IMAP with an app
+ * password (gmail-imap.ts), so DayBoard requests no restricted Gmail scope.
+ */
 const ACCESS_SCOPES: Record<GoogleAccess, string> = {
   tasks: "https://www.googleapis.com/auth/tasks",
-  mail: "https://www.googleapis.com/auth/gmail.modify",
   calendar: "https://www.googleapis.com/auth/calendar.events",
 };
 
@@ -53,7 +54,7 @@ interface GoogleAccountProfile {
 
 export class GoogleAuthError extends Error {
   constructor(
-    readonly reason: "needs-setup" | "not-connected" | "not-granted",
+    readonly reason: "needs-setup" | "not-connected" | "not-granted" | "mail-not-connected",
     message: string,
   ) {
     super(message);
