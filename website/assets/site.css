@@ -1304,6 +1304,17 @@ p {
   color: var(--ink-soft);
 }
 
+.prose-figure {
+  margin: 24px 0;
+}
+
+.prose-figure img {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  height: auto;
+}
+
 .prose strong {
   color: var(--ink);
 }
