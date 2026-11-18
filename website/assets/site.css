@@ -954,6 +954,19 @@ p {
   display: none;
 }
 
+/* A real window capture with its own chrome and shadow, so it gets no .window frame. */
+.update-shot {
+  margin: 0;
+  justify-self: center;
+  max-width: 600px;
+}
+
+.update-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* Privacy */
 .privacy {
   background: var(--ink);
@@ -1302,6 +1315,17 @@ p {
 .prose p,
 .prose li {
   color: var(--ink-soft);
+}
+
+.prose-figure {
+  margin: 24px 0;
+}
+
+.prose-figure img {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  height: auto;
 }
 
 .prose strong {

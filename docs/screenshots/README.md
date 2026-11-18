@@ -1,8 +1,8 @@
 # Screenshot gallery
 
-Captured November 4, 2026 (Pacific) from DayBoard `1.3.0-beta.17`, app source
-`c9979977d065c41fac164aecb2cb9bc48fd8c718`, using the repository's fictional demo fixtures.
-The Home and Ask captures were added to `scripts/capture-screenshots.mjs` for this refresh.
+Captured November 17, 2026 (Pacific) from DayBoard `1.3.9`, app source
+`319c08a` (tag `v1.3.9` at `631275c` plus a billing-only commit), using the repository's fictional
+demo fixtures.
 
 Each theme includes Home, the docked Assistant, Agenda, Calendar week/month, Tasks, Reminders,
 Inbox, the full Assistant and Settings. Main windows are 1280×820 logical pixels, captured at
