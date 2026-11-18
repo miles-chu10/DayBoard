@@ -6,9 +6,9 @@ const read = (name) => readFile(new URL(`../website/${name}`, import.meta.url), 
 
 // Verified against the downloaded release DMG, its GitHub digest and SHA256SUMS.txt.
 const publishedDmg = {
-  version: "1.3.9",
-  bytes: "138,212,652",
-  sha256: "74e101fca48892fe3ab0e91f5d016f9f153f44f9afe6c5de29cc42ab20dbcd95",
+  version: "1.3.10",
+  bytes: "139,376,907",
+  sha256: "98c476716a15f03481c7b89aad0d9eb77536b32eacf1587088eddcd824013968",
 };
 
 const dmgLinks = (text) => [
