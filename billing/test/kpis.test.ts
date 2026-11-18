@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 // @ts-expect-error The script is plain JavaScript with no type declarations.
-import { QUERIES, collectKpis, toMarkdown } from "../scripts/kpis.mjs";
+import { QUERIES, TRAFFIC_QUERY, collectKpis, toMarkdown } from "../scripts/kpis.mjs";
 import { LocalDb } from "./local-db.ts";
 
 type Init = { method?: string; headers?: Record<string, string>; body?: string };
@@ -30,6 +30,30 @@ function fakeFetch(db: LocalDb, calls: string[]) {
         status,
         headers: { "content-type": "application/json" },
       });
+    if (url.hostname === "api.cloudflare.com" && url.pathname.endsWith("/graphql")) {
+      assert.equal(init.headers?.authorization, "Bearer cf-token");
+      const { query, variables } = JSON.parse(init.body ?? "{}");
+      assert.equal(query, TRAFFIC_QUERY, "only the script's own analytics query runs");
+      assert.equal(variables.host, "getdayboard.com");
+      return json({
+        data: {
+          viewer: {
+            accounts: [
+              {
+                byDay: [
+                  { count: 5, sum: { visits: 3 }, dimensions: { date: "2026-11-12" } },
+                  { count: 7, sum: { visits: 4 }, dimensions: { date: "2026-11-13" } },
+                ],
+                byPath: [
+                  { count: 8, sum: { visits: 6 }, dimensions: { requestPath: "/" } },
+                  { count: 4, sum: { visits: 1 }, dimensions: { requestPath: "/download" } },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    }
     if (url.hostname === "api.cloudflare.com") {
       assert.equal(init.headers?.authorization, "Bearer cf-token");
       const { sql } = JSON.parse(init.body ?? "{}");
@@ -83,7 +107,12 @@ test("collects every section with read-only calls", async () => {
     seed(db);
     const calls: string[] = [];
     const k = await collectKpis({ env, fetch: fakeFetch(db, calls) });
-    assert.ok(calls.every((c) => c.startsWith("GET ") || c.includes("/d1/database/db/query")));
+    assert.ok(
+      calls.every(
+        (c) =>
+          c.startsWith("GET ") || c.includes("/d1/database/db/query") || c.endsWith("/graphql"),
+      ),
+    );
     assert.equal(k.usage.status, "ok");
     assert.equal(k.usage.summary.active_today, 2);
     assert.equal(k.usage.summary.tried_ai, 1);
@@ -114,8 +143,13 @@ test("collects every section with read-only calls", async () => {
       k.funnel.map((f: { count: number }) => f.count),
       [4, 2, 1, 2, 1, 1],
     );
+    assert.equal(k.traffic.status, "ok");
+    assert.equal(k.traffic.visits, 7);
+    assert.equal(k.traffic.pageviews, 12);
+    assert.deepEqual(k.traffic.pages[1], { path: "/download", visits: 1, pageviews: 4 });
     const md = toMarkdown(k);
     assert.match(md, /\| paid \| 1 \| 50% \|/);
+    assert.match(md, /7 visits, 12 page views/);
     assert.match(md, /est\. net \$4\.38/);
   } finally {
     db.close();
@@ -129,6 +163,7 @@ test("reports missing credentials and failures per section", async () => {
   });
   assert.equal(k.usage.status, "not_configured");
   assert.equal(k.money.status, "not_configured");
+  assert.equal(k.traffic.status, "not_configured");
   assert.equal(k.downloads.status, "error");
   assert.match(k.downloads.message, /HTTP 403: rate limited/);
   assert.ok(k.funnel.every((f: { count: number | null }) => f.count === null));

@@ -212,7 +212,7 @@ Setup, from Miles's Mac (not performed here): back up D1, apply `migrations/0007
 
 ## KPI report
 
-`scripts/kpis.mjs` prints the owner's KPIs as Markdown, or as JSON with `--json`, for people and for agents such as Codex: active installs (from the views above), versions in use, live licenses (paid vs. comp, activated, revoked), live Stripe checkouts, paid sales, refunds, estimated fees and net, GitHub downloads per release, and an all-time funnel from DMG downloads to activated paid licenses. It only reads: one D1 query endpoint with fixed SQL, two Stripe list endpoints and the public GitHub releases API. It prints counts only, never keys, emails or install IDs.
+`scripts/kpis.mjs` prints the owner's KPIs as Markdown, or as JSON with `--json`, for people and for agents such as Codex: active installs (from the views above), versions in use, website visits and top pages (last 30 days), live licenses (paid vs. comp, activated, revoked), live Stripe checkouts, paid sales, refunds, estimated fees and net, GitHub downloads per release, and an all-time funnel from DMG downloads to activated paid licenses. It only reads: one D1 query endpoint with fixed SQL, one fixed Cloudflare Web Analytics query for the website's page views, two Stripe list endpoints and the public GitHub releases API. It prints counts only, never keys, emails or install IDs.
 
 Credentials come from 1Password. Copy `kpis.env.template` and point each reference at your own items, then run from the repo root:
 
@@ -222,7 +222,7 @@ op run --env-file=billing/kpis.env.template -- npm --prefix billing run kpis -- 
 
 | Variable                                           | What to create                                                                                                                       |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`                             | A Cloudflare API token limited to **D1 Read** on the account                                                                         |
+| `CLOUDFLARE_API_TOKEN`                             | A Cloudflare API token limited to **D1 Read** and **Account Analytics Read** on the account (without Analytics, only traffic fails)  |
 | `CLOUDFLARE_ACCOUNT_ID`, `DAYBOARD_D1_DATABASE_ID` | The account and the live `dayboard` database ids                                                                                     |
 | `STRIPE_KPI_KEY`                                   | A live **restricted** key (`rk_live_...`) with Read on Checkout Sessions and Refunds and nothing else. Secret `sk_` keys are refused |
 | `GITHUB_TOKEN`                                     | Optional, raises GitHub's rate limit (`gh auth token` works)                                                                         |
