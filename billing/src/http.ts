@@ -3,6 +3,8 @@ import { hash } from "./crypto.ts";
 
 export const securityHeaders: Record<string, string> = {
   "Cache-Control": "no-store, max-age=0",
+  // The zone sends no HSTS of its own, so the API says it: browsers then refuse plain HTTP here.
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
