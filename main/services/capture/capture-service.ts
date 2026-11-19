@@ -51,7 +51,7 @@ export interface CaptureDeps {
   /** Runs a provider write only while `scope` is still the active account. */
   guardedWrite<T>(scope: string, write: () => Promise<T>): Promise<T>;
   getSettings(): Promise<CaptureSettings>;
-  getAccounts(): Promise<{ google: { connected: boolean }; reminders: string }>;
+  getAccounts(): Promise<{ google: { connected: boolean }; reminders: string; calendar?: string }>;
   /** The license check every AI action runs: starts the AI trial on first use, throws once locked. */
   assertAiAccess(): Promise<void>;
   complete(system: string, prompt: string): Promise<string>;
@@ -183,6 +183,7 @@ export function createCaptureService(deps: CaptureDeps) {
     const connected = availableKinds({
       googleConnected: accounts.google.connected,
       remindersAccess: accounts.reminders,
+      calendarAccess: accounts.calendar,
       sources: settings.sources,
     });
     // A chosen list narrows the parse to that one kind, so the item lands where it was aimed.

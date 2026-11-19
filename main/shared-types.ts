@@ -455,6 +455,8 @@ export interface CalendarEventItem {
   iCalUID?: string;
   /** Where the event lives; a missing value is Google Calendar. */
   provider?: "google" | "apple";
+  /** True for events on a Mac calendar that can't be changed, such as a subscribed one. */
+  readOnly?: boolean;
 }
 
 export interface GoogleCalendarInfo {

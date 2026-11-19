@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
-import { Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles } from "lucide-react";
 import {
   Button,
   Callout,
@@ -29,7 +29,7 @@ import {
   providerIndicator,
   type OnboardingStep,
 } from "../lib/onboarding";
-import { useAccounts, useRequestRemindersAccess } from "../lib/queries";
+import { useAccounts, useRequestCalendarAccess, useRequestRemindersAccess } from "../lib/queries";
 import {
   PROVIDER_DETAIL,
   PROVIDER_LABEL,
@@ -284,8 +284,10 @@ function ConnectStep() {
     <Status variant="loading">Checking…</Status>
   );
   const requestReminders = useRequestRemindersAccess();
+  const requestCalendar = useRequestCalendarAccess();
   const google = accounts?.google;
   const reminders = accounts?.reminders;
+  const macCalendar = accounts?.calendar;
 
   return (
     <>
@@ -355,6 +357,33 @@ function ConnectStep() {
             </Button>
           ) : (
             <Button size="small" onClick={() => void invoke("reminders:openSettings")}>
+              Open Privacy Settings
+            </Button>
+          )}
+        </AccountRow>
+        <AccountRow
+          icon={<CalendarDays className="size-4 text-support-red" />}
+          title="Mac Calendars"
+          description={
+            macCalendar === "denied" || macCalendar === "restricted"
+              ? "Turn on full access in System Settings → Privacy & Security → Calendars."
+              : "Calendars from the Calendar app, such as iCloud. macOS asks once."
+          }
+        >
+          {macCalendar === undefined ? (
+            checking
+          ) : macCalendar === "full-access" ? (
+            <Connected>Allowed</Connected>
+          ) : macCalendar === "not-determined" ? (
+            <Button
+              size="small"
+              onClick={() => requestCalendar.mutate()}
+              disabled={requestCalendar.isPending}
+            >
+              Allow Access
+            </Button>
+          ) : (
+            <Button size="small" onClick={() => void invoke("calendar:openSettings")}>
               Open Privacy Settings
             </Button>
           )}

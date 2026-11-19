@@ -61,9 +61,11 @@ function CaptureDialog({
     () => ({
       task: googleConnected && sourceOn(settings, "tasks"),
       reminder: accounts.data?.reminders === "full-access" && sourceOn(settings, "reminders"),
-      event: googleConnected && sourceOn(settings, "calendar"),
+      event:
+        (googleConnected || accounts.data?.calendar === "full-access") &&
+        sourceOn(settings, "calendar"),
     }),
-    [accounts.data?.reminders, googleConnected, settings],
+    [accounts.data?.reminders, accounts.data?.calendar, googleConnected, settings],
   );
   const nothingAvailable =
     accounts.data !== undefined && !available.task && !available.reminder && !available.event;

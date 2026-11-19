@@ -2,15 +2,24 @@
 // written through the bundled EventKit helper that already serves Apple Reminders. DayBoard never
 // sees an Apple password: macOS grants calendar access to the app, separately from Reminders.
 
-import { reminders, systemPreferences } from "../platform/index.js";
+import { logger, reminders, systemPreferences } from "../platform/index.js";
 import type { CalendarInfo, NativeCalendarEvent } from "../platform/reminders.js";
 
 import type {
   CalendarEventItem,
   CreateEventInput,
   MacCalendarInfo,
+  MacCalendarsResult,
   RemindersAccess,
+  SourceCoverage,
+  SourceResult,
 } from "../shared-types.js";
+import {
+  combineCalendarSources,
+  type GoogleAuthReason,
+  type GoogleCalendarOutcome,
+  type MacCalendarOutcome,
+} from "./calendar-merge.js";
 import type { UpdateEventInput } from "../../shared/item-edits.js";
 import {
   APPLE_CALENDAR_PREFIX,
@@ -32,8 +41,14 @@ export interface AppleEventList {
   truncated: boolean;
 }
 
-export function getCalendarAccess(): Promise<RemindersAccess> {
-  return reminders.eventStatus();
+/** Calendar access, or "unknown" when the helper can't tell. Never throws, so accounts still load. */
+export async function getCalendarAccess(): Promise<RemindersAccess> {
+  try {
+    return await reminders.eventStatus();
+  } catch (error) {
+    logger.warn("calendar", "Could not read Calendar access", error);
+    return "unknown";
+  }
 }
 
 export async function requestCalendarAccess(): Promise<RemindersAccess> {
@@ -76,7 +91,8 @@ function toInfo(calendar: CalendarInfo, googleEmail: string | null): MacCalendar
     name: calendar.title || "Calendar",
     color: calendar.color,
     account: calendar.source,
-    defaultVisible: !google && calendar.type !== "birthday",
+    // A Google account starts hidden only when DayBoard already shows Google Calendar itself.
+    defaultVisible: !(google && googleEmail) && calendar.type !== "birthday",
     writable: writable(calendar),
     google,
   };
@@ -135,6 +151,7 @@ export function appleEventToItem(
     selfResponse: event.selfStatus,
     ...(event.externalId ? { iCalUID: event.externalId } : {}),
     provider: "apple",
+    ...(calendar.writable ? {} : { readOnly: true }),
   };
 }
 
@@ -160,6 +177,61 @@ export async function listAppleEventsBetween(
     return calendar && event.id ? [appleEventToItem(event, calendar)] : [];
   });
   return { items, truncated: result.truncated };
+}
+
+/** Mac calendars and the access state, for Settings. Empty until access is granted. */
+export async function getMacCalendars(googleEmail: string | null): Promise<MacCalendarsResult> {
+  const access = await getCalendarAccess();
+  return {
+    access,
+    calendars: access === "full-access" ? await listMacCalendars(googleEmail) : [],
+  };
+}
+
+/** The Mac side of a calendar listing; failures are logged and reported, never thrown. */
+export async function macCalendarOutcome(
+  start: Date,
+  end: Date,
+  visibility: Record<string, boolean>,
+  googleEmail: string | null,
+): Promise<MacCalendarOutcome> {
+  try {
+    if ((await getCalendarAccess()) !== "full-access") return { kind: "off" };
+    const { items, truncated } = await listAppleEventsBetween(start, end, visibility, googleEmail);
+    return { kind: "ok", items, truncated };
+  } catch (error) {
+    logger.warn("calendar", "Could not read Mac calendars", error);
+    return { kind: "error", error };
+  }
+}
+
+export interface CalendarListingOptions {
+  start: Date;
+  end: Date;
+  visibility: Record<string, boolean>;
+  googleEmail: string | null;
+  googleConnected: boolean;
+  /** Loads the Google side; passed in so this module never signs in to Google itself. */
+  google: () => Promise<{ items: CalendarEventItem[]; coverage: SourceCoverage }>;
+  /** The Google sign-in state an error stands for, or null for any other failure. */
+  authReason: (error: unknown) => GoogleAuthReason | null;
+}
+
+/** Google Calendar and Mac calendar events between two instants, as one calendar source. */
+export async function listCalendarEvents(
+  options: CalendarListingOptions,
+): Promise<SourceResult<CalendarEventItem>> {
+  const [google, mac] = await Promise.all([
+    options.google().then(
+      (result): GoogleCalendarOutcome => ({ kind: "ok", ...result }),
+      (error: unknown): GoogleCalendarOutcome => {
+        const reason = options.authReason(error);
+        return reason ? { kind: "auth", reason } : { kind: "error", error };
+      },
+    ),
+    macCalendarOutcome(options.start, options.end, options.visibility, options.googleEmail),
+  ]);
+  return combineCalendarSources(google, mac, options.googleConnected);
 }
 
 async function calendarFor(calendarId: string, googleEmail: string | null = null) {

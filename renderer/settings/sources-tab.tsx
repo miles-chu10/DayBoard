@@ -7,6 +7,7 @@ import { useAccounts, useCalendars, useConnectGoogle, useItemLists } from "../li
 import { useSettingsEditor } from "../lib/settings";
 import { COLOR_OPTIONS, SOURCE_IDS, SOURCE_META } from "../lib/sources";
 import { GmailSettings, GoogleSettings, RemindersSettings } from "./account-settings";
+import { MacCalendarSettings } from "./mac-calendar-settings";
 import { SettingSelect } from "./setting-select";
 
 function CalendarsSettings() {
@@ -171,6 +172,10 @@ export function SourcesTab() {
       <GoogleSettings status={accounts.data?.google} />
       {accounts.data?.google.connected ? <GmailSettings status={accounts.data.gmail} /> : null}
       {accounts.data?.google.connected ? <CalendarsSettings /> : null}
+      <MacCalendarSettings
+        access={accounts.data?.calendar}
+        googleConnected={accounts.data?.google.connected ?? false}
+      />
       {accounts.data?.google.connected ? <ListsSettings source="tasks" /> : null}
       <RemindersSettings access={accounts.data?.reminders} />
       {accounts.data?.reminders === "full-access" ? <ListsSettings source="reminders" /> : null}

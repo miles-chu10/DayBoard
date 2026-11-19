@@ -114,6 +114,25 @@ test("availableKinds follows Google, Reminders access and source switches", () =
     }),
     { task: true, reminder: false, event: false },
   );
+  // Mac calendar access alone is enough to add events.
+  assert.deepEqual(
+    capture.availableKinds({
+      googleConnected: false,
+      remindersAccess: "denied",
+      calendarAccess: "full-access",
+      sources: sources(true, true, true),
+    }),
+    { task: false, reminder: false, event: true },
+  );
+  assert.deepEqual(
+    capture.availableKinds({
+      googleConnected: false,
+      remindersAccess: "denied",
+      calendarAccess: "full-access",
+      sources: sources(true, true, false),
+    }),
+    { task: false, reminder: false, event: false },
+  );
 });
 
 test("parseDraft keeps today's behaviour", () => {
@@ -221,7 +240,7 @@ test("buildCapturePrompt lists only available kinds", () => {
     new Date(2026, 9, 20, 9, 0),
   );
   assert.match(prompt, /"reminder" — Apple Reminders/);
-  assert.match(prompt, /"event" — Google Calendar/);
+  assert.match(prompt, /"event" — Calendar/);
   assert.doesNotMatch(prompt, /"task" — Google Tasks/);
   assert.match(prompt, /Today's ISO date is 2026-10-20\./);
   assert.match(prompt, /Sentence: "Call dentist Thursday 3pm"/);

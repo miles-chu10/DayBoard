@@ -54,3 +54,30 @@ export function decodeAppleEventId(eventId: string): AppleEventRef | null {
     return null;
   }
 }
+
+/** Where a new event goes: Google's primary calendar, or a Mac calendar (null: Calendar's default). */
+export type NewEventDestination = { kind: "google" } | { kind: "apple"; calendarId: string | null };
+
+/**
+ * Resolves the "New events go to" setting. "" picks Google Calendar when it is connected, otherwise
+ * the Mac's default calendar. Throws a readable error when the chosen place is unavailable.
+ */
+export function newEventDestination(
+  choice: string,
+  googleConnected: boolean,
+  macAccess: string | undefined,
+): NewEventDestination {
+  const mac = macAccess === "full-access";
+  if (choice === "google" || (choice === "" && googleConnected)) {
+    if (!googleConnected)
+      throw new Error("New events go to Google Calendar, but Google isn't connected.");
+    return { kind: "google" };
+  }
+  if (!mac)
+    throw new Error(
+      choice === ""
+        ? "Connect Google or allow access to your Mac calendars to add events."
+        : "DayBoard needs access to your Mac calendars to add this event.",
+    );
+  return { kind: "apple", calendarId: isAppleCalendarId(choice) ? choice : null };
+}
