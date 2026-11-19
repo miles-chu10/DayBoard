@@ -23,6 +23,7 @@ import { MeetingCard } from "../components/meeting-card";
 import { useOpenItem } from "../components/open-item";
 import { OverdueSummary } from "../components/overdue-summary";
 import { usePublishViewContext } from "../components/shell";
+import { TrialReminder } from "../components/trial-reminder";
 import { ViewActions } from "../components/view-actions";
 import { buildAgenda, type AgendaEntry } from "../lib/agenda";
 import { dayHeading, toISODate } from "../lib/dates";
@@ -301,6 +302,8 @@ export function HomeView() {
             </Text>
           </div>
         </header>
+
+        <TrialReminder />
 
         {nothingConnected(accounts.data) ? (
           <Callout

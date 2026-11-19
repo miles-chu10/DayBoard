@@ -297,6 +297,59 @@ test("checkout uses Managed Payments and accepts a buyer paying in a local curre
   assert.equal(f.db.sql.prepare("SELECT COUNT(*) n FROM licenses").get()!.n, 1);
 });
 
+test("checkout keeps where the buyer clicked Get DayBoard Pro, and only a clean tag", async () => {
+  const f = setup();
+  await f.order();
+  assert.deepEqual(f.createParams[0].metadata, { order_id: f.createParams[0].client_reference_id });
+  assert.equal(f.createParams[0].cancel_url, `${origin}/buy`);
+
+  const buy = await f.call("/buy?from=download-page");
+  const html = await buy.text();
+  assert.match(
+    html,
+    /<button id="buy" type="button" data-order-id="[A-Za-z0-9_-]{32}" data-source="download-page">/,
+  );
+  const orderId = html.match(/data-order-id="([A-Za-z0-9_-]{32})"/)![1];
+  const cookie = buy.headers.get("Set-Cookie")!.split(";")[0];
+  for (const body of [
+    { orderId, source: "Download Page" },
+    { orderId, source: "x".repeat(33) },
+    { orderId, source: 7 },
+    { orderId, source: "download-page", campaign: "x" },
+  ])
+    assert.equal((await f.call("/v1/checkout", "POST", cookie, body)).status, 400);
+  assert.equal(f.createParams.length, 1);
+  const tagged = await f.call("/v1/checkout", "POST", cookie, { orderId, source: "download-page" });
+  assert.equal(tagged.status, 200);
+  assert.deepEqual(f.createParams[1].metadata, { order_id: orderId, source: "download-page" });
+  assert.equal(f.createParams[1].cancel_url, `${origin}/buy?from=download-page`);
+  // The claim route still takes nothing but the order ID.
+  assert.equal(
+    (await f.call("/v1/checkout/claim", "POST", cookie, { orderId, source: "download-page" }))
+      .status,
+    400,
+  );
+
+  for (const from of ["%3Cscript%3E", "Download", "a%22b", ""])
+    assert.doesNotMatch(await (await f.call(`/buy?from=${from}`)).text(), /data-source=/);
+
+  // The served buy script sends the tag only when the page carries one.
+  for (const dataset of [{ orderId }, { orderId, source: "download-page" }]) {
+    const button: Record<string, unknown> = { dataset };
+    let sent: unknown;
+    new Function("document", "fetch", "location", buyScript)(
+      { getElementById: (id: string) => (id === "buy" ? button : {}) },
+      async (_url: string, init: { body: string }) => {
+        sent = JSON.parse(init.body);
+        return new Response(JSON.stringify({ url: "https://checkout.stripe.com/x" }));
+      },
+      { assign() {} },
+    );
+    await (button.onclick as () => Promise<void>)();
+    assert.deepEqual(sent, dataset);
+  }
+});
+
 test("a payment in a different currency than its session mints no key", async () => {
   const f = setup();
   await f.order();
@@ -930,7 +983,7 @@ test("receipt page gives the app's activation steps, the 7-day browser limit and
     /label: "DayBoard",\s*submenu:[\s\S]*?label: "Settings…",\s*accelerator: "Command\+,"/,
   );
   assert.match(tabs, /<TabsTrigger value="license">License<\/TabsTrigger>/);
-  assert.match(tab, /<Field label="License key">/);
+  assert.match(tab, /<Field label="License key"[\s>]/);
   assert.match(tab, /"Activating…" : "Activate"/);
   assert.match(tab, /"Deactivate this device"/);
 });

@@ -69,8 +69,13 @@ function fakeFetch(db: LocalDb, calls: string[]) {
         return json({
           has_more: false,
           data: [
-            { id: "cs_1", payment_status: "paid", amount_total: 500 },
-            { id: "cs_2", payment_status: "unpaid", amount_total: 500 },
+            {
+              id: "cs_1",
+              payment_status: "paid",
+              amount_total: 500,
+              metadata: { order_id: "o1", source: "download-page" },
+            },
+            { id: "cs_2", payment_status: "unpaid", amount_total: 500, metadata: {} },
           ],
         });
       return json({ has_more: false, data: [] });
@@ -131,6 +136,10 @@ test("collects every section with read-only calls", async () => {
     assert.equal(k.money.gross_usd, 5);
     assert.equal(k.money.fees_est_usd, 0.62);
     assert.equal(k.money.net_est_usd, 4.38);
+    assert.deepEqual(k.money.by_source, [
+      { source: "download-page", checkouts: 1, paid: 1 },
+      { source: "untagged", checkouts: 1, paid: 0 },
+    ]);
     assert.deepEqual(k.downloads.releases[0], {
       release: "1.3.2",
       published: "2026-11-12T21:17:34Z",
@@ -151,6 +160,7 @@ test("collects every section with read-only calls", async () => {
     assert.match(md, /\| paid \| 1 \| 50% \|/);
     assert.match(md, /7 visits, 12 page views/);
     assert.match(md, /est\. net \$4\.38/);
+    assert.match(md, /\| download-page \| 1 \| 1 \|\n\| untagged \| 1 \| 0 \|/);
   } finally {
     db.close();
   }

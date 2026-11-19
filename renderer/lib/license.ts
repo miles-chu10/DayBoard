@@ -67,6 +67,65 @@ export const LICENSE_STATUS_COPY: Record<
   },
 };
 
+// The launch price ends December 31, 2026 at 11:59 PM PST, as the website and checkout page say.
+const LAUNCH_PRICE_ENDS = Date.UTC(2027, 0, 1, 7, 59);
+const DAY_MS = 86_400_000;
+
+/** DayBoard Pro's price as the app states it, and how long the launch price lasts. */
+export function proPrice(now = Date.now()): { price: string; note: string } {
+  const daysLeft = Math.ceil((LAUNCH_PRICE_ENDS - now) / DAY_MS);
+  if (daysLeft <= 0) return { price: "$9", note: "" };
+  return {
+    price: "$5",
+    note:
+      daysLeft === 1
+        ? "Last day at the $5 launch price, then $9."
+        : daysLeft <= 60
+          ? `Launch price for ${daysLeft} more days, then $9.`
+          : "Launch price until December 31, then $9.",
+  };
+}
+
+/** What Pro adds, in the website's words. */
+export const PRO_BENEFITS = [
+  "The Assistant, on the Claude or ChatGPT plan you already have",
+  "AI in Quick Capture, dictation and the daily briefing",
+  `Up to ${LICENSE_ACTIVATION_LIMIT} Macs, with future updates included`,
+] as const;
+
+/**
+ * Where in the app a "Get DayBoard Pro" button sits. Checkout keeps it with the sale
+ * (`/buy?from=`), so sales can be counted per button; it names a place, never the person.
+ */
+export type ProBuySource =
+  | "app-trial-reminder"
+  | "app-sidebar"
+  | "app-settings"
+  | "app-ai-locked"
+  | "app-quick-capture";
+
+export function proBuyUrl(checkoutUrl: string, from: ProBuySource): string {
+  if (!checkoutUrl.trim()) return "";
+  try {
+    const url = new URL(checkoutUrl);
+    url.searchParams.set("from", from);
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Home's trial-ending reminder shows once at 3 days left and once on the last day. Returns which
+ * of the two is due, or null while the trial has more days left or for any other state.
+ */
+export type TrialReminderStage = "3-days" | "last-day";
+export function trialReminderStage(status: LicenseStatus | undefined): TrialReminderStage | null {
+  if (status?.state !== "trial") return null;
+  if (status.daysLeft <= 1) return "last-day";
+  return status.daysLeft <= 3 ? "3-days" : null;
+}
+
 export const LICENSE_RESET_COPY = {
   action: "Reset license data on this Mac",
   title: "Reset license data on this Mac?",

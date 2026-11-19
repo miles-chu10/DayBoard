@@ -10,9 +10,10 @@ const source = await readFile(new URL("../website/assets/site.js", import.meta.u
 function run(buyUrl) {
   assert.equal(source.match(/buyUrl: "[^"]*"/g)?.length, 1);
   const script = source.replace(/buyUrl: "[^"]*"/, `buyUrl: ${JSON.stringify(buyUrl)}`);
-  const button = { hidden: true, href: undefined };
+  const button = { hidden: true, href: undefined, dataset: { buy: "pricing" } };
+  const untagged = { hidden: true, href: undefined, dataset: { buy: "" } };
   const note = { hidden: false };
-  const lists = { "a[data-buy]": [button], "[data-buy-pending]": [note] };
+  const lists = { "a[data-buy]": [button, untagged], "[data-buy-pending]": [note] };
   vm.runInNewContext(script, {
     document: {
       querySelector: () => null,
@@ -26,7 +27,7 @@ function run(buyUrl) {
     },
     URL,
   });
-  return { button, note };
+  return { button, untagged, note };
 }
 
 test("the shipped site points its buy buttons at the live checkout page", () => {
@@ -40,10 +41,11 @@ test("an empty checkout address keeps the buy button hidden and says checkout is
   assert.equal(note.hidden, false);
 });
 
-test("an HTTPS checkout address shows the buy button and hides the note", () => {
-  const { button, note } = run("https://api.getdayboard.com/buy");
+test("an HTTPS checkout address shows the buy button, keeps its tag and hides the note", () => {
+  const { button, untagged, note } = run("https://api.getdayboard.com/buy");
   assert.equal(button.hidden, false);
-  assert.equal(button.href, "https://api.getdayboard.com/buy");
+  assert.equal(button.href, "https://api.getdayboard.com/buy?from=pricing");
+  assert.equal(untagged.href, "https://api.getdayboard.com/buy");
   assert.equal(note.hidden, true);
 });
 
@@ -58,17 +60,48 @@ test("a non-HTTPS or malformed checkout address keeps the button hidden", () => 
 test("the pricing page links to checkout in its HTML, so buying works without scripts", async () => {
   const page = await readFile(new URL("../website/pricing.html", import.meta.url), "utf8");
   const address = source.match(/buyUrl: "([^"]*)"/)[1];
-  assert.match(page, new RegExp(`<a class="button" data-buy href="${address}"`));
+  assert.match(
+    page,
+    new RegExp(`<a class="button" data-buy="pricing" href="${address}\\?from=pricing"`),
+  );
   assert.match(page, /<p data-buy-pending hidden>/);
 });
 
 test("the download page offers DayBoard Pro beside the download, in its HTML", async () => {
   const page = await readFile(new URL("../website/download.html", import.meta.url), "utf8");
   const address = source.match(/buyUrl: "([^"]*)"/)[1];
-  const buyLinks = page.match(/<a class="button[^"]*" data-buy href="([^"]*)"/g) ?? [];
-  assert.equal(buyLinks.length, 2, "the Pro offer and the download-started note");
-  for (const link of buyLinks) assert.ok(link.endsWith(`href="${address}"`), link);
+  const buyLinks = [
+    ...page.matchAll(/<a\s+class="button[^"]*"\s+data-buy="([^"]*)"\s+href="([^"]*)"/g),
+  ];
+  assert.deepEqual(
+    buyLinks.map(([, tag]) => tag),
+    ["download-started", "download-page"],
+    "the download-started note and the Pro offer",
+  );
+  for (const [, tag, href] of buyLinks) assert.equal(href, `${address}?from=${tag}`);
   assert.match(page, /<p class="fine" data-buy-pending hidden>/);
   assert.match(page, /<a\s+class="button"\s+data-download\s+href="[^"]+\.dmg"/);
   assert.match(page, /<div class="download-started" data-download-started role="status" hidden>/);
+});
+
+test("every site buy link names where it sits, and its HTML link carries that tag", async () => {
+  const address = source.match(/buyUrl: "([^"]*)"/)[1];
+  const tags = new Set();
+  for (const name of ["index.html", "download.html", "pricing.html"]) {
+    const page = await readFile(new URL(`../website/${name}`, import.meta.url), "utf8");
+    const links = [...page.matchAll(/<a\b[^>]*\bdata-buy\b[^>]*>/g)].map(([tag]) => tag);
+    assert.ok(links.length > 0, name);
+    for (const link of links) {
+      const [, tag, href] = link.match(/data-buy="([a-z0-9-]{1,32})"\s+href="([^"]*)"/) ?? [];
+      assert.ok(tag, `${name}: ${link}`);
+      assert.equal(href, `${address}?from=${tag}`, name);
+      tags.add(tag);
+    }
+  }
+  assert.deepEqual([...tags].sort(), [
+    "download-page",
+    "download-started",
+    "home-download-started",
+    "pricing",
+  ]);
 });

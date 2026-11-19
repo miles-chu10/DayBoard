@@ -1,8 +1,17 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
-import { Button, EmptyState } from "../ui";
-import { isLicenseBlocking, useLicenseStatus, type LicenseStatus } from "../lib/license";
+import { Button, EmptyState, Popover, PopoverContent, PopoverTrigger } from "../ui";
+import {
+  isLicenseBlocking,
+  proBuyUrl,
+  proPrice,
+  useLicenseStatus,
+  type LicenseStatus,
+  type ProBuySource,
+} from "../lib/license";
+import { LICENSE_ACTIVATION_LIMIT } from "../../shared/license";
 import { openExternal, openSettings } from "../lib/ipc";
+import { ProOffer } from "./pro-offer";
 
 /** True once license data has loaded and the current state blocks AI actions. */
 export function useLicenseGate(): {
@@ -31,12 +40,13 @@ function upsellCopy(status: LicenseStatus): {
   description: string;
 } {
   switch (status.state) {
-    case "expired":
+    case "expired": {
+      const { price, note } = proPrice();
       return {
         title: "AI trial ended",
-        description:
-          "Everything else in DayBoard stays free. Get DayBoard Pro, a one-time purchase, to keep using AI.",
+        description: `Your agenda, tasks, mail and notes keep working for free. DayBoard Pro brings back the Assistant, Quick Capture AI and dictation for ${price} once, on up to ${LICENSE_ACTIVATION_LIMIT} Macs.${note ? ` ${note}` : ""} 14-day refunds.`,
       };
+    }
     case "invalid":
       // The reason varies (revoked, released by another account on this Mac, not verified yet).
       return {
@@ -96,28 +106,39 @@ export function LicenseGate({
       placement={placement}
       title={copy.title}
       description={copy.description}
-      actions={<LicenseUpsellActions checkoutUrl={checkoutUrl} />}
+      actions={
+        <LicenseUpsellActions checkoutUrl={checkoutUrl} status={status} from="app-ai-locked" />
+      }
     />
   );
 }
 
-/** The buy and License buttons of every AI upsell. */
+/**
+ * The buy and License buttons of every AI upsell. Once the trial has ended the buy button names
+ * the price, and the second button speaks to people who already bought a key.
+ */
 export function LicenseUpsellActions({
   checkoutUrl,
+  status,
+  from,
   size,
 }: {
   checkoutUrl: string;
+  status: LicenseStatus;
+  from: ProBuySource;
   size?: "small";
 }) {
+  const buyUrl = proBuyUrl(checkoutUrl, from);
+  const ended = status.state === "expired";
   return (
     <>
-      {checkoutUrl ? (
-        <Button variant="accent" size={size} onClick={() => void openExternal(checkoutUrl)}>
-          Get DayBoard Pro
+      {buyUrl ? (
+        <Button variant="accent" size={size} onClick={() => void openExternal(buyUrl)}>
+          {ended ? `Get DayBoard Pro — ${proPrice().price}` : "Get DayBoard Pro"}
         </Button>
       ) : null}
       <Button size={size} onClick={() => void openSettings("license")}>
-        Open License Settings
+        {ended ? "I have a license key" : "Open License Settings"}
       </Button>
     </>
   );
@@ -162,6 +183,13 @@ export function LicenseStatusControl() {
         : data?.status.state === "unreadable"
           ? "License data needs attention"
           : "Unlock AI · DayBoard Pro";
+  // During the trial and once it ends, the counter opens what Pro costs and adds, one click from
+  // checkout; key entry stays in Settings. Other states need Settings itself.
+  const offer =
+    !isError &&
+    (data?.status.state === "trial" || data?.status.state === "expired") &&
+    proBuyUrl(data.checkoutUrl, "app-sidebar") !== "";
+  if (offer && data) return <SidebarProCard label={label} checkoutUrl={data.checkoutUrl} />;
   return (
     <Button
       size="small"
@@ -171,5 +199,34 @@ export function LicenseStatusControl() {
     >
       {label}
     </Button>
+  );
+}
+
+function SidebarProCard({ label, checkoutUrl }: { label: string; checkoutUrl: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="small" variant="transparent" className="w-full justify-start">
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-80 p-4">
+        <ProOffer
+          checkoutUrl={checkoutUrl}
+          from="app-sidebar"
+          secondary={
+            <Button
+              onClick={() => {
+                setOpen(false);
+                void openSettings("license");
+              }}
+            >
+              Enter key
+            </Button>
+          }
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

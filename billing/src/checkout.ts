@@ -22,6 +22,9 @@ interface Order {
   capability_expires_at: number;
 }
 const orderIdPattern = /^[A-Za-z0-9_-]{32}$/;
+// Where a buyer clicked "Get DayBoard Pro" (`/buy?from=download-page`). Kept on the Checkout
+// Session's metadata so sales can be counted per upsell; never shown or stored elsewhere.
+const sourcePattern = /^[a-z0-9-]{1,32}$/;
 const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
 const capabilityAge = ORDER_ACCESS_DAYS * 86400;
 function cookieName(orderId: string): string {
@@ -81,14 +84,16 @@ function asset({ type, body }: (typeof assets)[string]): Response {
     },
   });
 }
-function orderIdFromBody(value: unknown): string | null {
+function sourceParam(value: string | null): string | undefined {
+  return value !== null && sourcePattern.test(value) ? value : undefined;
+}
+function checkoutFromBody(value: unknown): { orderId: string; source?: string } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const fields = value as Record<string, unknown>;
-  return Object.keys(fields).length === 1 &&
-    typeof fields.orderId === "string" &&
-    orderIdPattern.test(fields.orderId)
-    ? fields.orderId
-    : null;
+  const { orderId, source, ...rest } = value as Record<string, unknown>;
+  if (Object.keys(rest).length || typeof orderId !== "string" || !orderIdPattern.test(orderId))
+    return null;
+  if (source === undefined) return { orderId };
+  return typeof source === "string" && sourcePattern.test(source) ? { orderId, source } : null;
 }
 function pageContext(env: Env, cfg: Config): PageContext {
   return {
@@ -113,9 +118,12 @@ export async function checkout(
       return html(busyPage(pageContext(env, cfg)), {}, 429);
     const orderId = randomToken(24);
     const token = randomToken();
-    return html(buyPage(orderId, pageContext(env, cfg)), {
-      "Set-Cookie": setCookie(orderId, token),
-    });
+    return html(
+      buyPage(orderId, pageContext(env, cfg), sourceParam(url.searchParams.get("from"))),
+      {
+        "Set-Cookie": setCookie(orderId, token),
+      },
+    );
   }
   if (request.method === "GET" && url.pathname === "/receipt")
     return html(receiptPage(pageContext(env, cfg)));
@@ -131,8 +139,9 @@ export async function checkout(
     } catch {
       return error(400, "invalid_body");
     }
-    const orderId = orderIdFromBody(body);
-    if (!orderId) return error(400, "invalid_body");
+    const parsed = checkoutFromBody(body);
+    if (!parsed) return error(400, "invalid_body");
+    const { orderId, source } = parsed;
     const token = cookie(request, orderId);
     if (!token) return error(401, "claim_required");
     const capHash = await hash(token, env.HASH_SECRET);
@@ -164,9 +173,9 @@ export async function checkout(
             client_reference_id: orderId,
             line_items: [{ price: cfg.priceId, quantity: 1 }],
             success_url: receiptUrl(cfg, orderId),
-            cancel_url: `${cfg.origin}/buy`,
+            cancel_url: source ? `${cfg.origin}/buy?from=${source}` : `${cfg.origin}/buy`,
             integration_identifier: "dayboard_ynevvaow",
-            metadata: { order_id: orderId },
+            metadata: source ? { order_id: orderId, source } : { order_id: orderId },
             // Stripe is merchant of record: it calculates and remits sales tax/VAT/GST.
             managed_payments: { enabled: true },
           },
@@ -204,8 +213,9 @@ export async function checkout(
     } catch {
       return error(400, "invalid_body");
     }
-    const orderId = orderIdFromBody(body);
-    if (!orderId) return error(400, "invalid_body");
+    const parsed = checkoutFromBody(body);
+    if (!parsed || parsed.source !== undefined) return error(400, "invalid_body");
+    const { orderId } = parsed;
     const order = await currentOrder(request, env, orderId);
     if (!order) return error(401, "claim_required");
     if (order.state !== "ready") return error(409, order.state);

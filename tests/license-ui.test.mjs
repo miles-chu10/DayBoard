@@ -35,6 +35,9 @@ const uiModule = `
   export { Field, FieldSet } from ${JSON.stringify(path.join(root, "renderer/ui/field.tsx"))};
   export { Input } from ${JSON.stringify(path.join(root, "renderer/ui/input.tsx"))};
   export { Status } from ${JSON.stringify(path.join(root, "renderer/ui/status.tsx"))};
+  export { Text } from ${JSON.stringify(path.join(root, "renderer/ui/text.tsx"))};
+  export { cn } from ${JSON.stringify(path.join(root, "renderer/ui/utils.ts"))};
+  export { Popover, PopoverTrigger, PopoverContent } from ${JSON.stringify(path.join(root, "renderer/ui/popover.tsx"))};
   const fixture = () => globalThis.__dayboardLicenseUiFixture;
   export function Button(props) {
     fixture().buttons.push({ label: props.children, onClick: props.onClick });
@@ -104,11 +107,17 @@ const fixturePlugin = {
 let LicenseGate;
 let LicenseStatusControl;
 let LicenseTab;
+let TrialReminder;
+let proPrice;
+let proBuyUrl;
+let trialReminderStage;
 try {
   await build({
     entryPoints: [
       path.join(root, "renderer/components/license-gate.tsx"),
       path.join(root, "renderer/settings/license-tab.tsx"),
+      path.join(root, "renderer/components/trial-reminder.tsx"),
+      path.join(root, "renderer/lib/license.ts"),
     ],
     outdir: tempDir,
     entryNames: "[name]",
@@ -126,6 +135,10 @@ try {
     pathToFileURL(path.join(tempDir, "license-gate.mjs"))
   ));
   ({ LicenseTab } = await import(pathToFileURL(path.join(tempDir, "license-tab.mjs"))));
+  ({ TrialReminder } = await import(pathToFileURL(path.join(tempDir, "trial-reminder.mjs"))));
+  ({ proPrice, proBuyUrl, trialReminderStage } = await import(
+    pathToFileURL(path.join(tempDir, "license.mjs"))
+  ));
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }
@@ -238,13 +251,34 @@ test("gate renders intended content for trial, licensed, demo, and unconfigured 
 });
 
 test("gate blocks expired and invalid statuses and opens License Settings", () => {
-  for (const state of ["expired", "invalid"]) {
+  for (const [state, settingsLabel] of [
+    ["expired", "I have a license key"],
+    ["invalid", "Open License Settings"],
+  ]) {
     const html = gate(status(state));
     assert.doesNotMatch(html, /PRIVATE ACTION CONTENT/, state);
-    assert.match(html, /Open License Settings/, state);
-    click("Open License Settings");
+    assert.match(html, new RegExp(settingsLabel), state);
+    click(settingsLabel);
     assert.deepEqual(fixture.calls, [["settings", "license"]], state);
   }
+});
+
+test("an ended trial names Pro's price on the gate and tags its buy link", () => {
+  const html = gate(status("expired"));
+  assert.match(html, /AI trial ended/);
+  assert.match(html, /keep working for free/);
+  assert.match(
+    html,
+    /DayBoard Pro brings back the Assistant, Quick Capture AI and dictation for \$(5|9) once, on up to 3 Macs/,
+  );
+  assert.match(html, /14-day refunds/);
+  const buy = fixture.buttons.find((item) => /^Get DayBoard Pro — \$(5|9)$/.test(item.label));
+  assert.ok(buy, "the buy button names the price");
+  buy.onClick();
+  assert.deepEqual(fixture.calls, [
+    ["external", "https://example.invalid/checkout?from=app-ai-locked"],
+  ]);
+  assert.doesNotMatch(html, /Open License Settings/);
 });
 
 test("an invalid key shows the service's reason instead of a generic one", () => {
@@ -282,14 +316,29 @@ test("demo and unconfigured Settings never expose activation or checkout", () =>
 });
 
 test("license status control opens the License tab when status needs attention", () => {
-  const html = render(LicenseStatusControl, status("expired"));
-  assert.match(html, /Unlock AI/);
-  click("Unlock AI · DayBoard Pro");
-  assert.deepEqual(fixture.calls, [["settings", "license"]]);
-
   render(LicenseStatusControl, status("unreadable"));
   click("License data needs attention");
   assert.deepEqual(fixture.calls, [["settings", "license"]]);
+
+  render(LicenseStatusControl, status("invalid"));
+  click("Unlock AI · DayBoard Pro");
+  assert.deepEqual(fixture.calls, [["settings", "license"]]);
+
+  // Without a checkout address there is no card to show, so the counter opens Settings.
+  render(LicenseStatusControl, status("expired", ""));
+  click("Unlock AI · DayBoard Pro");
+  assert.deepEqual(fixture.calls, [["settings", "license"]]);
+});
+
+test("during and after the trial, the sidebar counter opens a Pro card instead of Settings", () => {
+  for (const [state, label] of [
+    ["trial", "5 days left in your AI trial"],
+    ["expired", "Unlock AI · DayBoard Pro"],
+  ]) {
+    const html = render(LicenseStatusControl, status(state));
+    assert.match(html, new RegExp(`aria-haspopup="dialog"[^>]*>${label}<`), state);
+    assert.deepEqual(fixture.calls, [], state);
+  }
 });
 
 test("unreadable license data blocks AI and points to Settings", () => {
@@ -462,4 +511,125 @@ test("confirming the reset dialog sends license:reset with its exact confirmatio
     delete globalThis.window;
   }
   assert.deepEqual(fixture.toasts, [["error", "Error: Keychain refused"]]);
+});
+
+test("Settings leads the trial with Pro's price and what it adds, then key entry", () => {
+  for (const state of ["trial", "expired"]) {
+    const html = render(LicenseTab, status(state));
+    const offer = html.search(/DayBoard Pro · \$(5|9) once/);
+    const keyEntry = html.indexOf("License key");
+    assert.ok(offer > 0, state);
+    assert.ok(keyEntry > offer, `${state}: key entry follows the offer`);
+    assert.match(
+      html,
+      /Already bought Pro\? Paste the key from your receipt page or email\./,
+      state,
+    );
+    assert.match(html, /The Assistant, on the Claude or ChatGPT plan you already have/, state);
+    assert.match(html, /One payment, no subscription\. 14-day refunds\./, state);
+    assert.doesNotMatch(html, /After checkout, copy your license key/, state);
+    const buys = fixture.buttons.filter((item) => item.label === "Get DayBoard Pro");
+    assert.equal(buys.length, 1, `${state}: one buy button`);
+    buys[0].onClick();
+    assert.deepEqual(fixture.calls, [
+      ["external", "https://example.invalid/checkout?from=app-settings"],
+    ]);
+  }
+});
+
+test("Settings keeps fixing a saved key first, with a tagged buy button last", () => {
+  const html = render(LicenseTab, status("invalid"));
+  assert.doesNotMatch(html, /DayBoard Pro · \$|Already bought Pro\?/);
+  assert.ok(html.indexOf("Get DayBoard Pro") > html.indexOf("License key"));
+  click("Get DayBoard Pro");
+  assert.deepEqual(fixture.calls, [
+    ["external", "https://example.invalid/checkout?from=app-settings"],
+  ]);
+
+  const noCheckout = render(LicenseTab, status("trial", ""));
+  assert.doesNotMatch(noCheckout, /DayBoard Pro · \$|Get DayBoard Pro/);
+  assert.match(noCheckout, /After checkout, copy your license key/);
+});
+
+test("Pro's price follows the launch date the website and checkout page give", () => {
+  const pst = (iso) => Date.parse(`${iso}-08:00`);
+  assert.deepEqual(proPrice(pst("2026-11-01T09:00")), {
+    price: "$5",
+    note: "Launch price until December 31, then $9.",
+  });
+  assert.deepEqual(proPrice(pst("2026-11-19T09:00")), {
+    price: "$5",
+    note: "Launch price for 43 more days, then $9.",
+  });
+  assert.deepEqual(proPrice(pst("2026-12-31T09:00")), {
+    price: "$5",
+    note: "Last day at the $5 launch price, then $9.",
+  });
+  assert.deepEqual(proPrice(pst("2026-12-31T23:58")), {
+    price: "$5",
+    note: "Last day at the $5 launch price, then $9.",
+  });
+  assert.deepEqual(proPrice(pst("2027-01-01T00:00")), { price: "$9", note: "" });
+});
+
+test("buy links carry where in the app they sit, and nothing without a checkout address", () => {
+  assert.equal(
+    proBuyUrl("https://api.getdayboard.com/buy", "app-sidebar"),
+    "https://api.getdayboard.com/buy?from=app-sidebar",
+  );
+  assert.equal(proBuyUrl("", "app-sidebar"), "");
+  assert.equal(proBuyUrl("not a url", "app-sidebar"), "");
+});
+
+test("the trial reminder is due at 3 days left and on the last day, and never otherwise", () => {
+  const trial = (daysLeft) => ({ state: "trial", daysLeft });
+  assert.equal(trialReminderStage(trial(14)), null);
+  assert.equal(trialReminderStage(trial(4)), null);
+  assert.equal(trialReminderStage(trial(3)), "3-days");
+  assert.equal(trialReminderStage(trial(2)), "3-days");
+  assert.equal(trialReminderStage(trial(1)), "last-day");
+  for (const state of ["expired", "licensed", "demo", "disabled", "unconfigured"])
+    assert.equal(trialReminderStage({ state, keyHint: "1234" }), null, state);
+  assert.equal(trialReminderStage(undefined), null);
+});
+
+test("Home's trial reminder shows once per stage and Not now hides it until the next", () => {
+  const stored = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, value),
+  };
+  const reminder = (daysLeft, checkoutUrl = "https://example.invalid/checkout") =>
+    render(TrialReminder, { data: { status: { state: "trial", daysLeft }, checkoutUrl } });
+  try {
+    assert.equal(reminder(5), "");
+    assert.equal(reminder(3, ""), "");
+    const html = reminder(3);
+    assert.match(html, /3 days left in your AI trial\./);
+    assert.match(
+      html,
+      /Keep the Assistant, Quick Capture AI and dictation with DayBoard Pro: \$(5|9) once/,
+    );
+    click("Get DayBoard Pro");
+    assert.deepEqual(fixture.calls, [
+      ["external", "https://example.invalid/checkout?from=app-trial-reminder"],
+    ]);
+    click("Not now");
+    assert.equal(stored.get("home:trial-reminder:v1"), JSON.stringify("3-days"));
+    assert.equal(reminder(2), "");
+    assert.match(reminder(1), /Last day of your AI trial\./);
+    for (const state of ["expired", "licensed", "demo"])
+      assert.equal(
+        render(TrialReminder, {
+          data: {
+            status: { state, keyHint: "1234" },
+            checkoutUrl: "https://example.invalid/checkout",
+          },
+        }),
+        "",
+        state,
+      );
+  } finally {
+    delete globalThis.localStorage;
+  }
 });
