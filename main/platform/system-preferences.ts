@@ -7,6 +7,7 @@ import type { MediaAccessStatus, MediaAccessType } from "../../shared/bridge-pro
 
 const PRIVACY_PANES: Record<string, string> = {
   reminders: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders",
+  calendars: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars",
 };
 
 export const systemPreferences = {

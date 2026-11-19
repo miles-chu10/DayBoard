@@ -5,6 +5,7 @@ import { Notification } from "electron";
 
 import { describeCapture, parseCaptureTarget, type ItemDraft } from "../../shared/capture.js";
 import {
+  createCalendarEvent,
   getAccountsStatus,
   onAccountsChanged,
   requireAgendaScope,
@@ -13,6 +14,7 @@ import { ipcMain, logger } from "../platform/index.js";
 import { assertAiAccess, runGuardedCommand } from "../platform/ipc.js";
 import { runCompletion } from "../services/ai/completion.js";
 import { createReminder, deleteReminder } from "../services/apple-reminders.js";
+import { deleteAppleEvent, isAppleCalendarId } from "../services/apple-calendar.js";
 import { completeCapture } from "../services/capture/capture-completion.js";
 import {
   createCaptureService,
@@ -20,7 +22,7 @@ import {
   type CaptureSubmit,
 } from "../services/capture/capture-service.js";
 import { isDemoMode } from "../services/demo-data.js";
-import { createEvent, createTask, deleteEvent, deleteTask } from "../services/google-api.js";
+import { createTask, deleteEvent, deleteTask } from "../services/google-api.js";
 import { trackPendingWrite } from "../services/pending-writes.js";
 import { getSettings } from "../services/settings-store.js";
 import { recordNotificationResult } from "./notification-status.js";
@@ -62,7 +64,7 @@ const service = createCaptureService({
         dueTime: draft.date && draft.time ? draft.time : undefined,
       }),
     event: (draft) =>
-      createEvent({
+      createCalendarEvent({
         ...draftInput(draft),
         date: draft.date,
         startTime: draft.time || undefined,
@@ -73,7 +75,10 @@ const service = createCaptureService({
   remove: {
     task: (ref) => deleteTask(ref.listId, ref.taskId),
     reminder: (ref) => deleteReminder(ref),
-    event: (ref) => deleteEvent(ref.calendarId, ref.eventId),
+    event: (ref) =>
+      isAppleCalendarId(ref.calendarId)
+        ? deleteAppleEvent(ref.calendarId, ref.eventId)
+        : deleteEvent(ref.calendarId, ref.eventId),
   },
   onChange: (records) => ipcMain.broadcast("capture:changed", { records }),
   onCreated: (record) => {

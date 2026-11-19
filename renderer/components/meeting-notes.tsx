@@ -77,6 +77,7 @@ function FollowUps({ notes }: { notes: string }) {
       ? availableKinds({
           googleConnected: accounts.google.connected,
           remindersAccess: accounts.reminders,
+          calendarAccess: accounts.calendar,
           sources: settings.sources,
         })
       : { task: false, reminder: false, event: false };

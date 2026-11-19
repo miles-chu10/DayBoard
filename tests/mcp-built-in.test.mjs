@@ -1,4 +1,4 @@
-import { fixtureImport } from "./fixture-imports.mjs";
+import { fixtureImport, macCalendarOffStub } from "./fixture-imports.mjs";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { createServer, request } from "node:http";
@@ -24,8 +24,7 @@ export async function createReplyDraft() { throw new Error("write should not run
 export async function createTask() { throw new Error("write should not run"); }
 export async function getMessageBody() { return "body"; }
 export async function listCompletedTasks() { return []; }
-export async function listEvents() { return []; }
-export async function listEventsBetween() { return []; }
+export async function listEventsBetweenWithCoverage() { return { items: [], coverage: { complete: true, loaded: 0 } }; }
 export async function listInbox() { return []; }
 export async function listTasks() { return []; }
 export async function modifyMessage() { throw new Error("write should not run"); }
@@ -48,7 +47,7 @@ export async function getSettings() {
   return {
     sources: { tasks: { enabled: true }, reminders: { enabled: true }, mail: { enabled: true }, calendar: { enabled: true } },
     mail: { maxMessages: 25 },
-    calendar: { range: "next-7-days", visibility: {} },
+    calendar: { range: "next-7-days", visibility: {}, newEvents: "" },
     mcpServer: globalThis.__mcpServerSettings ?? { enabled: true, allowWrites: true },
   };
 }
@@ -67,6 +66,7 @@ function mcpPlugin() {
     ["./gmail-imap.js", googleStub],
     ["./google-auth.js", authStub],
     ["./apple-reminders.js", remindersStub],
+    ["./apple-calendar.js", macCalendarOffStub],
     ["./settings-store.js", settingsStub],
     ["./mcp-access-key.js", accessKeyStub],
     ["./calendar-range.js", calendarRangeStub],

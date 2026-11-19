@@ -13,8 +13,7 @@ import {
   createEvent,
   createTask,
   listCompletedTasks,
-  listEvents,
-  listEventsBetween,
+  listEventsBetweenWithCoverage,
   listTasks,
   setTaskCompleted,
 } from "./google-api.js";
@@ -27,6 +26,7 @@ import {
   listReminders,
   setReminderCompleted,
 } from "./apple-reminders.js";
+import { createAppleEvent, getCalendarAccess, listCalendarEvents } from "./apple-calendar.js";
 import { calendarRangeDays } from "./calendar-range.js";
 import { reconcileAgendaKeys } from "./agenda-store.js";
 import { isDemoMode } from "./demo-data.js";
@@ -44,7 +44,14 @@ import {
 } from "./agent-stores.js";
 import { trackPendingWrite } from "./pending-writes.js";
 import { runAppOperation } from "./runtime-activity.js";
-import type { DataChangedEvent, McpServerConfig, Note, SourceId } from "../shared-types.js";
+import type {
+  CalendarEventItem,
+  DataChangedEvent,
+  McpServerConfig,
+  Note,
+  SourceId,
+} from "../shared-types.js";
+import { newEventDestination } from "../../shared/apple-calendar.js";
 import { replacementAgendaKey } from "../../shared/agenda-identities.js";
 
 // Local MCP endpoint so MCP clients (Claude Code, Codex, …) can use the dashboard's
@@ -87,7 +94,7 @@ const SOURCE_NAMES: Record<SourceId, string> = {
   tasks: "Google Tasks",
   reminders: "Apple Reminders",
   mail: "Gmail",
-  calendar: "Google Calendar",
+  calendar: "Calendar",
 };
 
 const date = z
@@ -134,6 +141,27 @@ async function ensureSource(source: SourceId): Promise<void> {
       );
     }
   }
+}
+
+/** Google Calendar and Mac calendar events between two instants, as the app's calendar shows them. */
+async function calendarEventsBetween(start: Date, end: Date): Promise<CalendarEventItem[]> {
+  const [settings, google] = await Promise.all([getSettings(), getGoogleStatus()]);
+  const visibility = settings.calendar.visibility;
+  const result = await listCalendarEvents({
+    start,
+    end,
+    visibility,
+    googleEmail: google.email,
+    googleConnected: google.connected,
+    google: () => listEventsBetweenWithCoverage(start, end, visibility, google.email),
+    authReason: (error) => (error instanceof GoogleAuthError ? error.reason : null),
+  });
+  if (result.state === "ok") return result.items;
+  const reason =
+    result.state === "needs-setup" || result.state === "not-granted"
+      ? result.state
+      : "not-connected";
+  throw new GoogleAuthError(reason, "No calendar is available.");
 }
 
 function notifyChanged(source: SourceId): void {
@@ -276,7 +304,7 @@ function registerReadOnlyTools(server: McpServer): void {
     "list_events",
     {
       title: "List events",
-      description: `List upcoming Google Calendar events from the calendars shown in the app (up to ${MAX_LIST}).`,
+      description: `List upcoming events from the Google and Mac calendars shown in the app (up to ${MAX_LIST}).`,
       inputSchema: {
         days_ahead: z
           .number()
@@ -289,11 +317,11 @@ function registerReadOnlyTools(server: McpServer): void {
     },
     run("calendar", async ({ days_ahead }: { days_ahead?: number }) => {
       const settings = await getSettings();
-      const events = await listEvents(
-        days_ahead ?? calendarRangeDays(settings.calendar.range),
-        settings.calendar.visibility,
-      );
-      return text(capped(events, "events"));
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + (days_ahead ?? calendarRangeDays(settings.calendar.range)));
+      return text(capped(await calendarEventsBetween(start, end), "events"));
     }),
   );
   server.registerTool(
@@ -311,11 +339,10 @@ function registerReadOnlyTools(server: McpServer): void {
           ? { unavailable: result.content[0]?.text }
           : JSON.parse(result.content[0]?.text ?? "{}");
       };
-      const visibility = (await getSettings()).calendar.visibility;
       const [tasks, reminders, events] = await Promise.all([
         section("tasks", () => listCompletedTasks(since)),
         section("reminders", () => listCompletedReminders(since)),
-        section("calendar", () => listEventsBetween(since, new Date(), visibility)),
+        section("calendar", () => calendarEventsBetween(since, new Date())),
       ]);
       return text({
         since: since.toISOString(),
@@ -531,7 +558,7 @@ function buildMcpServer(allowWrites: boolean): McpServer {
     {
       title: "Create event",
       description:
-        "Add an event to the primary Google Calendar. Omit start_time for an all-day event.",
+        "Add an event where DayBoard adds new events: the primary Google Calendar or the Mac calendar chosen in Settings. Omit start_time for an all-day event.",
       inputSchema: {
         title: z.string().min(1),
         date,
@@ -551,14 +578,26 @@ function buildMcpServer(allowWrites: boolean): McpServer {
         time_zone?: string;
         notes?: string;
       }) => {
-        await createEvent({
+        const input = {
           title: args.title,
           date: args.date,
           startTime: args.start_time,
           endTime: args.end_time,
           timeZone: args.time_zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
           notes: args.notes,
-        });
+        };
+        const [settings, google, access] = await Promise.all([
+          getSettings(),
+          getGoogleStatus(),
+          getCalendarAccess(),
+        ]);
+        const destination = newEventDestination(
+          settings.calendar.newEvents,
+          google.connected,
+          access,
+        );
+        if (destination.kind === "google") await createEvent(input);
+        else await createAppleEvent(input, destination.calendarId ?? undefined);
         notifyChanged("calendar");
         return text(`Created event "${args.title}" on ${args.date}.`);
       },

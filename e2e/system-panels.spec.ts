@@ -929,20 +929,30 @@ test("the menu bar switches views and days without losing what is typed", async 
     await panel.screenshot({ path: "test-results/menubar-day-line-other-day.png" });
     await strip.getByRole("button").first().click();
 
-    // The command bar stays at the bottom, under the feed, inside the window.
-    const layout = await panel.evaluate(() => {
-      const { document, innerHeight } = globalThis as unknown as {
-        innerHeight: number;
-        document: {
-          querySelector(
-            selector: string,
-          ): { getBoundingClientRect(): { bottom: number; top: number } } | null;
+    // The command bar stays at the bottom, under the feed, inside the window. Today's line is
+    // longer than the other day's, and the window grows to fit it a moment after the click
+    // (ResizeObserver → panel:resize → setBounds), so measure once that has happened.
+    const measure = () =>
+      panel.evaluate(() => {
+        const { document, innerHeight } = globalThis as unknown as {
+          innerHeight: number;
+          document: {
+            querySelector(
+              selector: string,
+            ): { getBoundingClientRect(): { bottom: number; top: number } } | null;
+          };
         };
-      };
-      const input = document.querySelector("input")!.getBoundingClientRect();
-      const feed = document.querySelector('[aria-label="Agenda feed"]')!.getBoundingClientRect();
-      return { height: innerHeight, inputTop: input.top, inputBottom: input.bottom, feed };
-    });
+        const input = document.querySelector("input")!.getBoundingClientRect();
+        const feed = document.querySelector('[aria-label="Agenda feed"]')!.getBoundingClientRect();
+        return { height: innerHeight, inputTop: input.top, inputBottom: input.bottom, feed };
+      });
+    await expect
+      .poll(async () => {
+        const { height, inputBottom } = await measure();
+        return inputBottom <= height;
+      })
+      .toBe(true);
+    const layout = await measure();
     expect(layout.inputBottom).toBeLessThanOrEqual(layout.height);
     expect(layout.feed.bottom).toBeLessThanOrEqual(layout.inputTop);
     await panel.screenshot({ path: "test-results/menubar-day-line.png" });
