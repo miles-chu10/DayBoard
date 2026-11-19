@@ -3,11 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import worker, {
-  firePayload,
-  isAutomated,
-  startFeedbackCheck,
-} from "../support-mail-worker/worker.js";
+import worker, { isAutomated, startFeedbackCheck } from "../support-mail-worker/worker.js";
 
 const root = join(import.meta.dirname, "..");
 
@@ -54,7 +50,7 @@ async function withFetch(impl, run) {
   }
 }
 
-test("forwards first, then starts the feedback task once with only the message id and subject", async () => {
+test("forwards first, then starts the feedback task once with no text", async () => {
   const message = fakeMessage();
   const requests = [];
   await withFetch(
@@ -74,11 +70,7 @@ test("forwards first, then starts the feedback task once with only the message i
   assert.equal(init.headers.Authorization, "Bearer token-value");
   assert.equal(init.headers["anthropic-beta"], "experimental-cc-routine-2026-04-01");
   assert.equal(init.headers["anthropic-version"], "2023-06-01");
-  const body = JSON.parse(init.body);
-  assert.deepEqual(Object.keys(body), ["text"]);
-  assert.match(body.text, /Message-ID: <abc@example\.com>/);
-  assert.match(body.text, /Subject: DayBoard feedback \(1\.3\.10\)/);
-  assert.doesNotMatch(body.text, /user@example\.com/, "the sender stays out of the payload");
+  assert.deepEqual(JSON.parse(init.body), {}, "nothing from the email leaves the Worker");
 });
 
 test("a failed or hung start never throws after the forward", async () => {
@@ -93,9 +85,35 @@ test("a failed or hung start never throws after the forward", async () => {
     assert.deepEqual(message.calls, [["forward", "inbox@example.com"]]);
   }
   assert.equal(
-    await startFeedbackCheck(fakeMessage(), env, async () => new Response("", { status: 429 })),
+    await startFeedbackCheck(env, async () => new Response("", { status: 429 })),
     "failed",
   );
+});
+
+test("a refused start logs the API's error type and message, and nothing else", async () => {
+  const logged = [];
+  const original = console.error;
+  console.error = (line) => logged.push(line);
+  try {
+    const refusal = JSON.stringify({
+      type: "error",
+      error: { type: "permission_error", message: "No access\r\nto this endpoint" },
+    });
+    assert.equal(
+      await startFeedbackCheck(env, async () => new Response(refusal, { status: 403 })),
+      "failed",
+    );
+    assert.equal(
+      await startFeedbackCheck(env, async () => new Response("<html>", { status: 502 })),
+      "failed",
+    );
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(logged, [
+    "Feedback task did not start: HTTP 403 (permission_error: No access to this endpoint)",
+    "Feedback task did not start: HTTP 502",
+  ]);
 });
 
 test("without the task secrets it still forwards and makes no request", async () => {
@@ -142,17 +160,6 @@ test("bounces, auto-replies and list mail are forwarded but don't start the task
   }
   assert.equal(isAutomated(fakeMessage({ "Auto-Submitted": "no" })), false);
   assert.equal(isAutomated(fakeMessage()), false);
-});
-
-test("the payload stays on its own lines and is bounded", () => {
-  const text = firePayload(
-    fakeMessage({ Subject: `Hello\r\nBcc: x@example.com ${"a".repeat(500)}`, "Message-ID": "" }),
-  );
-  const lines = text.split("\n");
-  assert.equal(lines.length, 3);
-  assert.equal(lines[1], "Message-ID: (none)");
-  assert.ok(lines[2].length <= "Subject: ".length + 200);
-  assert.doesNotMatch(lines[2], /[\r\n]/);
 });
 
 test("the Worker config keeps the forwarding address and task secrets out of the repo", () => {

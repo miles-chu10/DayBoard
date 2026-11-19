@@ -6,12 +6,12 @@ through this Worker instead of a plain Email Routing forward. For each message i
 1. Forwards it to the inbox in `FORWARD_TO`, exactly like the old "Send to an email" rule. This
    always happens first and never depends on step 2.
 2. If a person wrote it (not a bounce, auto-reply or mailing list), starts the "DayBoard feedback
-   check" scheduled task once over its API, passing only the message's `Message-ID` and subject. The
-   task reads the email from Gmail, labels it `Projects/DayBoard/Feedback` and writes a reply draft.
-   It never sends mail.
+   check" scheduled task once over its API. The request carries nothing from the email: the task
+   finds new support mail in Gmail itself, labels it `Projects/DayBoard/Feedback` and writes a
+   reply draft. It never sends mail.
 
-If starting the task fails, the Worker logs `Feedback task did not start: HTTP <status>` and the
-email is still delivered. Every run of the task looks at all unlabelled support mail from the last
+If starting the task fails, the Worker logs `Feedback task did not start: HTTP <status>` with the
+API's error type and message, and the email is still delivered. Every run of the task looks at all unlabelled support mail from the last
 30 days, so the next email also picks up one that was missed.
 
 ## Secrets

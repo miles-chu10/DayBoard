@@ -2,8 +2,9 @@
 // Email Routing hands every message for support@getdayboard.com to this Worker. Delivery comes
 // first and never depends on the rest: the message is forwarded to the inbox exactly as the old
 // "Send to an email" rule did. Then, for mail a person wrote, the feedback scheduled task is
-// started once so it can label the thread and draft a reply. A failure to start it is logged and
-// ignored, because throwing after the forward could make Email Routing deliver the message twice.
+// started once so it can find the email in Gmail, label it and draft a reply. A failure to start it
+// is logged and ignored, because throwing after the forward could make Email Routing deliver the
+// message twice.
 
 const FIRE_URL = "https://api.anthropic.com/v1/claude_code/routines";
 const FIRE_TIMEOUT_MS = 10_000;
@@ -18,7 +19,7 @@ export default {
     }
     await message.forward(env.FORWARD_TO);
     if (isAutomated(message)) return;
-    await startFeedbackCheck(message, env);
+    await startFeedbackCheck(env);
   },
 };
 
@@ -39,21 +40,9 @@ export function isAutomated(message) {
   );
 }
 
-/** The task reads the message from Gmail itself; this only says which one to look for. */
-export function firePayload(message) {
-  const field = (name, max) =>
-    (message.headers.get(name) ?? "")
-      .replace(/[\r\n]+/g, " ")
-      .trim()
-      .slice(0, max);
-  return [
-    "A new email reached support@getdayboard.com.",
-    `Message-ID: ${field("message-id", 300) || "(none)"}`,
-    `Subject: ${field("subject", 200) || "(none)"}`,
-  ].join("\n");
-}
-
-export async function startFeedbackCheck(message, env, fetchImpl = fetch) {
+// The request carries no text. This task opens a new project thread on each run, and those tasks
+// can't be run with added text; the task finds new support mail in Gmail itself.
+export async function startFeedbackCheck(env, fetchImpl = fetch) {
   if (!env.FEEDBACK_TASK_ID || !env.FEEDBACK_TASK_TOKEN) {
     console.warn("Feedback task not configured; forwarded only");
     return "not-configured";
@@ -69,12 +58,14 @@ export async function startFeedbackCheck(message, env, fetchImpl = fetch) {
           "anthropic-version": "2023-06-01",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: firePayload(message) }),
+        body: "{}",
         signal: AbortSignal.timeout(FIRE_TIMEOUT_MS),
       },
     );
     if (!response.ok) {
-      console.error(`Feedback task did not start: HTTP ${response.status}`);
+      console.error(
+        `Feedback task did not start: HTTP ${response.status}${await errorDetail(response)}`,
+      );
       return "failed";
     }
     console.log("Feedback task started");
@@ -82,5 +73,16 @@ export async function startFeedbackCheck(message, env, fetchImpl = fetch) {
   } catch (error) {
     console.error(`Feedback task did not start: ${error?.name ?? "error"}`);
     return "failed";
+  }
+}
+
+/** The API's error type and message, which name the cause without any token or mail content. */
+async function errorDetail(response) {
+  try {
+    const { error } = await response.json();
+    const detail = [error?.type, error?.message].filter(Boolean).join(": ");
+    return detail ? ` (${detail.replace(/[\r\n]+/g, " ").slice(0, 200)})` : "";
+  } catch {
+    return "";
   }
 }
