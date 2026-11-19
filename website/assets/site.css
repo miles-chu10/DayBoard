@@ -1396,6 +1396,76 @@ p {
   font-size: 1.9rem;
 }
 
+/* Download page: the Pro offer under the download button, and the note shown once a download starts. */
+.pro-offer {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+
+.pro-offer h3 {
+  font: 600 1.45rem/1.15 var(--display);
+}
+
+.pro-offer h3 span {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.pro-offer ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.pro-offer li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.pro-offer li::before {
+  content: "";
+  position: absolute;
+  top: 0.42em;
+  left: 2px;
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid var(--calendar-ink);
+  border-left: 2px solid var(--calendar-ink);
+  transform: rotate(-45deg);
+}
+
+.download-started {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  max-width: 760px;
+  margin-top: 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.download-started[hidden] {
+  display: none;
+}
+
+.download-started p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
 .aside-card p {
   color: var(--ink-soft);
 }

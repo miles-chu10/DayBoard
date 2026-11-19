@@ -485,6 +485,7 @@ test("origin checks, bounded bodies, and receipt never disclose a key", async ()
   const buy = await f.call("/buy");
   const html = await buy.text();
   assert.equal(buy.headers.get("Cache-Control"), "no-store, max-age=0");
+  assert.equal(buy.headers.get("Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
   assert.match(html, /DayBoard/);
   assert.equal(
     (await f.call("/v1/checkout", "POST", "", undefined, { Origin: "https://other.example" }))

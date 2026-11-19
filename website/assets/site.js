@@ -23,6 +23,28 @@ for (const link of document.querySelectorAll("a[data-buy]")) {
 }
 for (const note of document.querySelectorAll("[data-buy-pending]")) note.hidden = Boolean(buyUrl);
 
+// The launch price ends December 31, 2026 at 11:59 PM PST. Until then, say how many days are left.
+const launchPriceEnds = Date.UTC(2027, 0, 1, 7, 59);
+const launchDaysLeft = Math.ceil((launchPriceEnds - Date.now()) / 86_400_000);
+if (launchDaysLeft > 0 && launchDaysLeft <= 60) {
+  for (const note of document.querySelectorAll("[data-launch-countdown]")) {
+    note.textContent =
+      launchDaysLeft === 1
+        ? "Last day at the $5 launch price, then $9."
+        : `$5 launch price for ${launchDaysLeft} more days, then $9.`;
+  }
+}
+
+// After a download starts, show the next step and the Pro offer nearest that download button.
+for (const link of document.querySelectorAll("a[data-download]")) {
+  link.addEventListener("click", () => {
+    let scope = link.parentElement;
+    while (scope && !scope.querySelector("[data-download-started]")) scope = scope.parentElement;
+    const note = scope?.querySelector("[data-download-started]");
+    if (note) note.hidden = false;
+  });
+}
+
 const contactEmail = /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(SITE_CONFIG.contactEmail)
   ? SITE_CONFIG.contactEmail
   : null;
