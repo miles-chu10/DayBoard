@@ -61,3 +61,14 @@ test("the pricing page links to checkout in its HTML, so buying works without sc
   assert.match(page, new RegExp(`<a class="button" data-buy href="${address}"`));
   assert.match(page, /<p data-buy-pending hidden>/);
 });
+
+test("the download page offers DayBoard Pro beside the download, in its HTML", async () => {
+  const page = await readFile(new URL("../website/download.html", import.meta.url), "utf8");
+  const address = source.match(/buyUrl: "([^"]*)"/)[1];
+  const buyLinks = page.match(/<a class="button[^"]*" data-buy href="([^"]*)"/g) ?? [];
+  assert.equal(buyLinks.length, 2, "the Pro offer and the download-started note");
+  for (const link of buyLinks) assert.ok(link.endsWith(`href="${address}"`), link);
+  assert.match(page, /<p class="fine" data-buy-pending hidden>/);
+  assert.match(page, /<a\s+class="button"\s+data-download\s+href="[^"]+\.dmg"/);
+  assert.match(page, /<div class="download-started" data-download-started role="status" hidden>/);
+});
