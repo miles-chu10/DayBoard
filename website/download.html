@@ -492,6 +492,13 @@
             app and its disk image are signed with an Apple Developer ID and notarized by Apple, and
             the app updates itself.
           </p>
+          <div class="download-started" data-download-started role="status" hidden>
+            <p>
+              <strong>Your download has started.</strong> Open the .dmg and drag DayBoard into
+              Applications. AI is free for 14 days, and Pro is $5 once at the launch price.
+            </p>
+            <a class="button" data-buy href="https://api.getdayboard.com/buy">Get DayBoard Pro</a>
+          </div>
         </div>
       </header>
 
@@ -602,13 +609,32 @@
           <p>macOS 14 Sonoma or later. 139.4 MB disk image.</p>
           <a
             class="button"
+            data-download
             href="https://github.com/miles-chu10/DayBoard/releases/download/v1.3.10/DayBoard-1.3.10-arm64.dmg"
             >Download for Mac</a
           >
           <p class="fine">
-            <a href="changelog.html">Release notes</a>
-            · <a href="pricing.html">Pricing</a> · 14-day AI trial.
+            <a href="changelog.html">Release notes</a> · Free, with a 14-day AI trial.
           </p>
+          <section class="pro-offer" aria-labelledby="pro-offer-title">
+            <span class="eyebrow">DayBoard Pro · Launch price</span>
+            <h3 id="pro-offer-title">$5 once <span>for AI, for good.</span></h3>
+            <ul>
+              <li>The Assistant, on the Claude or ChatGPT plan you already have</li>
+              <li>AI in Quick Capture, dictation and the daily briefing</li>
+              <li>Up to 3 Macs, with future updates included</li>
+            </ul>
+            <a class="button button-quiet" data-buy href="https://api.getdayboard.com/buy"
+              >Get DayBoard Pro</a
+            >
+            <p class="fine">
+              <span data-launch-countdown>$5 until December 31, 2026, then $9.</span> One payment,
+              14-day refunds. <a href="pricing.html">What's included</a>
+            </p>
+            <p class="fine" data-buy-pending hidden>
+              Checkout isn't open yet. AI is free for 14 days from the first time you use it.
+            </p>
+          </section>
         </aside>
       </div>
     </main>
