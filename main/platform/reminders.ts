@@ -111,6 +111,76 @@ export interface UpdateReminderPatch {
   clearFields?: ClearableReminderField[];
 }
 
+/** Locates one Mac Calendar event, or one occurrence of a recurring event. */
+export interface CalendarEventRef {
+  id: string;
+  /** The occurrence's original start as an instant; stays fixed when the occurrence is moved. */
+  occurrenceDate: string | null;
+  /** The current start instant, a search hint for a moved occurrence. */
+  start?: string | null;
+}
+
+export interface NativeCalendarEvent {
+  id: string;
+  occurrenceDate: string | null;
+  startInstant: string | null;
+  externalId: string | null;
+  calendarId: string;
+  title: string;
+  /** YYYY-MM-DD for all-day events, otherwise an RFC 3339 instant with the Mac's offset. */
+  start: string;
+  /** Exclusive YYYY-MM-DD for all-day events, otherwise an RFC 3339 instant. */
+  end: string;
+  allDay: boolean;
+  location: string | null;
+  notes: string | null;
+  url: string | null;
+  recurring: boolean;
+  attendees: string[];
+  hasAttendees: boolean;
+  organizerIsSelf: boolean;
+  selfStatus: "accepted" | "declined" | "tentative" | "needsAction" | null;
+}
+
+export interface GetEventsOptions {
+  /** RFC 3339 instants. */
+  start: string;
+  end: string;
+  /** Only these calendars; an empty list returns no events. Omit for every calendar. */
+  calendarIds?: string[];
+  limit?: number;
+}
+
+export interface GetEventsResult {
+  events: NativeCalendarEvent[];
+  truncated: boolean;
+}
+
+/** All-day: YYYY-MM-DD dates, end exclusive. Timed: RFC 3339 instants or wall-clock times in a zone. */
+export type CalendarEventTimes =
+  | { allDay: true; start: string; end: string }
+  | {
+      allDay: false;
+      start: string | EventTime;
+      end: string | EventTime;
+      timeZone?: string;
+    };
+
+export interface CalendarEventPatch {
+  title?: string;
+  /** Empty clears. */
+  notes?: string;
+  /** Empty clears. */
+  location?: string;
+  calendarId?: string;
+  times?: CalendarEventTimes;
+}
+
+export interface CreateCalendarEventInput extends CalendarEventPatch {
+  title: string;
+  times: CalendarEventTimes;
+}
+
 const REQUEST_TIMEOUT_MS = 15_000;
 const PERMISSION_TIMEOUT_MS = 5 * 60_000;
 
@@ -212,7 +282,9 @@ class RemindersProcess {
           true,
         );
       },
-      pending.op === "requestAccess" ? PERMISSION_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+      pending.op === "requestAccess" || pending.op === "requestEventAccess"
+        ? PERMISSION_TIMEOUT_MS
+        : REQUEST_TIMEOUT_MS,
     );
     try {
       child.stdin.write(
@@ -268,5 +340,33 @@ export const reminders = {
   },
   deleteReminder(reference: ReminderRef): Promise<void> {
     return process_.request("deleteReminder", { reference });
+  },
+  // Mac Calendar events share the helper; macOS grants calendar access separately from Reminders.
+  eventStatus(): Promise<RemindersAuthorizationStatus> {
+    return process_.request("eventStatus");
+  },
+  requestEventAccess(): Promise<RemindersAuthorizationStatus> {
+    return process_.request("requestEventAccess");
+  },
+  getEventCalendars(): Promise<CalendarInfo[]> {
+    return process_.request("getEventCalendars");
+  },
+  getEvents(options: GetEventsOptions): Promise<GetEventsResult> {
+    return process_.request("getEvents", { ...options });
+  },
+  getEvent(reference: CalendarEventRef): Promise<NativeCalendarEvent> {
+    return process_.request("getEvent", { reference });
+  },
+  createEvent(input: CreateCalendarEventInput): Promise<NativeCalendarEvent> {
+    return process_.request("createEvent", { input });
+  },
+  updateEvent(
+    reference: CalendarEventRef,
+    patch: CalendarEventPatch,
+  ): Promise<NativeCalendarEvent> {
+    return process_.request("updateEvent", { reference, patch });
+  },
+  deleteEvent(reference: CalendarEventRef): Promise<void> {
+    return process_.request("deleteEvent", { reference });
   },
 };

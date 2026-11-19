@@ -45,6 +45,7 @@ import {
   requestRemindersAccess,
   setReminderCompleted,
 } from "../services/apple-reminders.js";
+import { getCalendarAccess } from "../services/apple-calendar.js";
 import { calendarRangeDays } from "../services/calendar-range.js";
 import {
   trackPendingWrite as trackProductivityWrite,
@@ -197,12 +198,13 @@ function requireUUID(value: unknown, channel: string): string {
 
 export async function getAccountsStatus(): Promise<AccountsStatus> {
   if (isDemoMode()) return demoAccounts;
-  const [google, gmail, reminders] = await Promise.all([
+  const [google, gmail, reminders, calendar] = await Promise.all([
     getGoogleStatus(),
     getGmailStatus(),
     getRemindersAccess(),
+    getCalendarAccess(),
   ]);
-  return { google, gmail, reminders };
+  return { google, gmail, reminders, calendar };
 }
 
 async function agendaScope(): Promise<string | null> {
