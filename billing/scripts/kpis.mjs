@@ -192,7 +192,18 @@ export function summarizeMoney(sessions, refunds) {
   const refunded =
     refunds.filter((r) => r.status === "succeeded").reduce((n, r) => n + r.amount, 0) / 100;
   const fees = gross * FEE_RATE + paid.length * FEE_FIXED;
+  // Where each buyer clicked Get DayBoard Pro (`/buy?from=`); sessions before tags were added
+  // or opened from a bare /buy link count as "untagged".
+  const bySource = new Map();
+  for (const s of sessions) {
+    const source = s.metadata?.source || "untagged";
+    const row = bySource.get(source) ?? { source, checkouts: 0, paid: 0 };
+    row.checkouts += 1;
+    if (s.payment_status === "paid") row.paid += 1;
+    bySource.set(source, row);
+  }
   return {
+    by_source: [...bySource.values()].sort((a, b) => b.paid - a.paid || b.checkouts - a.checkouts),
     checkouts_started: sessions.length,
     paid_sales: paid.length,
     gross_usd: round2(gross),
@@ -358,6 +369,13 @@ export function toMarkdown(k) {
       `- Checkouts started: ${m.checkouts_started}, paid sales: ${m.paid_sales}`,
       `- Gross $${m.gross_usd.toFixed(2)}, refunds $${m.refunds_usd.toFixed(2)}, est. fees $${m.fees_est_usd.toFixed(2)}, est. net $${m.net_est_usd.toFixed(2)}`,
     );
+    if (m.by_source.length)
+      out.push(
+        ``,
+        `| Clicked from | Checkouts | Paid |`,
+        `|---|---:|---:|`,
+        ...m.by_source.map((r) => `| ${r.source} | ${r.checkouts} | ${r.paid} |`),
+      );
     if (m.truncated)
       out.push(`- Only the most recent ${STRIPE_PAGE_LIMIT * 100} records were read.`);
   } else out.push(unavailable(k.money));

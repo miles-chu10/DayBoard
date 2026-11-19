@@ -200,7 +200,14 @@ export function CapturePanel() {
       {ai.lock && license && !nothingAvailable ? (
         <Callout
           color="orange"
-          actions={<LicenseUpsellActions checkoutUrl={license.checkoutUrl} size="small" />}
+          actions={
+            <LicenseUpsellActions
+              checkoutUrl={license.checkoutUrl}
+              status={license.status}
+              from="app-quick-capture"
+              size="small"
+            />
+          }
         >
           {AI_LOCKED_NOTE[ai.lock]}
         </Callout>

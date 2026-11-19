@@ -16,9 +16,15 @@ const buyUrl = (() => {
   }
 })();
 // Pages carry the live link in their HTML so buying works without scripts; this keeps them in
-// step with the address above, and closes them when it is empty.
+// step with the address above, and closes them when it is empty. data-buy="<tag>" names where
+// the link sits; checkout keeps it with the sale (?from=) so sales can be counted per link.
 for (const link of document.querySelectorAll("a[data-buy]")) {
-  if (buyUrl) link.href = buyUrl;
+  if (buyUrl) {
+    const url = new URL(buyUrl);
+    const from = link.dataset?.buy ?? "";
+    if (/^[a-z0-9-]{1,32}$/.test(from)) url.searchParams.set("from", from);
+    link.href = url.href;
+  }
   link.hidden = !buyUrl;
 }
 for (const note of document.querySelectorAll("[data-buy-pending]")) note.hidden = Boolean(buyUrl);

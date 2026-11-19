@@ -26,7 +26,7 @@ The waitlist closed when DayBoard 1.3.0 shipped. `waitlist.html` and the signup 
 
 From beta 18 on, both the app and its DMG are Developer ID signed, notarized and stapled (the DMG passes `stapler validate` and `spctl` as Notarized Developer ID). Releases up to beta 17 notarized only the app. Google access may still be restricted to invited accounts. From beta 19 on, licensing is on: everything that isn't AI stays free, and AI runs a 14-day trial on each Mac before it needs DayBoard Pro.
 
-Buy buttons (`a[data-buy]`) ship hidden, and `[data-buy-pending]` notes say checkout isn't open yet. `buyUrl` in `assets/site.js` is set to the live billing service's checkout page (`https://api.getdayboard.com/buy`), so the script shows the buttons and hides the notes. Set it to `""` to close checkout again. Only an HTTPS address is accepted. `tests/website-buy.test.mjs` pins the live address and checks both states.
+Buy buttons (`a[data-buy]`) ship hidden, and `[data-buy-pending]` notes say checkout isn't open yet. `buyUrl` in `assets/site.js` is set to the live billing service's checkout page (`https://api.getdayboard.com/buy`), so the script shows the buttons and hides the notes. Set it to `""` to close checkout again. Only an HTTPS address is accepted. Each buy link names where it sits, as `data-buy="<tag>"` with the same tag in its HTML link (`/buy?from=<tag>`), and the script keeps that tag when it sets the address; checkout saves it with the sale so the KPI report can count sales per link. `tests/website-buy.test.mjs` pins the live address, checks both states and requires every link to carry a tag.
 
 ## Publishing
 

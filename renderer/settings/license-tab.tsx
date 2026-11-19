@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 import { AlertDialog, Button, Callout, Field, FieldSet, Input, Status } from "../ui";
+import { ProOffer } from "../components/pro-offer";
 import {
   LICENSE_DEACTIVATE_COPY,
   LICENSE_FORGET_COPY,
   LICENSE_RELEASE_PENDING_COPY,
   LICENSE_RESET_COPY,
   LICENSE_STATUS_COPY,
+  proBuyUrl,
   useActivateLicense,
   useDeactivateLicense,
   useForgetPendingRelease,
@@ -27,14 +29,26 @@ const STATUS_VARIANT = {
   unreadable: "warning",
 } as const;
 
-function KeyEntry({ busy, onSubmit }: { busy: boolean; onSubmit: (key: string) => void }) {
+function KeyEntry({
+  busy,
+  onSubmit,
+  description,
+  secondary = false,
+}: {
+  busy: boolean;
+  onSubmit: (key: string) => void;
+  description?: string;
+  /** Below the Pro offer, so its buy button stays the one accent button. */
+  secondary?: boolean;
+}) {
   const [key, setKey] = useState("");
   const commit = () => {
     const trimmed = key.trim();
     if (trimmed) onSubmit(trimmed);
   };
   return (
-    <Field label="License key">
+    // The receipt page and license email say "Paste your key into License key".
+    <Field label="License key" description={description}>
       <div className="flex gap-2">
         <Input
           aria-label="License key"
@@ -47,7 +61,11 @@ function KeyEntry({ busy, onSubmit }: { busy: boolean; onSubmit: (key: string) =
           }}
           className="flex-1"
         />
-        <Button variant="accent" onClick={commit} disabled={busy || !key.trim()}>
+        <Button
+          variant={secondary ? "filled" : "accent"}
+          onClick={commit}
+          disabled={busy || !key.trim()}
+        >
           {busy ? "Activating…" : "Activate"}
         </Button>
       </div>
@@ -86,7 +104,10 @@ export function LicenseTab() {
 
   const { status, checkoutUrl } = data;
   const copy = LICENSE_STATUS_COPY[status.state];
-  const canBuy = checkoutUrl.trim().length > 0;
+  const buyUrl = proBuyUrl(checkoutUrl, "app-settings");
+  // While trying AI or once the trial ends, lead with what Pro costs and adds; people who already
+  // bought find key entry right below. Other states lead with fixing the saved key.
+  const offerFirst = buyUrl !== "" && (status.state === "trial" || status.state === "expired");
   // From the saved record, so it survives reopening Settings and clears once a retry confirms.
   // Only while no key is saved, so "Try again" can never remove a newly entered key.
   const releasePending =
@@ -138,6 +159,16 @@ export function LicenseTab() {
         </Field>
       ) : null}
 
+      {offerFirst ? (
+        <Field>
+          <ProOffer
+            checkoutUrl={checkoutUrl}
+            from="app-settings"
+            className="rounded-xl bg-control-subtle p-4"
+          />
+        </Field>
+      ) : null}
+
       {status.state === "disabled" ||
       status.state === "demo" ||
       status.state === "unconfigured" ? null : status.state === "licensed" ? (
@@ -148,13 +179,24 @@ export function LicenseTab() {
         </Field>
       ) : (
         <>
-          <Field>
-            <p className="text-small text-secondary">
-              After checkout, copy your license key from the DayBoard receipt page and activate it
-              here.
-            </p>
-          </Field>
-          <KeyEntry busy={activate.isPending} onSubmit={(key) => activate.mutate(key)} />
+          {offerFirst ? (
+            <KeyEntry
+              busy={activate.isPending}
+              onSubmit={(key) => activate.mutate(key)}
+              description="Already bought Pro? Paste the key from your receipt page or email."
+              secondary
+            />
+          ) : (
+            <>
+              <Field>
+                <p className="text-small text-secondary">
+                  After checkout, copy your license key from the DayBoard receipt page and activate
+                  it here.
+                </p>
+              </Field>
+              <KeyEntry busy={activate.isPending} onSubmit={(key) => activate.mutate(key)} />
+            </>
+          )}
           {status.state === "network-error" || status.state === "invalid" ? (
             <Field>
               <Button onClick={() => deactivate.mutate()} disabled={deactivate.isPending}>
@@ -176,9 +218,9 @@ export function LicenseTab() {
               </div>
             </Field>
           ) : null}
-          {canBuy ? (
+          {buyUrl && !offerFirst ? (
             <Field>
-              <Button variant="accent" onClick={() => openExternal(checkoutUrl)}>
+              <Button variant="accent" onClick={() => openExternal(buyUrl)}>
                 Get DayBoard Pro
               </Button>
             </Field>
