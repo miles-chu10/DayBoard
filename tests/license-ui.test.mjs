@@ -31,16 +31,26 @@ const uiModule = `
   import { Button as RealButton } from ${JSON.stringify(path.join(root, "renderer/ui/button.tsx"))};
   import { AlertDialog as RealAlertDialog } from ${JSON.stringify(path.join(root, "renderer/ui/alert-dialog.tsx"))};
   export { EmptyState } from ${JSON.stringify(path.join(root, "renderer/ui/empty-state.tsx"))};
+  export { Badge } from ${JSON.stringify(path.join(root, "renderer/ui/badge.tsx"))};
   export { Callout } from ${JSON.stringify(path.join(root, "renderer/ui/callout.tsx"))};
-  export { Field, FieldSet } from ${JSON.stringify(path.join(root, "renderer/ui/field.tsx"))};
+  export { Field, FieldGroup, FieldSet } from ${JSON.stringify(path.join(root, "renderer/ui/field.tsx"))};
   export { Input } from ${JSON.stringify(path.join(root, "renderer/ui/input.tsx"))};
   export { Status } from ${JSON.stringify(path.join(root, "renderer/ui/status.tsx"))};
   export { Text } from ${JSON.stringify(path.join(root, "renderer/ui/text.tsx"))};
   export { cn } from ${JSON.stringify(path.join(root, "renderer/ui/utils.ts"))};
   export { Popover, PopoverTrigger, PopoverContent } from ${JSON.stringify(path.join(root, "renderer/ui/popover.tsx"))};
   const fixture = () => globalThis.__dayboardLicenseUiFixture;
+  // A button's label is its text; icons and wrappers around it don't count.
+  const text = (node) =>
+    typeof node === "string" || typeof node === "number"
+      ? String(node)
+      : Array.isArray(node)
+        ? node.map(text).join("")
+        : React.isValidElement(node)
+          ? text(node.props.children)
+          : "";
   export function Button(props) {
-    fixture().buttons.push({ label: props.children, onClick: props.onClick });
+    fixture().buttons.push({ label: text(props.children), onClick: props.onClick });
     return React.createElement(RealButton, props);
   }
   export function AlertDialog(props) {
@@ -75,6 +85,10 @@ const fixturePlugin = {
                 globalThis.__dayboardLicenseUiFixture.calls.push(["external", url]);
               }
               export function errorMessage(error) { return String(error); }
+              export function invoke(channel, ...args) {
+                globalThis.__dayboardLicenseUiFixture.calls.push(["invoke", channel, ...args]);
+                return Promise.resolve();
+              }
             `
             : `
               const fixture = () => globalThis.__dayboardLicenseUiFixture;
@@ -128,6 +142,8 @@ try {
     jsx: "automatic",
     platform: "node",
     packages: "external",
+    alias: { "@shared": path.join(root, "shared") },
+    loader: { ".png": "dataurl" },
     plugins: [fixturePlugin],
     logLevel: "silent",
   });
@@ -336,7 +352,7 @@ test("during and after the trial, the sidebar counter opens a Pro card instead o
     ["expired", "Unlock AI · DayBoard Pro"],
   ]) {
     const html = render(LicenseStatusControl, status(state));
-    assert.match(html, new RegExp(`aria-haspopup="dialog"[^>]*>${label}<`), state);
+    assert.match(html, new RegExp(`aria-haspopup="dialog"[^>]*>.*?>${label}<`), state);
     assert.deepEqual(fixture.calls, [], state);
   }
 });
@@ -516,7 +532,8 @@ test("confirming the reset dialog sends license:reset with its exact confirmatio
 test("Settings leads the trial with Pro's price and what it adds, then key entry", () => {
   for (const state of ["trial", "expired"]) {
     const html = render(LicenseTab, status(state));
-    const offer = html.search(/DayBoard Pro · \$(5|9) once/);
+    const offer = html.search(/data-pro-offer/);
+    assert.match(html, /aria-label="\$(5|9) once"/, state);
     const keyEntry = html.indexOf("License key");
     assert.ok(offer > 0, state);
     assert.ok(keyEntry > offer, `${state}: key entry follows the offer`);
@@ -539,7 +556,7 @@ test("Settings leads the trial with Pro's price and what it adds, then key entry
 
 test("Settings keeps fixing a saved key first, with a tagged buy button last", () => {
   const html = render(LicenseTab, status("invalid"));
-  assert.doesNotMatch(html, /DayBoard Pro · \$|Already bought Pro\?/);
+  assert.doesNotMatch(html, /data-pro-offer|Already bought Pro\?/);
   assert.ok(html.indexOf("Get DayBoard Pro") > html.indexOf("License key"));
   click("Get DayBoard Pro");
   assert.deepEqual(fixture.calls, [
@@ -547,7 +564,7 @@ test("Settings keeps fixing a saved key first, with a tagged buy button last", (
   ]);
 
   const noCheckout = render(LicenseTab, status("trial", ""));
-  assert.doesNotMatch(noCheckout, /DayBoard Pro · \$|Get DayBoard Pro/);
+  assert.doesNotMatch(noCheckout, /data-pro-offer|Get DayBoard Pro/);
   assert.match(noCheckout, /After checkout, copy your license key/);
 });
 

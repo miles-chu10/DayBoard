@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
+import { ChevronRight, Sparkles } from "lucide-react";
 
-import { Button, EmptyState, Popover, PopoverContent, PopoverTrigger } from "../ui";
+import { Badge, Button, EmptyState, Popover, PopoverContent, PopoverTrigger } from "../ui";
 import {
   isLicenseBlocking,
   proBuyUrl,
@@ -11,6 +12,7 @@ import {
 } from "../lib/license";
 import { LICENSE_ACTIVATION_LIMIT } from "../../shared/license";
 import { openExternal, openSettings } from "../lib/ipc";
+import { AppMark } from "./app-mark";
 import { ProOffer } from "./pro-offer";
 
 /** True once license data has loaded and the current state blocks AI actions. */
@@ -104,10 +106,13 @@ export function LicenseGate({
   return (
     <EmptyState
       placement={placement}
+      media={<AppMark className="size-12" />}
       title={copy.title}
       description={copy.description}
       actions={
-        <LicenseUpsellActions checkoutUrl={checkoutUrl} status={status} from="app-ai-locked" />
+        <div className="flex flex-wrap items-center gap-2">
+          <LicenseUpsellActions checkoutUrl={checkoutUrl} status={status} from="app-ai-locked" />
+        </div>
       }
     />
   );
@@ -194,11 +199,35 @@ export function LicenseStatusControl() {
     <Button
       size="small"
       variant="transparent"
-      className="w-full justify-start"
+      className={SIDEBAR_CONTROL_CLASS}
       onClick={() => void openSettings("license")}
     >
-      {label}
+      <SidebarControlLabel>{label}</SidebarControlLabel>
     </Button>
+  );
+}
+
+const SIDEBAR_CONTROL_CLASS = "w-full justify-start gap-2 rounded-lg text-secondary";
+
+/** The sidebar counter's contents: a Pro glyph, what the license needs, and a way in. */
+function SidebarControlLabel({ children }: { children: string }) {
+  return (
+    <>
+      <Sparkles className="text-accent" aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+      <ChevronRight className="text-tertiary" aria-hidden />
+    </>
+  );
+}
+
+/** A small "Pro" mark beside the account name once this Mac has a working license. */
+export function ProBadge() {
+  const { data, isError } = useLicenseStatus();
+  if (isError || data?.status.state !== "licensed") return null;
+  return (
+    <Badge color="blue" className="h-4 px-1.5 text-mini" title="DayBoard Pro is active on this Mac">
+      Pro
+    </Badge>
   );
 }
 
@@ -207,11 +236,11 @@ function SidebarProCard({ label, checkoutUrl }: { label: string; checkoutUrl: st
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="small" variant="transparent" className="w-full justify-start">
-          {label}
+        <Button size="small" variant="transparent" className={SIDEBAR_CONTROL_CLASS}>
+          <SidebarControlLabel>{label}</SidebarControlLabel>
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-80 p-4">
+      <PopoverContent side="top" align="start" className="w-[22rem] p-4">
         <ProOffer
           checkoutUrl={checkoutUrl}
           from="app-sidebar"
