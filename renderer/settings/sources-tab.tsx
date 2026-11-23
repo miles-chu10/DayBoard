@@ -1,6 +1,7 @@
 import { Button, Field, FieldSet, Status, Switch } from "@renderer/ui";
 import { cn } from "@renderer/ui/utils";
 import type { SourceColor } from "@main/shared-types";
+import { isGoogleBusy } from "../../shared/google-errors";
 
 import { SourceHeading } from "../components/source-dot";
 import { useAccounts, useCalendars, useConnectGoogle, useItemLists } from "../lib/queries";
@@ -25,7 +26,14 @@ function CalendarsSettings() {
           <Status variant="loading">Loading…</Status>
         </Field>
       ) : calendars.isError ? (
-        <Field label="Calendars" description="Couldn't load your calendar list.">
+        <Field
+          label="Calendars"
+          description={
+            isGoogleBusy(calendars.error)
+              ? "Google is busy right now. Your calendars are still connected. Try again in a minute."
+              : "Couldn't load your calendar list."
+          }
+        >
           <Button size="small" onClick={() => void calendars.refetch()}>
             Retry
           </Button>
