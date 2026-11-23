@@ -84,22 +84,11 @@ function inline(line: string): string {
 const IMAGE_BLOCK = /^!\[([^\]]*)\]\((https:\/\/[^\s()]+)\)$/;
 const BUTTON_BLOCK = /^\[([^\]]+)\]\((https:\/\/[^\s()]+)\)$/;
 const UPDATE_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
-// Mail apps that honor a stylesheet get the dark theme and tighter phone padding from it. The
-// rest (Gmail drops the dark rules) keep the inline light theme, which stands on its own.
-const UPDATE_STYLE = `:root{color-scheme:light dark;supported-color-schemes:light dark}
+// The email is dark everywhere: Gmail drops theme rules, so one inline theme is the only way
+// every reader sees the same thing. The stylesheet only tightens the padding on phones.
+const UPDATE_STYLE = `:root{color-scheme:dark;supported-color-schemes:dark}
 a{color:inherit}
-@media (max-width:620px){.db-pad{padding:28px 22px !important}.db-title{font-size:26px !important}}
-@media (prefers-color-scheme:dark){
-.db-paper{background:#151412 !important}
-.db-card{background:#1d1c19 !important;border-color:#2c2a25 !important}
-.db-sunk{background:#100f0d !important}
-.db-ink{color:#f1ebdf !important}
-.db-soft{color:#b3aa9a !important}
-.db-rule{border-color:#2c2a25 !important}
-.db-dot{background:#8f887a !important}
-.db-button{background:#f1ebdf !important;color:#151412 !important;border-color:#f1ebdf !important}
-.db-button-quiet{background:transparent !important;color:#f1ebdf !important;border-color:#3d3a33 !important}
-}`;
+@media (max-width:620px){.db-pad{padding:28px 22px !important}.db-title{font-size:26px !important}}`;
 
 /**
  * The email subscribers get when a version is published. `body` is plain text: blocks separated
@@ -144,26 +133,26 @@ export function updateMessage(
     const lines = block.split("\n");
     const image = IMAGE_BLOCK.exec(block);
     if (image)
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px"><tr><td class="db-sunk" align="center" style="padding:24px 16px 0;background:#f4f3f0;border-radius:14px"><img src="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" width="300" style="display:block;width:100%;max-width:300px;height:auto;border:0;border-radius:12px 12px 0 0"></td></tr></table>`;
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px"><tr><td class="db-sunk" align="center" style="padding:24px 16px 0;background:#100f0d;border-radius:14px"><img src="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" width="300" style="display:block;width:100%;max-width:300px;height:auto;border:0;border-radius:12px 12px 0 0"></td></tr></table>`;
     const button = BUTTON_BLOCK.exec(block);
     if (button) {
       const primary = buttons++ === 0;
-      return `<p style="margin:0 0 28px"><a class="${primary ? "db-button" : "db-button-quiet"}" href="${escapeHtml(button[2])}" style="display:inline-block;padding:13px 24px;border:1px solid ${primary ? "#1d1c1a" : "#cfccc4"};border-radius:12px;background:${primary ? "#1d1c1a" : "#ffffff"};color:${primary ? "#ffffff" : "#1d1c1a"};font-size:16px;font-weight:600;line-height:1.2;text-decoration:none">${escapeHtml(button[1])}</a></p>`;
+      return `<p style="margin:0 0 28px"><a class="${primary ? "db-button" : "db-button-quiet"}" href="${escapeHtml(button[2])}" style="display:inline-block;padding:13px 24px;border:1px solid ${primary ? "#f1ebdf" : "#3d3a33"};border-radius:12px;background:${primary ? "#f1ebdf" : "#1d1c19"};color:${primary ? "#151412" : "#f1ebdf"};font-size:16px;font-weight:600;line-height:1.2;text-decoration:none">${escapeHtml(button[1])}</a></p>`;
     }
     if (lines.every((line) => line.startsWith("- ")))
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px">${lines.map((line) => `<tr><td width="20" valign="top" style="padding:9px 0 0"><div class="db-dot" style="width:6px;height:6px;border-radius:3px;background:#8a877f;font-size:0;line-height:0">&nbsp;</div></td><td class="db-ink" valign="top" style="padding:0 0 14px;color:#1d1c1a;font-size:15px;line-height:1.6">${inline(line.slice(2))}</td></tr>`).join("")}</table>`;
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px">${lines.map((line) => `<tr><td width="20" valign="top" style="padding:9px 0 0"><div class="db-dot" style="width:6px;height:6px;border-radius:3px;background:#8f887a;font-size:0;line-height:0">&nbsp;</div></td><td class="db-ink" valign="top" style="padding:0 0 14px;color:#f1ebdf;font-size:15px;line-height:1.6">${inline(line.slice(2))}</td></tr>`).join("")}</table>`;
     if (lines.length === 1 && block.startsWith("## "))
-      return `<h2 class="db-soft db-rule" style="margin:8px 0 18px;padding:24px 0 0;border-top:1px solid #e6e3dc;color:#55534f;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.3;text-transform:uppercase">${inline(block.slice(3))}</h2>`;
+      return `<h2 class="db-soft db-rule" style="margin:8px 0 18px;padding:24px 0 0;border-top:1px solid #2c2a25;color:#b3aa9a;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.3;text-transform:uppercase">${inline(block.slice(3))}</h2>`;
     const content = lines.map(inline).join("<br>");
     if (lead && index === 0) {
       lead = false;
-      return `<p class="db-soft" style="margin:0 0 28px;color:#55534f;font-size:17px;line-height:1.6">${content}</p>`;
+      return `<p class="db-soft" style="margin:0 0 28px;color:#b3aa9a;font-size:17px;line-height:1.6">${content}</p>`;
     }
-    return `<p class="db-ink" style="margin:0 0 16px;color:#1d1c1a;font-size:15px;line-height:1.6">${content}</p>`;
+    return `<p class="db-ink" style="margin:0 0 16px;color:#f1ebdf;font-size:15px;line-height:1.6">${content}</p>`;
   });
   const origin = escapeHtml(site);
-  const small = "margin:0 0 8px;color:#55534f;font-size:13px;line-height:1.6";
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${escapeHtml(subject)}</title><style>${UPDATE_STYLE}</style></head><body class="db-paper" style="margin:0;padding:0;background:#f4f3f0;font-family:${UPDATE_FONT}"><table role="presentation" class="db-paper" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f3f0"><tr><td align="center" style="padding:32px 12px 40px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;font-family:${UPDATE_FONT};text-align:left"><tr><td style="padding:0 8px 20px"><a href="${origin}" style="text-decoration:none"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="middle" style="padding:0 10px 0 0"><img src="${origin}/assets/icon-96.png" alt="" width="32" height="32" style="display:block;border:0;border-radius:8px"></td><td class="db-ink" valign="middle" style="color:#1d1c1a;font-size:18px;font-weight:700;letter-spacing:-.01em">DayBoard</td></tr></table></a></td></tr><tr><td class="db-card db-pad" style="padding:40px 44px 28px;background:#ffffff;border:1px solid #e6e3dc;border-radius:20px"><p class="db-soft" style="margin:0 0 12px;color:#55534f;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.3;text-transform:uppercase">${escapeHtml(label)}</p><h1 class="db-ink db-title" style="margin:0 0 16px;color:#1d1c1a;font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.15">${escapeHtml(title)}</h1>${parts.join("")}</td></tr><tr><td style="padding:24px 8px 0"><p class="db-soft" style="${small}">${escapeHtml(why)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:inherit;text-decoration:underline">Unsubscribe</a>.</p><p class="db-soft" style="${small}"><a href="${origin}" style="color:inherit;text-decoration:underline">${escapeHtml(host)}</a>${postalAddress ? `<br>${escapeHtml(postalAddress)}` : ""}</p></td></tr></table></td></tr></table></body></html>`;
+  const small = "margin:0 0 8px;color:#b3aa9a;font-size:13px;line-height:1.6";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(subject)}</title><style>${UPDATE_STYLE}</style></head><body class="db-paper" style="margin:0;padding:0;background:#151412;font-family:${UPDATE_FONT}"><table role="presentation" class="db-paper" width="100%" cellpadding="0" cellspacing="0" style="background:#151412"><tr><td align="center" style="padding:32px 12px 40px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;font-family:${UPDATE_FONT};text-align:left"><tr><td style="padding:0 8px 20px"><a href="${origin}" style="text-decoration:none"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="middle" style="padding:0 10px 0 0"><img src="${origin}/assets/icon-96.png" alt="" width="32" height="32" style="display:block;border:0;border-radius:8px"></td><td class="db-ink" valign="middle" style="color:#f1ebdf;font-size:18px;font-weight:700;letter-spacing:-.01em">DayBoard</td></tr></table></a></td></tr><tr><td class="db-card db-pad" style="padding:40px 44px 28px;background:#1d1c19;border:1px solid #2c2a25;border-radius:20px"><p class="db-soft" style="margin:0 0 12px;color:#b3aa9a;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.3;text-transform:uppercase">${escapeHtml(label)}</p><h1 class="db-ink db-title" style="margin:0 0 16px;color:#f1ebdf;font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.15">${escapeHtml(title)}</h1>${parts.join("")}</td></tr><tr><td style="padding:24px 8px 0"><p class="db-soft" style="${small}">${escapeHtml(why)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:inherit;text-decoration:underline">Unsubscribe</a>.</p><p class="db-soft" style="${small}"><a href="${origin}" style="color:inherit;text-decoration:underline">${escapeHtml(host)}</a>${postalAddress ? `<br>${escapeHtml(postalAddress)}` : ""}</p></td></tr></table></td></tr></table></body></html>`;
   return { subject, text, html };
 }
 
