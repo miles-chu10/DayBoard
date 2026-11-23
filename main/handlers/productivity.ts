@@ -198,13 +198,12 @@ function requireUUID(value: unknown, channel: string): string {
 
 export async function getAccountsStatus(): Promise<AccountsStatus> {
   if (isDemoMode()) return demoAccounts;
-  const [google, gmail, reminders, macName] = await Promise.all([
+  const [google, gmail, reminders] = await Promise.all([
     getGoogleStatus(),
     getGmailStatus(),
     getRemindersAccess(),
-    macUserName(),
   ]);
-  return { google, gmail, reminders, ...(macName ? { macName } : {}) };
+  return { google, gmail, reminders };
 }
 
 async function agendaScope(): Promise<string | null> {
@@ -571,7 +570,12 @@ async function createAgendaBlock(
 
 export function registerProductivityHandlers(): void {
   // Accounts
-  ipcMain.handle("accounts:getStatus", () => getAccountsStatus());
+  ipcMain.handle("accounts:getStatus", async () => {
+    const status = await getAccountsStatus();
+    // The demo keeps its fictional person.
+    const macName = isDemoMode() ? "" : await macUserName();
+    return macName ? { ...status, macName } : status;
+  });
 
   ipcMain.handle("google:connect", async () => {
     assertNotDemo("google:connect");
