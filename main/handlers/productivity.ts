@@ -52,6 +52,7 @@ import {
   drainPendingWrites,
   hasPendingWrites,
 } from "../services/pending-writes.js";
+import { macUserName } from "../services/mac-user-name.js";
 import { getSettings } from "../services/settings-store.js";
 import {
   completeAgendaBlock,
@@ -197,12 +198,13 @@ function requireUUID(value: unknown, channel: string): string {
 
 export async function getAccountsStatus(): Promise<AccountsStatus> {
   if (isDemoMode()) return demoAccounts;
-  const [google, gmail, reminders] = await Promise.all([
+  const [google, gmail, reminders, macName] = await Promise.all([
     getGoogleStatus(),
     getGmailStatus(),
     getRemindersAccess(),
+    macUserName(),
   ]);
-  return { google, gmail, reminders };
+  return { google, gmail, reminders, ...(macName ? { macName } : {}) };
 }
 
 async function agendaScope(): Promise<string | null> {

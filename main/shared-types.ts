@@ -347,6 +347,8 @@ export interface AccountsStatus {
   google: GoogleAccountStatus;
   gmail: GmailAccountStatus;
   reminders: RemindersAccess;
+  /** The full name on this Mac's user account, when it has one. Never set in demo mode. */
+  macName?: string;
 }
 
 export interface SourceCoverage {
