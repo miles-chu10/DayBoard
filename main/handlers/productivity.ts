@@ -8,6 +8,7 @@ import {
   findAgendaEvent,
   getTaskInList,
   createTask,
+  clearCalendarListCache,
   listCalendars,
   listCompletedTasks,
   listTasksWithCoverage,
@@ -301,6 +302,7 @@ export function onAccountsChanged(listener: () => void): () => void {
 }
 
 function publishAccountsChanged(status?: AccountsStatus): void {
+  clearCalendarListCache();
   for (const listener of accountListeners) {
     try {
       listener();

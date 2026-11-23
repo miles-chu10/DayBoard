@@ -84,6 +84,7 @@ export async function listEventsWithCoverage() { return { items: [], coverage: {
 export async function createEvent() {}
 export async function createTask() {}
 export async function listCalendars() { return { calendars: [], limited: false }; }
+export function clearCalendarListCache() {}
 export async function listCompletedTasks() { return []; }
 export async function listEventsBetween() { return []; }
 export async function setTaskCompleted() {}

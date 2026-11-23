@@ -9,11 +9,13 @@ import { isDemoMode } from "../services/demo-data.js";
 import { createMeetingAlerts, type MeetingAlert } from "../services/meetings/meeting-alerts.js";
 import { getSettings, onSettingsChanged } from "../services/settings-store.js";
 import { focusMainWindow } from "../window.js";
+import { debounce } from "../../shared/debounce.js";
 import { recordNotificationResult } from "./notification-status.js";
 import { showPanel } from "./panel-window.js";
 
 const DAY_MS = 24 * 3_600_000;
 const MAX_TIMER_MS = 2 ** 31 - 1;
+const SETTINGS_SETTLE_MS = 1_000;
 // Electron drops a notification's handlers once it is garbage-collected; keep each one alive.
 const live = new Set<Notification>();
 
@@ -89,6 +91,7 @@ export function startMeetingNotifications(): void {
     await alerts.configure(settings.system.meetings);
   };
   void apply().catch((error) => logger.warn("meetings", "Could not start meeting alerts", error));
-  onSettingsChanged(() => void apply());
+  // Several settings saved in quick succession, such as calendar switches, reload events once.
+  onSettingsChanged(debounce(() => void apply(), SETTINGS_SETTLE_MS));
   onAccountsChanged(() => void alerts.refresh());
 }

@@ -38,6 +38,8 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 const originalFetch = globalThis.fetch;
+// The calendar list is reused between reads; each test starts without one.
+test.beforeEach(() => adapter.clearCalendarListCache?.());
 
 test("Tasks paginates task lists and tasks, retaining list identity", async () => {
   const calls = [];
@@ -209,6 +211,192 @@ test("treats a non-primary invitation as mine even beyond the 20-attendee cap", 
     assert.equal(declined.selfResponse, "declined");
     assert.equal(declined.selfInvited, true);
   } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Google's own error bodies for the two kinds of 403 a calendar list request can get.
+const quota403 = (headers = { "retry-after": "0.001" }) =>
+  new globalThis.Response(
+    JSON.stringify({
+      error: {
+        code: 403,
+        message:
+          "Quota exceeded for quota metric 'Queries' and limit 'Queries per minute per user' of service 'calendar-json.googleapis.com'.",
+        errors: [{ domain: "usageLimits", reason: "rateLimitExceeded" }],
+        status: "PERMISSION_DENIED",
+      },
+    }),
+    { status: 403, headers: { "content-type": "application/json", ...headers } },
+  );
+const scope403 = () =>
+  json(
+    {
+      error: {
+        code: 403,
+        message: "Request had insufficient authentication scopes.",
+        errors: [{ domain: "global", reason: "insufficientPermissions" }],
+        status: "PERMISSION_DENIED",
+      },
+    },
+    403,
+  );
+const twoCalendars = () =>
+  json({
+    items: [
+      { id: "primary-id", summary: "Me", primary: true },
+      { id: "work", summary: "Work", selected: true },
+    ],
+  });
+const isList = (input) => new URL(input).pathname.endsWith("/calendarList");
+
+test("A quota 403 on the calendar list is reported as Google being busy, not as missing access", async () => {
+  let listCalls = 0;
+  globalThis.fetch = async (input) => {
+    if (!isList(input)) return json({ items: [] });
+    listCalls++;
+    return quota403();
+  };
+  try {
+    await assert.rejects(adapter.listCalendars(), (error) => {
+      assert.equal(error.status, 403);
+      assert.equal(error.reason, "rateLimitExceeded");
+      assert.equal(error.rateLimited, true);
+      assert.match(error.message, /^Google is busy right now\. Try again in a minute\./);
+      assert.match(error.message, /Queries per minute per user/);
+      return true;
+    });
+    assert.equal(listCalls, 4, "retried with backoff before giving up");
+    await assert.rejects(
+      adapter.listEventsBetweenWithCoverage(new Date("2027-01-01"), new Date("2027-01-02"), {}),
+      /Google is busy/,
+      "events must not silently fall back to the primary calendar",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+for (const reason of ["userRateLimitExceeded", "quotaExceeded"]) {
+  test(`A 403 with reason ${reason} is treated as a rate limit`, async () => {
+    globalThis.fetch = async () =>
+      new globalThis.Response(
+        JSON.stringify({ error: { message: "limit", errors: [{ reason }] } }),
+        { status: 403, headers: { "retry-after": "0.001" } },
+      );
+    try {
+      await assert.rejects(adapter.listCalendars(), (error) => error.rateLimited === true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+}
+
+test("A brief quota 403 is retried and the full calendar list comes back", async () => {
+  let listCalls = 0;
+  globalThis.fetch = async (input) => {
+    if (!isList(input)) return json({ items: [] });
+    return ++listCalls === 1 ? quota403() : twoCalendars();
+  };
+  try {
+    const result = await adapter.listCalendars();
+    assert.equal(result.limited, false);
+    assert.deepEqual(
+      result.calendars.map((calendar) => calendar.id),
+      ["primary-id", "work"],
+    );
+    assert.equal(listCalls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("A missing-scope 403 on the calendar list still means primary calendar only", async () => {
+  globalThis.fetch = async (input) => (isList(input) ? scope403() : json({ items: [] }));
+  try {
+    const result = await adapter.listCalendars();
+    assert.equal(result.limited, true);
+    assert.deepEqual(
+      result.calendars.map((calendar) => calendar.id),
+      ["primary"],
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Calendar reads in a burst share one calendar list request", async () => {
+  const requests = [];
+  globalThis.fetch = async (input) => {
+    requests.push(new URL(input).pathname);
+    return isList(input) ? twoCalendars() : json({ items: [] });
+  };
+  try {
+    const range = [new Date("2027-01-01"), new Date("2027-01-02"), {}];
+    await Promise.all([
+      adapter.listCalendars(),
+      adapter.listEventsBetweenWithCoverage(...range),
+      adapter.listEventsBetweenWithCoverage(...range),
+      adapter.listEventsBetweenWithCoverage(...range),
+    ]);
+    await adapter.listEventsBetweenWithCoverage(...range);
+    assert.equal(requests.filter((path) => path.endsWith("/calendarList")).length, 1);
+    assert.equal(requests.filter((path) => path.endsWith("/events")).length, 8);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("The known calendars are kept when a later list refresh hits the quota", async () => {
+  const originalNow = Date.now;
+  let throttled = false;
+  const eventCalendars = [];
+  globalThis.fetch = async (input) => {
+    if (isList(input)) return throttled ? quota403() : twoCalendars();
+    eventCalendars.push(decodeURIComponent(new URL(input).pathname.split("/").at(-2)));
+    return json({ items: [] });
+  };
+  try {
+    assert.equal((await adapter.listCalendars()).calendars.length, 2);
+    throttled = true;
+    const later = originalNow() + 5 * 60_000;
+    Date.now = () => later;
+    const list = await adapter.listCalendars();
+    assert.equal(list.limited, false);
+    assert.equal(list.calendars.length, 2);
+    const events = await adapter.listEventsBetweenWithCoverage(
+      new Date("2027-01-01"),
+      new Date("2027-01-02"),
+      {},
+    );
+    assert.equal(events.coverage.complete, true);
+    assert.deepEqual(eventCalendars.sort(), ["primary-id", "work"]);
+  } finally {
+    Date.now = originalNow;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("The calendar list is forgotten on an account change and refreshed after a minute", async () => {
+  const originalNow = Date.now;
+  let listCalls = 0;
+  globalThis.fetch = async (input) => {
+    if (isList(input)) listCalls++;
+    return isList(input) ? twoCalendars() : json({ items: [] });
+  };
+  try {
+    await adapter.listCalendars();
+    await adapter.listCalendars();
+    assert.equal(listCalls, 1);
+    adapter.clearCalendarListCache();
+    await adapter.listCalendars();
+    assert.equal(listCalls, 2);
+    const later = originalNow() + 61_000;
+    Date.now = () => later;
+    await adapter.listCalendars();
+    assert.equal(listCalls, 3);
+  } finally {
+    Date.now = originalNow;
     globalThis.fetch = originalFetch;
   }
 });

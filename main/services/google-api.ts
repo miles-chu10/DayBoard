@@ -13,6 +13,7 @@ import type { UpdateEventInput, UpdateTaskInput } from "../../shared/item-edits.
 import { GoogleAuthError, getGoogleAccessToken } from "./google-auth.js";
 import { agendaEventId } from "./agenda-utils.js";
 import { decodeEntities } from "./mail-text.js";
+import { GOOGLE_BUSY_MESSAGE } from "../../shared/google-errors.js";
 
 const TASKS = "https://tasks.googleapis.com/tasks/v1";
 const CALENDAR = "https://www.googleapis.com/calendar/v3";
@@ -23,24 +24,64 @@ export class GoogleApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Google's machine-readable reason, such as `rateLimitExceeded` or `insufficientPermissions`. */
+    readonly reason: string | null = null,
   ) {
     super(message);
     this.name = "GoogleApiError";
   }
+
+  /** Google refused the request for quota, not for permission. It clears on its own. */
+  get rateLimited(): boolean {
+    return isRateLimit(this.status, this.reason, this.message);
+  }
+}
+
+const RATE_LIMIT_REASONS = new Set([
+  "rateLimitExceeded",
+  "userRateLimitExceeded",
+  "quotaExceeded",
+  "dailyLimitExceeded",
+  "RATE_LIMIT_EXCEEDED",
+  "RESOURCE_EXHAUSTED",
+]);
+
+// Google reports quota limits as 429, or as 403 with a quota reason. A 403 for a missing
+// permission has a different reason, and must not be mistaken for one.
+function isRateLimit(status: number, reason: string | null, message: string): boolean {
+  if (status === 429) return true;
+  if (status !== 403) return false;
+  return reason
+    ? RATE_LIMIT_REASONS.has(reason)
+    : /quota exceeded|rate limit exceeded/i.test(message);
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function describeGoogleError(body: string): string {
+function describeGoogleError(body: string): { detail: string; reason: string | null } {
   try {
-    const parsed = JSON.parse(body) as { error?: { message?: string } };
-    if (parsed.error?.message) return parsed.error.message;
+    const parsed = JSON.parse(body) as {
+      error?: {
+        message?: string;
+        status?: string;
+        errors?: { reason?: string }[];
+        details?: { reason?: string }[];
+      };
+    };
+    const error = parsed.error;
+    const reason =
+      error?.errors?.find((entry) => entry.reason)?.reason ??
+      error?.details?.find((entry) => entry.reason)?.reason ??
+      error?.status ??
+      null;
+    if (error?.message) return { detail: error.message, reason };
+    if (reason) return { detail: body.slice(0, 200), reason };
   } catch {
     // Non-JSON body
   }
-  return body.slice(0, 200);
+  return { detail: body.slice(0, 200), reason: null };
 }
 
 function accessForUrl(url: string): GoogleAccess | undefined {
@@ -48,6 +89,8 @@ function accessForUrl(url: string): GoogleAccess | undefined {
   if (url.startsWith(CALENDAR)) return "calendar";
   return undefined;
 }
+
+const MAX_RETRIES = 3;
 
 async function googleFetch<T>(
   url: string,
@@ -65,28 +108,30 @@ async function googleFetch<T>(
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
 
-  if (
-    method.toUpperCase() === "GET" &&
-    (response.status === 429 || response.status === 503) &&
-    attempt < 3
-  ) {
+  const isGet = method.toUpperCase() === "GET";
+  const backOff = async () => {
     const retryAfter = Number(response.headers.get("retry-after"));
     const delay =
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * 2 ** attempt;
-    await response.body?.cancel().catch(() => {});
     await sleep(delay + Math.random() * 250);
     return googleFetch<T>(url, init, attempt + 1);
+  };
+  if (isGet && (response.status === 429 || response.status === 503) && attempt < MAX_RETRIES) {
+    await response.body?.cancel().catch(() => {});
+    return backOff();
   }
   if (response.status === 401) {
     await response.body?.cancel().catch(() => {});
     throw new GoogleAuthError("not-connected", "Google session expired. Reconnect your account.");
   }
   if (!response.ok) {
-    const detail = describeGoogleError(await response.text());
-    throw new GoogleApiError(
-      response.status,
-      `Google API error ${response.status} (${new URL(url).hostname}): ${detail}`,
-    );
+    const { detail, reason } = describeGoogleError(await response.text());
+    const technical = `Google API error ${response.status} (${new URL(url).hostname}): ${detail}`;
+    if (isRateLimit(response.status, reason, detail)) {
+      if (isGet && attempt < MAX_RETRIES) return backOff();
+      throw new GoogleApiError(response.status, `${GOOGLE_BUSY_MESSAGE} (${technical})`, reason);
+    }
+    throw new GoogleApiError(response.status, technical, reason);
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
@@ -350,7 +395,34 @@ interface CalendarLookup extends CalendarListResult {
   truncated: boolean;
 }
 
-async function listCalendarsWithCoverage(): Promise<CalendarLookup> {
+// Every calendar read starts from the calendar list, and one settings change refreshes several
+// reads at once. They share one list request, and the answer is reused briefly, so a burst of
+// calendar toggles does not spend Google's per-minute quota on the same list.
+const CALENDAR_LIST_TTL_MS = 60_000;
+let calendarListCache: { lookup: CalendarLookup; at: number } | null = null;
+let calendarListRequest: Promise<CalendarLookup> | null = null;
+let calendarListGeneration = 0;
+
+/** Forgets the calendar list, for a sign-in, sign-out or account switch. */
+export function clearCalendarListCache(): void {
+  calendarListGeneration++;
+  calendarListCache = null;
+  calendarListRequest = null;
+}
+
+function listCalendarsWithCoverage(): Promise<CalendarLookup> {
+  if (calendarListCache && Date.now() - calendarListCache.at < CALENDAR_LIST_TTL_MS)
+    return Promise.resolve(calendarListCache.lookup);
+  if (calendarListRequest) return calendarListRequest;
+  const generation = calendarListGeneration;
+  const request = fetchCalendarList(generation).finally(() => {
+    if (calendarListRequest === request) calendarListRequest = null;
+  });
+  calendarListRequest = request;
+  return request;
+}
+
+async function fetchCalendarList(generation: number): Promise<CalendarLookup> {
   try {
     const url = new URL(`${CALENDAR}/users/me/calendarList`);
     url.searchParams.set("maxResults", String(CALENDAR_PAGE_SIZE));
@@ -363,25 +435,34 @@ async function listCalendarsWithCoverage(): Promise<CalendarLookup> {
       defaultVisible: Boolean(entry.primary || entry.selected),
     }));
     calendars.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
-    return { calendars, limited: false, truncated: data.truncated };
+    const lookup = { calendars, limited: false, truncated: data.truncated };
+    if (generation === calendarListGeneration) calendarListCache = { lookup, at: Date.now() };
+    return lookup;
   } catch (error) {
-    // Sign-ins from before calendar-list access was requested can only read the primary calendar.
-    if (error instanceof GoogleApiError && error.status === 403) {
-      return {
-        calendars: [
-          {
-            id: "primary",
-            name: "Calendar",
-            color: null,
-            primary: true,
-            defaultVisible: true,
-          },
-        ],
-        limited: true,
-        truncated: false,
-      };
+    if (!(error instanceof GoogleApiError) || error.status !== 403) throw error;
+    if (error.rateLimited) {
+      // Google is throttling, not refusing: keep the calendars already known for this account
+      // rather than dropping to the primary calendar or asking for a reconnect.
+      if (calendarListCache && generation === calendarListGeneration) {
+        calendarListCache.at = Date.now();
+        return calendarListCache.lookup;
+      }
+      throw error;
     }
-    throw error;
+    // Sign-ins from before calendar-list access was requested can only read the primary calendar.
+    return {
+      calendars: [
+        {
+          id: "primary",
+          name: "Calendar",
+          color: null,
+          primary: true,
+          defaultVisible: true,
+        },
+      ],
+      limited: true,
+      truncated: false,
+    };
   }
 }
 

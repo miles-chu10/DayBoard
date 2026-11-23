@@ -24,6 +24,8 @@ import type {
   TaskItem,
 } from "@main/shared-types";
 
+import { debounce } from "../../shared/debounce";
+
 import { clearAccountScopedQueries, refreshMeetingNotes } from "./account-scoped-queries";
 import { errorMessage, invoke } from "./ipc";
 import { settingsQueryKey, settingsSaveInFlight, sourceOn, useSettings } from "./settings";
@@ -60,6 +62,7 @@ const DATA_KEYS = [
 ];
 
 const SOURCE_STALE_TIME = 2 * 60_000;
+const SETTINGS_SETTLE_MS = 600;
 const todoWrites = new Set<string>();
 const todoVersions = new Map<string, number>();
 
@@ -218,7 +221,12 @@ export function useBackendSync() {
   const queryClient = useQueryClient();
   useEffect(() => {
     const ipc = window.dayboard.ipc;
+    // Settings saved in quick succession, such as several calendar switches, reload data once.
+    const refreshData = debounce(() => {
+      for (const key of DATA_KEYS) void queryClient.invalidateQueries({ queryKey: key });
+    }, SETTINGS_SETTLE_MS);
     const unsubscribers = [
+      refreshData.cancel,
       ipc.onNotification("meetings:notesChanged", () => {
         void refreshMeetingNotes(queryClient);
       }),
@@ -238,9 +246,7 @@ export function useBackendSync() {
           queryClient.setQueryData(settingsQueryKey, event.settings);
         void queryClient.invalidateQueries({ queryKey: queryKeys.assistantMcp });
         void queryClient.invalidateQueries({ queryKey: ["assistant-mcp-servers"] });
-        if (event?.dataChanged) {
-          for (const key of DATA_KEYS) void queryClient.invalidateQueries({ queryKey: key });
-        }
+        if (event?.dataChanged) refreshData();
       }),
       ipc.onNotification("data:changed", (params) => {
         const event = params as Partial<DataChangedEvent> | null;
