@@ -29,7 +29,10 @@ Options:
   --recipients N   Required for send: the count \`list\` printed. If the list has changed since,
                    nothing is sent.
   --file PATH      Use this text instead of the release notes. Its first line is
-                   "Subject: ...", then a blank line, then the email.
+                   "Subject: ...", then a blank line, then the email. A line that is only
+                   "[label](https://...)" becomes a button, "![alt](https://...)" a picture.
+  --image URL      Show this picture under the download button, such as
+                   https://getdayboard.com/assets/screens/light-menubar.png.
 
 Environment:
   DAYBOARD_ADMIN_TOKEN     The Worker's ADMIN_TOKEN. Pass it with 1Password "op run".
@@ -42,7 +45,7 @@ class UsageError extends Error {}
  * Turns a version's release notes into the email: the title becomes the subject, wrapped lines
  * are joined, pull request numbers are dropped, and download and changelog links are added.
  */
-export function draftFromNotes(version, notes, site = SITE) {
+export function draftFromNotes(version, notes, site = SITE, image = "") {
   const blocks = notes
     .replaceAll("\r\n", "\n")
     .split(/\n{2,}/)
@@ -67,13 +70,17 @@ export function draftFromNotes(version, notes, site = SITE) {
     }
     return items.map((item) => `- ${tidy(item)}`).join("\n");
   });
+  // The download button and the picture sit right under the opening paragraph.
+  const top = [`[Download DayBoard ${version}](${site}/download)`];
+  if (image) top.push(`![DayBoard ${version}](${image})`);
+  body.splice(body[0] && !/^(## |- )/.test(body[0]) ? 1 : 0, 0, ...top);
   body.push(
-    `Download DayBoard ${version}: ${site}/download\nIf you already have DayBoard, it will offer the update.\nEverything that changed: ${site}/changelog`,
+    `If you already have DayBoard, it will offer the update.\nEverything that changed: ${site}/changelog`,
   );
   return { subject, text: body.join("\n\n") };
 }
 
-async function draft(version, file) {
+async function draft(version, file, image) {
   if (file) {
     const [first, ...rest] = (await readFile(file, "utf8")).replaceAll("\r\n", "\n").split("\n");
     const subject = /^Subject: (.+)$/.exec(first)?.[1].trim();
@@ -88,7 +95,7 @@ async function draft(version, file) {
   } catch {
     throw new UsageError(`No docs/release-notes-${version}.md. Write it first, or pass --file.`);
   }
-  return draftFromNotes(version, notes);
+  return draftFromNotes(version, notes, SITE, image);
 }
 
 function serviceOrigin(value) {
@@ -166,6 +173,7 @@ async function main(argv, env, log) {
       recipients: { type: "string" },
       to: { type: "string" },
       file: { type: "string" },
+      image: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -185,10 +193,12 @@ async function main(argv, env, log) {
   if (command === "test" && !values.to) throw new UsageError("test needs --to <address>.");
   if (command === "send" && !/^[1-9][0-9]*$/.test(values.recipients ?? ""))
     throw new UsageError("send needs --recipients N, the count `list` printed.");
+  if (values.image && !/^https:\/\/[^\s()]+$/.test(values.image))
+    throw new UsageError("--image must be an https URL.");
   const [version] = rest;
 
   const message = ["draft", "test", "send"].includes(command)
-    ? await draft(version, values.file)
+    ? await draft(version, values.file, values.image)
     : null;
   if (command === "draft") {
     log.out(`Subject: ${message.subject}\n\n${message.text}`);

@@ -138,8 +138,8 @@ function setup(overrides: Partial<Env> = {}) {
 
 const draft = {
   version: "1.3.11",
-  subject: "DayBoard 1.3.11 is out",
-  text: "DayBoard 1.3.11 is out.\n\n## New\n\n- **Day line** in the menu bar\n- iCloud calendars\n\nDownload: https://site.example.test/download",
+  subject: "DayBoard 1.3.11: A new menu bar",
+  text: "DayBoard 1.3.11 is out.\n\n## New\n\n- **Day line** in the menu bar\n- iCloud calendars\n\nDownload: https://site.example.test/download\n\n[Get DayBoard](https://site.example.test/download)\n\n![The day line](https://site.example.test/assets/shot.png)",
 };
 
 test("the migration starts the list from the waitlist, without unsubscribed or test addresses", () => {
@@ -355,18 +355,32 @@ test("a version is announced once, to exactly the list the owner looked at", asy
   assert.match(mail.headers["idempotency-key"], /^dayboard-update\/1\.3\.11\/[a-f0-9]{32}\/\d+$/);
   assert.ok(mail.body.text.includes(`Unsubscribe: ${link}`));
   assert.ok(mail.body.text.includes("- Day line in the menu bar"));
-  assert.ok(mail.body.html.includes(`<a href="${link}">Unsubscribe</a>`));
-  assert.ok(
-    mail.body.html.includes(
-      '<li style="margin:0 0 6px"><strong>Day line</strong> in the menu bar</li>',
-    ),
+  // The plain-text part spells a button out as a link and leaves the picture out.
+  assert.ok(mail.body.text.includes("Get DayBoard: https://site.example.test/download"));
+  assert.ok(!mail.body.text.includes("shot.png"));
+  const { html } = mail.body;
+  assert.match(html, new RegExp(`<a href="${link.replaceAll("?", "\\?")}"[^>]*>Unsubscribe</a>`));
+  // The subject splits at ": " into a label over the headline.
+  assert.match(
+    html,
+    /<p class="db-soft"[^>]*>DayBoard 1\.3\.11<\/p><h1 [^>]*>A new menu bar<\/h1>/,
   );
-  assert.ok(mail.body.html.includes('<h2 style="margin:24px 0 8px;font-size:18px">New</h2>'));
-  assert.ok(
-    mail.body.html.includes(
-      '<a href="https://site.example.test/download">https://site.example.test/download</a>',
-    ),
+  assert.match(html, /<td class="db-ink"[^>]*><strong>Day line<\/strong> in the menu bar<\/td>/);
+  assert.match(html, /<h2 [^>]*>New<\/h2>/);
+  assert.match(
+    html,
+    /<a href="https:\/\/site\.example\.test\/download" style="[^"]*">site\.example\.test\/download<\/a>/,
   );
+  assert.match(
+    html,
+    /<a class="db-button" href="https:\/\/site\.example\.test\/download"[^>]*>Get DayBoard<\/a>/,
+  );
+  assert.match(
+    html,
+    /<img src="https:\/\/site\.example\.test\/assets\/shot\.png" alt="The day line" width="300"/,
+  );
+  // Nothing in it runs, and every picture and link is HTTPS.
+  assert.doesNotMatch(html, /<script|\son[a-z]+=|(?:src|href)="(?!https:\/\/)/);
   // Each person gets their own link, and it works.
   const other = sent.find((one) => one.body.to[0] === "b@example.test")!;
   assert.ok(!other.body.text.includes(token("a@example.test")));
@@ -530,10 +544,21 @@ test("the release notes become the email: subject from the title, no pull reques
     draft.text,
     [
       "DayBoard 9.9.9 redraws the menu bar panel so today fits on one screen.",
+      "[Download DayBoard 9.9.9](https://site.example.test/download)",
       "## Added",
       "- **Day line.** One line for the whole day, with what's next.\n- Quick capture.",
-      "Download DayBoard 9.9.9: https://site.example.test/download\nIf you already have DayBoard, it will offer the update.\nEverything that changed: https://site.example.test/changelog",
+      "If you already have DayBoard, it will offer the update.\nEverything that changed: https://site.example.test/changelog",
     ].join("\n\n"),
   );
   assert.equal(draftFromNotes("9.9.9", "No title here.").subject, "DayBoard 9.9.9 is out");
+  // --image puts a picture right under the button.
+  assert.equal(
+    draftFromNotes(
+      "9.9.9",
+      notes,
+      "https://site.example.test",
+      "https://site.example.test/a.png",
+    ).text.split("\n\n")[2],
+    "![DayBoard 9.9.9](https://site.example.test/a.png)",
+  );
 });
