@@ -26,6 +26,8 @@ source, and makes it easier to get DayBoard Pro from inside the app.
 
 ## Fixed
 
+- DayBoard now greets you by the name on your Mac account instead of one built from your Gmail
+  address. You can still change it in **Settings → General → Your name**.
 - Updated the libraries behind DayBoard's local MCP server to fix reported security issues (#169).
 
 ## Updating
