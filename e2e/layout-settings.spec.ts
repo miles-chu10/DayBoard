@@ -42,9 +42,20 @@ test("Sidebar settings reorder and hide views and turn off counts; ⌃ numbers f
     const views = settings.getByRole("list", { name: "Sidebar views" });
     await expect(views.getByRole("switch", { name: "Show Home" })).toBeDisabled();
     await expect(views.getByRole("button", { name: "Move Home up" })).toBeDisabled();
-    // Inbox moves to the top, and Agenda leaves the sidebar.
-    for (let step = 0; step < 3; step++)
+    // The list is drawn as the sidebar is, so Calendar, Tasks and Reminders sit under Agenda and
+    // Inbox passes the whole group in one press. Inbox moves to the top, and Agenda leaves.
+    await expect(views.getByRole("listitem")).toHaveText([
+      /^Home/,
+      /^Agenda/,
+      /^Calendar/,
+      /^Tasks/,
+      /^Reminders/,
+      /^Inbox/,
+      /^Notes/,
+    ]);
+    for (let step = 0; step < 2; step++)
       await views.getByRole("button", { name: "Move Inbox up" }).click();
+    await expect(views.getByRole("button", { name: "Move Inbox up" })).toBeDisabled();
     await views.getByRole("switch", { name: "Show Agenda" }).click();
     await settings.getByRole("switch", { name: "Show counts" }).click();
     await views.scrollIntoViewIfNeeded();

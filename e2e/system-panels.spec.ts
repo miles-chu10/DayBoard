@@ -442,7 +442,8 @@ test("the panels follow the design system's ground, input, row and copy rules", 
     await capture.keyboard.press("Escape");
 
     const menubar = await openMenuBarAgenda(demo.app);
-    expect(await opaque(menubar)).toMatch(/^rgb\(/);
+    // The window event can arrive before the panel's stylesheet has applied.
+    await expect.poll(() => opaque(menubar)).toMatch(/^rgb\(/);
     await expect(menubar.getByRole("textbox", { name: "Add, ask or search" })).toHaveAttribute(
       "placeholder",
       /^.{1,32}…$/,

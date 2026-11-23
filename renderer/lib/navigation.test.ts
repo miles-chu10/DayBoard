@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { AppSettings } from "@main/shared-types";
 
-import { NAV_ITEMS, navTargets, sidebarNav, sidebarRows, visibleNav } from "./navigation";
+import {
+  NAV_ITEMS,
+  moveSidebarView,
+  navTargets,
+  sidebarNav,
+  sidebarOrderRows,
+  sidebarRows,
+  visibleNav,
+} from "./navigation";
 
 type Source = "tasks" | "reminders" | "mail" | "calendar";
 
@@ -134,4 +142,48 @@ test("with the Agenda hidden its sources are ordinary rows in the saved order", 
       ["notes", false],
     ],
   );
+});
+
+test("Settings lists the views as the sidebar draws them and moves a view past its own kind", () => {
+  const order = ["home", "agenda", "calendar", "mail", "tasks", "reminders", "notes"] as const;
+  assert.deepEqual(
+    sidebarOrderRows(order, []).map((row) => [row.id, row.nested]),
+    [
+      ["home", false],
+      ["agenda", false],
+      ["calendar", true],
+      ["tasks", true],
+      ["reminders", true],
+      ["mail", false],
+      ["notes", false],
+    ],
+  );
+  // Inbox passes the whole Agenda group in one press; a source moves among the sources.
+  const inboxUp = moveSidebarView(order, [], "mail", -1);
+  assert.deepEqual(
+    sidebarOrderRows(inboxUp, []).map((row) => row.id),
+    ["home", "mail", "agenda", "calendar", "tasks", "reminders", "notes"],
+  );
+  assert.deepEqual(
+    sidebarOrderRows(moveSidebarView(order, [], "tasks", -1), []).map((row) => row.id),
+    ["home", "agenda", "tasks", "calendar", "reminders", "mail", "notes"],
+  );
+  // Nowhere to go returns the same array, which is how the buttons know to disable.
+  assert.equal(moveSidebarView(order, [], "home", -1), order);
+  assert.equal(moveSidebarView(order, [], "reminders", 1), order);
+  assert.equal(moveSidebarView(order, [], "notes", 1), order);
+  // With the Agenda hidden the list is flat and a move is one place in the saved order.
+  assert.deepEqual(
+    sidebarOrderRows(order, ["agenda"]).map((row) => [row.id, row.nested]),
+    order.map((id) => [id, false]),
+  );
+  assert.deepEqual(moveSidebarView(order, ["agenda"], "mail", 1), [
+    "home",
+    "agenda",
+    "calendar",
+    "tasks",
+    "mail",
+    "reminders",
+    "notes",
+  ]);
 });
