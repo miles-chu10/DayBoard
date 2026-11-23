@@ -362,7 +362,7 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
             size="small"
             variant="muted"
             disabled={busy}
-            onClick={() => void writes.saveEvent(event, tomorrow).then(done)}
+            onClick={() => void writes.moveEvent(event, tomorrow, "Tomorrow").then(done)}
           >
             Move to tomorrow
           </Button>
