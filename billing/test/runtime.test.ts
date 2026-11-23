@@ -491,3 +491,92 @@ test("real Worker and D1 record the desktop app's daily check-in", async (t) => 
     await mf.dispose();
   }
 });
+
+test("real Worker and D1 take a signup, send the update email once and honour its unsubscribe link", async () => {
+  const adminToken = randomToken();
+  const site = "https://site.runtime.test";
+  const mails: { to: string[]; text: string; headers: Record<string, string> }[] = [];
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: await workerScript(),
+      compatibilityDate: "2026-09-22",
+      compatibilityFlags: ["nodejs_compat"],
+      cf: false,
+      d1Databases: ["DB"],
+      d1Persist: false,
+      bindings: {
+        SERVICE_ORIGIN: origin,
+        PRODUCT_ID: "prod_RUNTIME",
+        PRICE_ID: "price_RUNTIME",
+        PRICE_CURRENCY: "usd",
+        ENVIRONMENT: "test",
+        ACTIVATION_LIMIT: "1",
+        STRIPE_SECRET_KEY: "rk_test_disposable_runtime",
+        STRIPE_WEBHOOK_SECRET: `whsec_${randomToken()}`,
+        ENCRYPTION_KEY: randomToken(),
+        HASH_SECRET: randomToken(),
+        ADMIN_TOKEN: adminToken,
+        SITE_ORIGIN: site,
+        RESEND_API_KEY: "re_disposable_runtime",
+        MAIL_FROM: "DayBoard <updates@mail.runtime.test>",
+      },
+      // The only outbound request allowed is the email provider's.
+      outboundService: async (request: Request) => {
+        assert.equal(request.url, "https://api.resend.com/emails");
+        mails.push((await request.json()) as (typeof mails)[number]);
+        return Response.json({ id: "email_runtime" });
+      },
+    }),
+  );
+  try {
+    const db = await mf.getD1Database("DB");
+    await migrate(db);
+    const signup = (email: string) =>
+      mf.dispatchFetch(`${origin}/v1/updates/subscribe`, {
+        method: "POST",
+        headers: { Origin: site, "Content-Type": "application/json" },
+        body: JSON.stringify({ email, company: "" }),
+      });
+    const admin = (action: string, body?: unknown) =>
+      mf.dispatchFetch(`${origin}/v1/admin/updates/${action}`, {
+        method: body === undefined ? "GET" : "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    for (const email of ["one@runtime.test", "two@runtime.test", "one@runtime.test"])
+      assert.deepEqual(await (await signup(email)).json(), { ok: true });
+    const list = (await (await admin("subscribers")).json()) as { recipients: number };
+    assert.equal(list.recipients, 2);
+    const message = { version: "1.3.11", subject: "DayBoard 1.3.11 is out", text: "It's out." };
+    const announced = await admin("mailings", { ...message, recipients: 2 });
+    assert.equal(announced.status, 201);
+    // Delivery runs after the reply; wait for it.
+    for (let i = 0; i < 50 && mails.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(mails.map((mail) => mail.to[0]).sort(), [
+      "one@runtime.test",
+      "two@runtime.test",
+    ]);
+    assert.equal((await admin("mailings", { ...message, recipients: 2 })).status, 409);
+
+    const link = /Unsubscribe: (https:\S+)/.exec(mails[0].text)?.[1] ?? "";
+    assert.ok(mails[0].headers["List-Unsubscribe"].startsWith(`<${link}>`));
+    assert.equal((await mf.dispatchFetch(link)).status, 200);
+    assert.equal(((await (await admin("subscribers")).json()) as typeof list).recipients, 2);
+    const oneClick = await mf.dispatchFetch(link, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "List-Unsubscribe=One-Click",
+    });
+    assert.equal(oneClick.status, 200);
+    assert.equal(((await (await admin("subscribers")).json()) as typeof list).recipients, 1);
+    const progress = (await (await admin("mailings?version=1.3.11")).json()) as { sent: number };
+    assert.equal(progress.sent, 2);
+    assert.equal(mails.length, 2);
+  } finally {
+    await mf.dispose();
+  }
+});

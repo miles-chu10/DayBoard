@@ -1257,6 +1257,51 @@
         </div>
       </section>
 
+      <section class="section" id="newsletter" aria-labelledby="newsletter-title">
+        <div class="wrap">
+          <div class="subscribe" data-reveal>
+            <div class="subscribe-copy">
+              <span class="eyebrow">Release emails</span>
+              <h2 id="newsletter-title">Hear when DayBoard <em>gets better.</em></h2>
+              <p>
+                One short email when a new version is out: what changed and where to get it. Nothing
+                else, and you can unsubscribe in one click.
+              </p>
+            </div>
+            <form class="signup" data-signup method="post" novalidate>
+              <div class="signup-row">
+                <label class="visually-hidden" for="email-updates">Email address</label>
+                <input
+                  id="email-updates"
+                  disabled
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="you@example.com"
+                  required
+                  maxlength="254"
+                />
+                <div class="trap" aria-hidden="true">
+                  <label for="company-updates">Leave this empty</label
+                  ><input id="company-updates" name="company" tabindex="-1" autocomplete="off" />
+                </div>
+                <button class="button" type="submit" disabled>Email me updates</button>
+              </div>
+              <p class="signup-note">
+                We use your address only for DayBoard release emails. See the
+                <a href="privacy.html#website">privacy page</a>.
+              </p>
+              <p class="signup-status" role="status" aria-live="polite"></p>
+              <noscript
+                ><p class="signup-note">
+                  Turn on JavaScript to sign up for release emails.
+                </p></noscript
+              >
+            </form>
+          </div>
+        </div>
+      </section>
+
       <section class="section band" id="faq" aria-labelledby="faq-title">
         <div class="wrap faq">
           <div class="section-head" data-reveal>

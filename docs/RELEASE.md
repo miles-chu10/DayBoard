@@ -246,6 +246,20 @@ The separate `billing/` service creates hosted Checkout Sessions, verifies signe
 
 `npm run measure -- --inspect` runs a disposable fictional demo and records launch/idle process measurements. Set `DAYBOARD_E2E_EXECUTABLE` to measure the packaged executable. Summed process working sets may count shared memory more than once; this measurement does not describe real-account workloads.
 
+## Release email
+
+After a release is published and the website shows it, announce it to the update newsletter with
+`billing/scripts/update-email.mjs` (see "Update newsletter" in `billing/README.md`). Nothing sends
+this email automatically. In order:
+
+1. `draft <version>` prints the email written from `docs/release-notes-<version>.md`. Check that
+   its download link serves the new version.
+2. `list` prints the recipients and their count. `test <version> --to <your address>` sends you
+   one copy.
+3. Show Miles the draft and the list. Only when he approves that draft and that list, run
+   `send <version> --recipients <count>`. It sends once per version.
+4. `status <version>` shows progress. The rest go out within the hour.
+
 ## Website and source distribution
 
 The static site is in `website/`, served by the assets binding in `website-worker/worker.js`.

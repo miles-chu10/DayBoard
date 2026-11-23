@@ -51,7 +51,7 @@ async function currentOrder(request: Request, env: Env, orderId: string): Promis
     .bind(orderId, await hash(token, env.HASH_SECRET), Date.now())
     .first<Order>();
 }
-function html(markup: string, headers: HeadersInit = {}, status = 200): Response {
+export function html(markup: string, headers: HeadersInit = {}, status = 200): Response {
   return new Response(markup, {
     status,
     headers: {

@@ -1,6 +1,6 @@
 # DayBoard billing service
 
-This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics. Its only email is the optional license key email to buyers ([below](#license-key-email)).
+This is a separate TypeScript Cloudflare Worker with D1 storage. It issues one-time DayBoard licenses after verified Stripe Checkout payments, and complimentary licenses the owner issues through an admin route ([below](#complimentary-licenses)). It shares only the version 1 license request/response contract in `../shared/license-contract.ts` with the desktop app. The service runs no analytics. It sends two kinds of email, both optional: the license key email to buyers ([below](#license-key-email)) and the release email to people who signed up for it ([below](#update-newsletter)).
 
 ## Local verification
 
@@ -150,6 +150,43 @@ npx wrangler d1 execute <database> --remote --command "INSERT OR REPLACE INTO li
 ```
 
 The next scheduled run, within 15 minutes, sends the key to the address on that Checkout Session. It can't go to an address someone gives you, and a refunded or disputed order gets `skipped` instead.
+
+## Update newsletter
+
+People can sign up on the website to get one email when a new DayBoard version is out. The owner sends that email by hand, once per version, with `scripts/update-email.mjs`. It uses the same Resend settings as the license key email (`RESEND_API_KEY`, `MAIL_FROM`) and the same 15-minute Cron Trigger. Nothing is sent automatically when a release is published.
+
+- **Who is on the list.** `update_subscribers` (migration 0009) holds one row per address: the address, a random 32-character token, where it came from (`waitlist` or `site`) and when. The migration seeds it with every waitlist signup that isn't a `likely_test` and isn't in `email_suppressions`; the waitlist promised "major DayBoard news". No `beta_signups` row is changed. An address in `email_suppressions` is never emailed, whenever it was added.
+- **Signup.** `POST /v1/updates/subscribe` with `{ "email": "...", "company": "" }`, only from `SITE_ORIGIN` (other origins get `403 origin_not_allowed`). It is single opt-in: no confirmation email is sent. New, existing and unsubscribed addresses all get `200 { "ok": true }`, so the form can't be used to find out who is on the list. An address that unsubscribed stays unsubscribed. A filled `company` field (hidden on the page) is a bot and is dropped with the same answer. At most five signups a minute per client address, counted with the keyed IP hash the waitlist used.
+- **Unsubscribe.** Every email carries `<origin>/unsubscribe?t=<token>`, in the footer and in the `List-Unsubscribe` header with `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058), so Gmail and Apple Mail show their own unsubscribe button. The link holds the token, never the address. `GET` shows a confirmation page with one button, so a mail scanner that opens links can't unsubscribe anyone. `POST` unsubscribes and offers an undo. The row stays, marked with `unsubscribed_at`.
+- **Sending.** `POST /v1/admin/updates/mailings` stores the email in `update_mailings`, keyed by version, and one `update_deliveries` row per active subscriber. The request must carry `recipients`, the count the owner saw in `list`. If the list has changed since, nothing is stored or sent and the answer is `409 recipient_count_changed`. A version that already has a mailing answers `409 already_announced`: a version is announced once, and people who sign up later get the next one. The first ten emails go out with the request and the Cron Trigger sends ten more per run, so 34 addresses take about 45 minutes. Each attempt claims its row first, so parallel runs send once, and carries the Resend idempotency key `dayboard-update/<version>/<token>/<created_at>`. Retries stop 23 hours after the mailing, when the row becomes `failed`. A person who unsubscribes before their copy goes out is `skipped`. A `429` from Resend ends the run; the next one continues. Resend's free plan allows 100 emails a day, shared with license key emails.
+- **What it says.** Plain text and HTML made from the same text: `## ` headings, `- ` lists, `**bold**` and bare `https://` links. `Reply-To` is `support@getdayboard.com`. The footer says why the person is getting the email and links to unsubscribe. Set the optional `UPDATES_POSTAL_ADDRESS` var to add a postal address line to the footer; US law (CAN-SPAM) asks commercial email to carry one. No tags, attachments or tracking.
+
+Admin routes, behind the same `ADMIN_TOKEN` and limits as [Complimentary licenses](#complimentary-licenses):
+
+| Route                                    | Body                                     | Result                                                                              |
+| ---------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /v1/admin/updates/subscribers`      | none                                     | `{ recipients, subscribers: [{ email, source, subscribedAt }] }`, active ones only  |
+| `POST /v1/admin/updates/unsubscribe`     | `{ email }`                              | `{ unsubscribed: true }`. Adds the address as unsubscribed if it wasn't on the list |
+| `POST /v1/admin/updates/test`            | `{ to, subject, text }`                  | `{ sent: true }`. One copy to one address. Its link works only for a subscriber     |
+| `POST /v1/admin/updates/mailings`        | `{ version, subject, text, recipients }` | `201` with the counts below, or one of the `409`s above                             |
+| `GET /v1/admin/updates/mailings?version` | none                                     | `{ version, subject, createdAt, pending, sent, failed, skipped }`, or `404`         |
+
+`scripts/update-email.mjs` calls them. It writes the email from `docs/release-notes-<version>.md`: the title becomes the subject, pull request numbers are dropped, and download and changelog links are added. `--file` sends other text instead. From the repo root, with the token passed by 1Password as for complimentary licenses:
+
+```sh
+export DAYBOARD_ADMIN_TOKEN="op://<vault>/<item>/credential" # a 1Password reference, not the token
+export DAYBOARD_BILLING_ORIGIN="https://api.getdayboard.com"
+node billing/scripts/update-email.mjs draft 1.3.11                                  # print the email; contacts nothing
+op run -- node billing/scripts/update-email.mjs list                                # who it goes to, and the count
+op run -- node billing/scripts/update-email.mjs unsubscribe someone@example.com     # take an address off
+op run -- node billing/scripts/update-email.mjs test 1.3.11 --to you@example.com    # one copy, to yourself
+op run -- node billing/scripts/update-email.mjs send 1.3.11 --recipients <count>    # everyone, once
+op run -- node billing/scripts/update-email.mjs status 1.3.11                       # sent, waiting, failed, skipped
+```
+
+`send` emails real people and can't be undone or repeated for that version. Run it only with the owner's go-ahead for that draft and that list.
+
+Setup: back up D1, apply `migrations/0009_update_subscribers.sql` (three new tables, one index, and the seed; no existing row changes), then deploy the Worker, then the website. Deployed before the migration, the signup form answers `503 service_unavailable` and everything else works as before.
 
 ## Complimentary licenses
 

@@ -1,8 +1,11 @@
 import type { Config, Env } from "./config.ts";
 import { hash, mintLicense, randomToken, safeEqual } from "./crypto.ts";
+import type { WaitUntil } from "./beta.ts";
 import { count, error, json, limit, object, readJson, uncount } from "./http.ts";
+import type { Send } from "./mail.ts";
+import { adminUpdates } from "./updates.ts";
 
-// Owner-only routes for complimentary ("comp") licenses. Callers authenticate with
+// Owner-only routes for complimentary ("comp") licenses and the update newsletter. Callers authenticate with
 // `Authorization: Bearer <ADMIN_TOKEN>`. Nothing here logs the token, a key or a request body.
 const MIN_TOKEN_LENGTH = 32;
 // Enough for a 50-key CLI run plus a list, from one address in one minute.
@@ -158,7 +161,13 @@ async function list(env: Env): Promise<Response> {
   });
 }
 
-export async function admin(request: Request, env: Env, cfg: Config): Promise<Response> {
+export async function admin(
+  request: Request,
+  env: Env,
+  cfg: Config,
+  send: Send,
+  ctx?: WaitUntil,
+): Promise<Response> {
   const token = env.ADMIN_TOKEN;
   // Closed by default: without a strong token configured, no admin request is considered.
   if (!token || token.length < MIN_TOKEN_LENGTH) return error(503, "admin_unconfigured");
@@ -174,6 +183,7 @@ export async function admin(request: Request, env: Env, cfg: Config): Promise<Re
   if (!(await authorized(request, token))) return unauthorized();
   await uncount(env, attempt);
   const path = new URL(request.url).pathname;
+  if (path.startsWith("/v1/admin/updates/")) return adminUpdates(request, env, cfg, send, ctx);
   if (path === "/v1/admin/comp-licenses") {
     if (request.method === "POST") return issue(request, env, cfg);
     if (request.method === "GET") return list(env);
