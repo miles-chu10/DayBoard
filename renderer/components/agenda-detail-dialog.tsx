@@ -41,7 +41,6 @@ import { useAgendaClock } from "../lib/use-agenda-clock";
 import { SOURCE_META } from "../lib/sources";
 import { DetailPanel } from "./detail-panel";
 import { ItemEditButton } from "./item-editor";
-import { SourceDot } from "./source-dot";
 
 const STOP_WORDS = new Set(["about", "and", "for", "from", "meeting", "the", "this", "with"]);
 
@@ -323,11 +322,7 @@ export function AgendaDetailDialog({
         <Callout color="orange">Focus and links are unavailable. Try reopening this item.</Callout>
       ) : null}
       <FieldGroup>
-        <Field
-          label="Due"
-          description="A due date. It doesn't block time on your calendar."
-          orientation="vertical"
-        >
+        <Field label="Due" orientation="vertical">
           <Text>
             {todo.dueDate
               ? `${shortDate(todo.dueDate)}${
@@ -350,15 +345,6 @@ export function AgendaDetailDialog({
                 : "Google Tasks doesn't share task times with other apps, so a time set in Google Calendar can't show here."}
             </Text>
           ) : null}
-        </Field>
-        <Field label="Saved in" orientation="vertical">
-          <span className="flex items-center gap-2">
-            <SourceDot source={todo.source} />
-            <Text>{todo.source === "tasks" ? "Google Tasks" : "Apple Reminders"}</Text>
-          </span>
-        </Field>
-        <Field label="List" orientation="vertical">
-          <Text>{todo.listTitle}</Text>
         </Field>
         {todo.notes ? (
           <Field label="Notes" orientation="vertical">

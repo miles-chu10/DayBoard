@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { AppSettings } from "@main/shared-types";
 
-import { NAV_ITEMS, navTargets, visibleNav } from "./navigation";
+import { NAV_ITEMS, navTargets, sidebarNav, sidebarRows, visibleNav } from "./navigation";
 
 type Source = "tasks" | "reminders" | "mail" | "calendar";
 
@@ -80,5 +80,58 @@ test("the sidebar follows the saved order and leaves out hidden views; ⌘K keep
   assert.deepEqual(
     navTargets(custom).map((item) => item.id),
     ["mail", "home", "notes", "agenda", "calendar", "tasks", "reminders", "assistant", "review"],
+  );
+});
+
+test("Calendar, Tasks and Reminders sit under the Agenda in their saved order", () => {
+  const custom = {
+    ...settings({}),
+    general: {
+      sidebar: {
+        order: ["mail", "reminders", "home", "notes", "agenda", "calendar", "tasks"],
+        hidden: [],
+        counts: true,
+      },
+    },
+  } as unknown as AppSettings;
+  assert.deepEqual(
+    sidebarRows(custom).map((row) => [row.item.id, row.nested]),
+    [
+      ["mail", false],
+      ["home", false],
+      ["notes", false],
+      ["agenda", false],
+      ["reminders", true],
+      ["calendar", true],
+      ["tasks", true],
+    ],
+  );
+  // ⌃1–9 follow the rows as drawn, then the AI views.
+  assert.deepEqual(
+    sidebarNav(custom).map((item) => item.id),
+    ["mail", "home", "notes", "agenda", "reminders", "calendar", "tasks", "assistant", "review"],
+  );
+});
+
+test("with the Agenda hidden its sources are ordinary rows in the saved order", () => {
+  const custom = {
+    ...settings({ sources: { reminders: false } }),
+    general: {
+      sidebar: {
+        order: ["home", "tasks", "agenda", "calendar", "mail", "reminders", "notes"],
+        hidden: ["agenda"],
+        counts: true,
+      },
+    },
+  } as unknown as AppSettings;
+  assert.deepEqual(
+    sidebarRows(custom).map((row) => [row.item.id, row.nested]),
+    [
+      ["home", false],
+      ["tasks", false],
+      ["calendar", false],
+      ["mail", false],
+      ["notes", false],
+    ],
   );
 });

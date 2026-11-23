@@ -363,11 +363,11 @@ function ConnectStep() {
         </AccountRow>
         <AccountRow
           icon={<CalendarDays className="size-4 text-support-red" />}
-          title="Mac Calendars"
+          title="iCloud Calendars"
           description={
             macCalendar === "denied" || macCalendar === "restricted"
               ? "Turn on full access in System Settings → Privacy & Security → Calendars."
-              : "Calendars from the Calendar app, such as iCloud. macOS asks once."
+              : "Your iCloud calendars and any others in the Calendar app. macOS asks once."
           }
         >
           {macCalendar === undefined ? (

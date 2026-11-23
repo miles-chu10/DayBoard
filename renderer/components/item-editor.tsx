@@ -51,7 +51,8 @@ function isCalendarEvent(item: EditableItem): item is CalendarEventItem {
 }
 
 function sourceLabel(item: EditableItem): string {
-  if (isCalendarEvent(item)) return item.provider === "apple" ? "Mac Calendar" : "Google Calendar";
+  if (isCalendarEvent(item))
+    return item.provider === "apple" ? "iCloud Calendar" : "Google Calendar";
   return item.source === "tasks" ? "Google Tasks" : "Apple Reminders";
 }
 

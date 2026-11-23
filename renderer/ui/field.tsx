@@ -14,6 +14,22 @@ export interface FieldProps extends Omit<React.ComponentProps<"div">, "onClick">
   disabled?: boolean;
 }
 
+/**
+ * How a field without an explicit orientation lays out. "row" puts the label and description on
+ * the left and the control on the right, wrapping a wide control onto its own line.
+ */
+const FieldLayoutContext = React.createContext<"stacked" | "row">("stacked");
+
+export function FieldLayout({
+  layout,
+  children,
+}: {
+  layout: "stacked" | "row";
+  children: React.ReactNode;
+}) {
+  return <FieldLayoutContext.Provider value={layout}>{children}</FieldLayoutContext.Provider>;
+}
+
 export function Field({
   label,
   htmlFor,
@@ -26,7 +42,9 @@ export function Field({
   children,
   ...props
 }: FieldProps) {
-  const resolvedOrientation = orientation ?? (onClick ? "horizontal" : "vertical");
+  const layout = React.useContext(FieldLayoutContext);
+  const resolvedOrientation =
+    orientation ?? (onClick ? "horizontal" : layout === "row" ? "row" : "vertical");
   const body = (
     <>
       {label || description ? (
@@ -44,6 +62,8 @@ export function Field({
     resolvedOrientation === "responsive" &&
       "flex-col @md:flex-row @md:items-center @md:justify-between",
     resolvedOrientation === "vertical" && "flex-col",
+    resolvedOrientation === "row" &&
+      "flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 [&>div:first-child]:min-w-[45%]",
     disabled && "opacity-40",
     error && "data-[invalid]:text-support-red",
     className,

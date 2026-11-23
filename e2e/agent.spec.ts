@@ -34,7 +34,7 @@ test("Notes lists, creates, autosaves, reopens and deletes notes", async ({
   const demo = await launchDemo();
   try {
     const page = demo.page;
-    await expect(sidebarItem(page, "Notes")).toContainText("2 notes");
+    await expect(sidebarItem(page, "Notes").getByRole("img", { name: "2 notes" })).toBeVisible();
     await navigate(page, "Notes");
     const list = page.getByRole("list", { name: "Notes" });
     await expect(list.getByRole("button", { name: /^Launch checklist/ })).toBeVisible();
@@ -55,7 +55,7 @@ test("Notes lists, creates, autosaves, reopens and deletes notes", async ({
 
     // Newest edit first, with its title taken from the first line.
     await expect(list.getByRole("button").first()).toContainText("Offsite");
-    await expect(sidebarItem(page, "Notes")).toContainText("3 notes");
+    await expect(sidebarItem(page, "Notes").getByRole("img", { name: "3 notes" })).toBeVisible();
     await page.getByRole("textbox", { name: "Search notes" }).fill("venue");
     await expect(list.getByRole("button")).toHaveCount(1);
     await list.getByRole("button", { name: /^Offsite/ }).click();
@@ -73,7 +73,7 @@ test("Notes lists, creates, autosaves, reopens and deletes notes", async ({
     await page.getByRole("button", { name: "Delete note" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
     await expect(list.getByRole("button", { name: /^Team offsite/ })).toHaveCount(0);
-    await expect(sidebarItem(page, "Notes")).toContainText("2 notes");
+    await expect(sidebarItem(page, "Notes").getByRole("img", { name: "2 notes" })).toBeVisible();
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { BadgeCheck, Layers, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
 import {
+  FieldLayout,
   ScrollArea,
   Tabs,
   TabsContent,
@@ -28,7 +30,20 @@ import { isSettingsTab as isKnownTab, type SettingsTab } from "@shared/settings-
 const isSettingsTab = (value: unknown): value is SettingsTab =>
   isKnownTab(value) && !(isAppStoreBuild && value === "license");
 
-const TAB_CONTENT_CLASS = "px-4 pb-8 pt-2 flex flex-col gap-8";
+const TAB_CONTENT_CLASS = "mx-auto flex w-full max-w-[40rem] flex-col gap-7 px-5 pb-8 pt-1";
+
+const SECTIONS = [
+  { id: "general", title: "General", icon: SlidersHorizontal },
+  { id: "sources", title: "Sources", icon: Layers },
+  { id: "ai", title: "AI", icon: Sparkles },
+  { id: "mcp", title: "MCP Servers", icon: Server },
+  { id: "license", title: "License", icon: BadgeCheck },
+  { id: "updates", title: "Updates", icon: RefreshCw },
+] as const satisfies readonly { id: SettingsTab; title: string; icon: unknown }[];
+
+const NAV_ITEM_CLASS =
+  "h-8 w-full justify-start gap-2 rounded-md px-2 text-regular font-normal text-primary hover:bg-list-hover " +
+  "data-[state=active]:bg-list-selection data-[state=active]:font-semibold data-[state=active]:shadow-none";
 
 export function SettingsView() {
   useBackendSync();
@@ -75,58 +90,73 @@ export function SettingsView() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const sections = SECTIONS.filter((section) => isSettingsTab(section.id));
   return (
     <TabsRoot
       value={tab}
+      orientation="vertical"
       onValueChange={(value) => {
         if (isSettingsTab(value)) setTab(value);
       }}
-      className="h-full"
+      className="flex h-full"
     >
+      <div className="flex w-[11.5rem] shrink-0 flex-col border-r border-separator/60 bg-background-secondary px-2 pt-3">
+        <Tabs
+          variant="transparent"
+          aria-label="Settings sections"
+          className="h-auto flex-col items-stretch gap-0.5 rounded-none p-0"
+        >
+          {sections.map(({ id, title, icon: Icon }) => (
+            <TabsTrigger key={id} value={id} className={NAV_ITEM_CLASS}>
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md bg-control-subtle text-secondary"
+              >
+                <Icon className="size-[15px]" strokeWidth={1.75} />
+              </span>
+              {title}
+            </TabsTrigger>
+          ))}
+        </Tabs>
+      </div>
       <ScrollArea
-        className="h-full"
+        className="h-full min-w-0 flex-1"
         toolbar={
-          <Toolbar>
-            <ToolbarRow>
+          <Toolbar inset="none">
+            <ToolbarRow className="mx-auto w-full max-w-[40rem] px-8">
               <ToolbarContent>
-                <ToolbarTitle>Settings</ToolbarTitle>
+                <ToolbarTitle as="h1" className="text-[17px] font-semibold">
+                  {sections.find((section) => section.id === tab)?.title}
+                </ToolbarTitle>
               </ToolbarContent>
-            </ToolbarRow>
-            <ToolbarRow className="overflow-x-auto">
-              <Tabs variant="glass" className="mx-auto shrink-0">
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="sources">Sources</TabsTrigger>
-                <TabsTrigger value="ai">AI</TabsTrigger>
-                <TabsTrigger value="mcp">MCP Servers</TabsTrigger>
-                {isAppStoreBuild ? null : <TabsTrigger value="license">License</TabsTrigger>}
-                <TabsTrigger value="updates">Updates</TabsTrigger>
-              </Tabs>
             </ToolbarRow>
           </Toolbar>
         }
       >
-        <TabsContent value="general" className={TAB_CONTENT_CLASS}>
-          <GeneralTab />
-        </TabsContent>
-        <TabsContent value="sources" className={TAB_CONTENT_CLASS}>
-          <SourcesTab />
-        </TabsContent>
-        <TabsContent value="ai" className={TAB_CONTENT_CLASS}>
-          <AITab />
-        </TabsContent>
-        <TabsContent value="mcp" className={TAB_CONTENT_CLASS}>
-          <McpTab />
-        </TabsContent>
-        {isAppStoreBuild ? null : (
-          <TabsContent value="license" className={TAB_CONTENT_CLASS}>
-            <LicenseTab />
+        <FieldLayout layout="row">
+          <TabsContent value="general" className={TAB_CONTENT_CLASS}>
+            <GeneralTab />
           </TabsContent>
-        )}
-        <TabsContent value="updates" className={TAB_CONTENT_CLASS}>
-          <UpdatesTab />
-          <FeedbackSettings />
-          <UsageCheckInSettings />
-        </TabsContent>
+          <TabsContent value="sources" className={TAB_CONTENT_CLASS}>
+            <SourcesTab />
+          </TabsContent>
+          <TabsContent value="ai" className={TAB_CONTENT_CLASS}>
+            <AITab />
+          </TabsContent>
+          <TabsContent value="mcp" className={TAB_CONTENT_CLASS}>
+            <McpTab />
+          </TabsContent>
+          {isAppStoreBuild ? null : (
+            <TabsContent value="license" className={TAB_CONTENT_CLASS}>
+              <LicenseTab />
+            </TabsContent>
+          )}
+          <TabsContent value="updates" className={TAB_CONTENT_CLASS}>
+            <UpdatesTab />
+            <FeedbackSettings />
+            <UsageCheckInSettings />
+          </TabsContent>
+        </FieldLayout>
       </ScrollArea>
     </TabsRoot>
   );

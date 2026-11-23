@@ -61,7 +61,7 @@ test("new events follow the setting, falling back to Google, then the Mac defaul
   assert.throws(() => ids.newEventDestination("", false, "denied"), /Connect Google or allow/);
   assert.throws(
     () => ids.newEventDestination("apple:home", true, "not-determined"),
-    /needs access to your Mac calendars/,
+    /needs access to your iCloud calendars/,
   );
 });
 
@@ -364,5 +364,5 @@ test("read-only Mac calendars refuse edits before EventKit is asked to change an
   });
   const eventId = ids.encodeAppleEventId({ id: "B", occurrenceDate: null, start: null });
   await assert.rejects(apple.deleteAppleEvent("apple:HOLIDAYS", eventId), /read-only/);
-  await assert.rejects(apple.deleteAppleEvent("primary", eventId), /not a Mac Calendar event/);
+  await assert.rejects(apple.deleteAppleEvent("primary", eventId), /not an iCloud Calendar event/);
 });

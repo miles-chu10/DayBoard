@@ -76,8 +76,8 @@ export function newEventDestination(
   if (!mac)
     throw new Error(
       choice === ""
-        ? "Connect Google or allow access to your Mac calendars to add events."
-        : "DayBoard needs access to your Mac calendars to add this event.",
+        ? "Connect Google or allow access to your iCloud calendars to add events."
+        : "DayBoard needs access to your iCloud calendars to add this event.",
     );
   return { kind: "apple", calendarId: isAppleCalendarId(choice) ? choice : null };
 }

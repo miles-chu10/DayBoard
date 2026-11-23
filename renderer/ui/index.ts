@@ -15,6 +15,7 @@ export { Textarea, type TextareaProps } from "./textarea";
 export { Label } from "./label";
 export {
   Field,
+  FieldLayout,
   FieldSet,
   FieldLegend,
   FieldGroup,

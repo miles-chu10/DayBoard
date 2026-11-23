@@ -237,13 +237,14 @@ export async function listCalendarEvents(
 async function calendarFor(calendarId: string, googleEmail: string | null = null) {
   const calendars = await listMacCalendars(googleEmail);
   const calendar = calendars.find((candidate) => candidate.id === calendarId);
-  if (!calendar) throw new Error("This Mac calendar is no longer available.");
+  if (!calendar) throw new Error("This iCloud calendar is no longer available.");
   return calendar;
 }
 
 function refFor(calendarId: string, eventId: string) {
   const ref = decodeAppleEventId(eventId);
-  if (!isAppleCalendarId(calendarId) || !ref) throw new Error("This is not a Mac Calendar event.");
+  if (!isAppleCalendarId(calendarId) || !ref)
+    throw new Error("This is not an iCloud Calendar event.");
   return ref;
 }
 
@@ -261,7 +262,7 @@ export async function getAppleEventForEditing(
 export async function updateAppleEvent(input: UpdateEventInput): Promise<CalendarEventItem> {
   const ref = refFor(input.calendarId, input.eventId);
   const calendar = await calendarFor(input.calendarId);
-  if (!calendar.writable) throw new Error("This Mac calendar is read-only.");
+  if (!calendar.writable) throw new Error("This iCloud calendar is read-only.");
   const updated = await reminders.updateEvent(ref, {
     title: input.title,
     ...(input.description === undefined ? {} : { notes: input.description }),
@@ -286,7 +287,7 @@ export async function updateAppleEvent(input: UpdateEventInput): Promise<Calenda
 export async function deleteAppleEvent(calendarId: string, eventId: string): Promise<void> {
   const ref = refFor(calendarId, eventId);
   const calendar = await calendarFor(calendarId);
-  if (!calendar.writable) throw new Error("This Mac calendar is read-only.");
+  if (!calendar.writable) throw new Error("This iCloud calendar is read-only.");
   await reminders.deleteEvent(ref);
 }
 

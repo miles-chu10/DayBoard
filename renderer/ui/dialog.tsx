@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 
 import { cn } from "./utils";
 import { Button } from "./button";
+import { FieldLayout } from "./field";
 import { ScrollArea } from "./scroll-area";
 
 const SIZE_CLASS = {
@@ -171,7 +172,7 @@ export function DialogContent({
       )}
       {...props}
     >
-      {children}
+      <FieldLayout layout="stacked">{children}</FieldLayout>
       {showCloseButton ? (
         <DialogPrimitive.Close asChild>
           <Button
