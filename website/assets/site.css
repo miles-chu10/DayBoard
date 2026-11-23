@@ -678,6 +678,11 @@ p {
   background: #28c840;
 }
 
+.window.narrow {
+  width: min(360px, 100%);
+  margin-inline: auto;
+}
+
 .board > .window {
   z-index: 2;
 }

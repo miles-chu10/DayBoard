@@ -193,6 +193,18 @@ for (const theme of ["light", "dark"]) {
       settings.getByRole("textbox", { name: "Your name" }),
     ]);
 
+    // The menu-bar panel is its own small window; File → Menu Bar Agenda opens it.
+    const opened = app.waitForEvent("window", (w) => w.url().endsWith("#menubar"));
+    await app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()?.getMenuItemById("menubar-agenda")?.click(),
+    );
+    const panel = await opened;
+    await panel.emulateMedia({ colorScheme: theme });
+    await capture(panel, `${theme}-menubar`, [
+      panel.getByRole("radio", { name: "Day", checked: true }),
+      panel.getByRole("region", { name: "Today's items", exact: true }),
+    ]);
+
     if (demo.errors.length) throw Error(`Page errors: ${demo.errors.join("; ")}`);
   } finally {
     await demo.close(false);
