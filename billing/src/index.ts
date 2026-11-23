@@ -8,6 +8,13 @@ import { error } from "./http.ts";
 import { retryLicenseEmails } from "./license-email.ts";
 import { licenses } from "./licenses.ts";
 import type { Send } from "./mail.ts";
+import {
+  SUBSCRIBE_PATH,
+  UNSUBSCRIBE_PATH,
+  deliverUpdates,
+  subscribe,
+  unsubscribe,
+} from "./updates.ts";
 import { usageCheckIn } from "./usage.ts";
 import { webhook } from "./webhook.ts";
 import { USAGE_CHECKIN_PATH } from "../../shared/usage-checkin.ts";
@@ -42,7 +49,9 @@ export function createWorker(
           return await webhook(request, env, cfg, stripeFactory(env), send, ctx);
         if (path.startsWith("/v1/licenses/")) return await licenses(request, env, cfg);
         if (path === USAGE_CHECKIN_PATH) return await usageCheckIn(request, env);
-        if (path.startsWith("/v1/admin/")) return await admin(request, env, cfg);
+        if (path.startsWith("/v1/admin/")) return await admin(request, env, cfg, send, ctx);
+        if (path === SUBSCRIBE_PATH) return await subscribe(request, env);
+        if (path === UNSUBSCRIBE_PATH) return await unsubscribe(request, env);
         if (
           [
             "/buy",
@@ -61,7 +70,7 @@ export function createWorker(
         return error(503, "service_unavailable");
       }
     },
-    /** The Cron Trigger: retries license key emails that haven't been sent yet. */
+    /** The Cron Trigger: sends license key and update emails that haven't been sent yet. */
     async scheduled(_controller: unknown, env: Env): Promise<void> {
       let cfg;
       try {
@@ -70,6 +79,7 @@ export function createWorker(
         return;
       }
       await retryLicenseEmails(env, cfg, stripeFactory(env), send);
+      await deliverUpdates(env, cfg, send);
     },
   };
 }

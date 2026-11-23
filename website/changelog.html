@@ -491,6 +491,34 @@
             Every DayBoard release, newest first. These are the same notes DayBoard shows when it
             offers you an update.
           </p>
+          <form class="signup" data-signup method="post" novalidate>
+            <div class="signup-row">
+              <label class="visually-hidden" for="email-changelog">Email address</label>
+              <input
+                id="email-changelog"
+                disabled
+                name="email"
+                type="email"
+                autocomplete="email"
+                placeholder="you@example.com"
+                required
+                maxlength="254"
+              />
+              <div class="trap" aria-hidden="true">
+                <label for="company-changelog">Leave this empty</label
+                ><input id="company-changelog" name="company" tabindex="-1" autocomplete="off" />
+              </div>
+              <button class="button" type="submit" disabled>Email me updates</button>
+            </div>
+            <p class="signup-note">
+              Get these notes by email when a new version is out. Nothing else, and you can
+              unsubscribe in one click. See the <a href="privacy.html#website">privacy page</a>.
+            </p>
+            <p class="signup-status" role="status" aria-live="polite"></p>
+            <noscript
+              ><p class="signup-note">Turn on JavaScript to sign up for release emails.</p></noscript
+            >
+          </form>
         </div>
       </header>
 

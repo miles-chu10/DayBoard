@@ -1206,6 +1206,58 @@ p {
   margin-top: -10px;
 }
 
+/* Release email signup */
+.subscribe {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px 56px;
+  padding: 48px;
+  border-radius: 28px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-window);
+}
+
+.subscribe-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.subscribe h2 {
+  font-size: clamp(2rem, 3.6vw, 3rem);
+}
+
+.subscribe-copy p {
+  max-width: 460px;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+}
+
+.subscribe .signup {
+  justify-self: end;
+}
+
+.subscribe .signup-row {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.page-head .signup {
+  margin-top: 4px;
+}
+
+.page-head .signup-note,
+.page-head .signup-status,
+.page-head .signup-done p {
+  font-size: 0.9rem;
+}
+
+.subscribe .signup-note a,
+.page-head .signup-note a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* Final call to action */
 .cta {
   display: grid;
@@ -1576,6 +1628,13 @@ p {
 }
 
 @media (max-width: 960px) {
+  .subscribe {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 40px 32px;
+  }
+  .subscribe .signup {
+    justify-self: start;
+  }
   .merge {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1655,6 +1714,9 @@ p {
   }
   .footer-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .subscribe {
+    padding: 32px 20px;
   }
   .cta {
     padding: 52px 20px;
