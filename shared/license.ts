@@ -51,6 +51,8 @@ export interface LicenseDeactivationPayload extends LicenseStatusPayload {
  * enforces its own ACTIVATION_LIMIT; keep the two equal (docs/RELEASE.md).
  */
 export const LICENSE_ACTIVATION_LIMIT = 3;
+/** AI trial length in days; the clock starts on the first AI use, not on install. */
+export const LICENSE_TRIAL_DAYS = 14;
 export const LICENSE_SUPPORT_EMAIL = "support@getdayboard.com";
 /** The label every activation sends to the license service. */
 export const LICENSE_INSTANCE_NAME = "DayBoard on macOS";

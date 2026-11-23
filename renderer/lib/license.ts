@@ -54,7 +54,8 @@ export const LICENSE_STATUS_COPY: Record<
   },
   licensed: {
     label: "DayBoard Pro",
-    description: "Thanks for supporting DayBoard.",
+    description:
+      "Thanks for supporting DayBoard. AI is unlocked on this Mac, and future updates are included.",
   },
   "network-error": {
     label: "Can't verify",

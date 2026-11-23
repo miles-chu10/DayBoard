@@ -55,7 +55,7 @@ import {
   useAssistantMcpServers,
 } from "./mcp-servers-dialog";
 import { ProviderMark } from "./provider-logo";
-import { LicenseStatusControl } from "./license-gate";
+import { LicenseStatusControl, ProBadge } from "./license-gate";
 import { sourceStatusShort } from "./source-gate";
 
 /**
@@ -405,9 +405,12 @@ export function AppSidebar() {
                       <AvatarBadge color={connected ? "green" : "gray"} />
                     </Avatar>
                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                      <Text variant="small-strong" truncate>
-                        {name}
-                      </Text>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <Text variant="small-strong" truncate>
+                          {name}
+                        </Text>
+                        <ProBadge />
+                      </div>
                       <Text variant="small" color={connected ? "green" : "secondary"} truncate>
                         {status}
                       </Text>
