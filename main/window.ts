@@ -217,9 +217,9 @@ export async function openSettingsWindow(tab?: SettingsTab): Promise<BrowserWind
   }
 
   const window = new BrowserWindow({
-    width: 660,
+    width: 820,
     height: 740,
-    minWidth: 460,
+    minWidth: 620,
     minHeight: 420,
     title: "Settings",
     show: false,

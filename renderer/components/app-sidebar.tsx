@@ -26,17 +26,15 @@ import {
   CircleAlert,
   House,
   NotebookPen,
-  Server,
   Settings,
   Video,
 } from "lucide-react";
 import type { AppSettings, SourceId, SourceResult } from "@main/shared-types";
 
-import { assistantProvider, useAssistantModel } from "../lib/ai-models";
+import { assistantProvider } from "../lib/ai-models";
 import { eventDayKey, formatTimeOfDay, isEventPast, toISODate } from "../lib/dates";
-import { modelSummary } from "../lib/model-choices";
 import { connectionStatus } from "../lib/connection-status";
-import { visibleNav, type NavItem } from "../lib/navigation";
+import { sidebarRows, type NavItem } from "../lib/navigation";
 import { needsYou } from "../lib/home";
 import { readTriageMap, useTriageChanges } from "../lib/triage";
 import { dueFollowUps, useMailSchedule } from "../lib/mail-schedule";
@@ -44,17 +42,12 @@ import { useNotes } from "../lib/agent-data";
 import { invoke, openExternal, openSettings } from "../lib/ipc";
 import { useProfileAvatar } from "../lib/profile-avatar";
 import { useAccounts, useCalendar, useMail, useReminders, useTasks } from "../lib/queries";
-import { PROVIDER_LABEL, featureOn, providerUsesMcp, sourceOn, useSettings } from "../lib/settings";
+import { featureOn, sourceOn, useSettings } from "../lib/settings";
 import { COLOR_CLASS, SOURCE_META, sourceColor, sourceColorVar } from "../lib/sources";
 import { buildTodos } from "../lib/todos";
 import { useAgendaClock } from "../lib/use-agenda-clock";
 import { NewItemButton } from "./new-item-button";
 import { EventDetail } from "./event-detail";
-import {
-  McpServersDialog,
-  useAssistantMcpCheck,
-  useAssistantMcpServers,
-} from "./mcp-servers-dialog";
 import { ProviderMark } from "./provider-logo";
 import { LicenseStatusControl, ProBadge } from "./license-gate";
 import { sourceStatusShort } from "./source-gate";
@@ -100,20 +93,18 @@ function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-function sourceSubtitle(
-  query: { isPending: boolean; isError: boolean; data?: SourceResult<unknown> },
-  loaded?: string,
-  empty?: string,
-): string | undefined {
-  if (query.isPending) return "Loading…";
+/** What is wrong with a source, if anything. A healthy source shows only its count. */
+function sourceProblem(query: {
+  isPending: boolean;
+  isError: boolean;
+  data?: SourceResult<unknown>;
+}): string | undefined {
+  if (query.isPending) return undefined;
   if (!query.data) return "Unavailable";
   if (query.data.state !== "ok") return sourceStatusShort(query.data) ?? undefined;
-  if (query.isError || query.data.refreshError)
-    return loaded ? `${loaded} · Refresh failed` : "Refresh failed";
-  if (query.data.coverage?.complete === false)
-    return loaded ? `${loaded} · Partially loaded` : "Partially loaded";
-  if (loaded) return loaded;
-  return empty;
+  if (query.isError || query.data.refreshError) return "Refresh failed";
+  if (query.data.coverage?.complete === false) return "Partially loaded";
+  return undefined;
 }
 
 const CONNECTION_BADGE = { ok: "green", attention: "orange", off: "gray" } as const;
@@ -170,17 +161,10 @@ export function AppSidebar() {
   const calendar = useCalendar();
   const avatar = useProfileAvatar();
   const provider = assistantProvider(settings);
-  const model = useAssistantModel(settings);
 
   const now = useAgendaClock();
   const today = toISODate(now);
   const open = buildTodos(tasks.data, reminders.data).filter((todo) => !todo.completed);
-  const dueToday = (source: SourceId) =>
-    open.filter((todo) => todo.source === source && todo.dueDate === today).length;
-  const overdue = (source?: SourceId) =>
-    open.filter(
-      (todo) => (!source || todo.source === source) && todo.dueDate && todo.dueDate < today,
-    ).length;
   const todayEvents =
     calendar.data?.state === "ok"
       ? calendar.data.items.filter((event) => eventDayKey(event) === today && !isEventPast(event))
@@ -194,21 +178,12 @@ export function AppSidebar() {
     mail: unread.length,
     calendar: todayEvents.length,
   };
-  const subtitles: Record<SourceId, string | undefined> = {
-    tasks: sourceSubtitle(tasks, summary(dueToday("tasks"), overdue("tasks"))),
-    reminders: sourceSubtitle(reminders, summary(dueToday("reminders"), overdue("reminders"))),
-    mail: sourceSubtitle(mail, unread[0] ? `Latest: ${unread[0].from}` : undefined),
-    calendar: sourceSubtitle(
-      calendar,
-      nextEvent ? `Next ${formatTimeOfDay(nextEvent.start)} · ${nextEvent.title}` : undefined,
-      todayEvents.length ? undefined : "Nothing else today",
-    ),
+  const problems: Record<SourceId, string | undefined> = {
+    tasks: sourceProblem(tasks),
+    reminders: sourceProblem(reminders),
+    mail: sourceProblem(mail),
+    calendar: sourceProblem(calendar),
   };
-  function summary(due: number, late: number): string | undefined {
-    // Short enough to read at the sidebar's default width.
-    if (due && late) return `${due} due · ${late} overdue`;
-    return due ? `${due} due today` : late ? `${late} overdue` : undefined;
-  }
 
   const google = accounts.data?.google;
   const name = knownName(settings, google?.email, accounts.data?.macName) || "DayBoard";
@@ -228,17 +203,9 @@ export function AppSidebar() {
   ].join("\n");
   const showAssistant = featureOn(settings, "assistant");
   const showReview = featureOn(settings, "weeklyReview");
-  const [mcpOpen, setMcpOpen] = useState(false);
   const [upNextOpen, setUpNextOpen] = useState(false);
-  const mcpServers = useAssistantMcpServers();
-  const mcpCheck = useAssistantMcpCheck(showAssistant && Boolean(mcpServers.data?.length));
-  const mcpResults = mcpCheck.data ?? [];
-  const mcpOk = mcpResults.filter((result) => result.ok).length;
-  const mcpError = mcpResults.some((result) => !result.ok);
-  const mcpInUse = providerUsesMcp(provider);
   const agendaDue = open.filter((todo) => todo.dueDate === today).length;
-  const agendaLate = overdue();
-  const mcpCount = mcpServers.data?.length ?? 0;
+  const agendaLate = open.filter((todo) => todo.dueDate && todo.dueDate < today).length;
 
   useTriageChanges();
   const schedule = useMailSchedule();
@@ -252,9 +219,7 @@ export function AppSidebar() {
   // The Dock badge shows what Settings picks: what waits on you, unread mail, or nothing.
   const notes = useNotes();
   const showCounts = settings?.general.sidebar.counts ?? true;
-  const mainNav = visibleNav(settings).filter(
-    (item): item is NavItem & { id: MainNavId } => item.group === "main",
-  );
+  const rows = sidebarRows(settings) as { item: NavItem & { id: MainNavId }; nested: boolean }[];
   const badgeSetting = settings?.system.dockBadge;
   const badgeCount =
     badgeSetting === "waiting" ? waiting : badgeSetting === "unread" ? counts.mail : 0;
@@ -300,14 +265,9 @@ export function AppSidebar() {
     return pathname === route;
   }
 
+  // Rows are one line; a second line appears only when a source needs attention.
   function navSubtitle(id: MainNavId): string | undefined {
-    if (id === "home") return waiting ? `${waiting} waiting on you` : "Nothing waiting on you";
-    if (id === "agenda") return summary(agendaDue, agendaLate);
-    if (id === "notes") {
-      const count = notes.data?.length ?? 0;
-      return count ? plural(count, "note") : "Nothing written yet";
-    }
-    return subtitles[id];
+    return id === "home" || id === "agenda" || id === "notes" ? undefined : problems[id];
   }
 
   function navAccessory(id: MainNavId) {
@@ -322,7 +282,10 @@ export function AppSidebar() {
         <SidebarCount count={agendaDue} label={`${plural(agendaDue, "item")} due today`} />
       ) : undefined;
     }
-    if (id === "notes") return undefined;
+    if (id === "notes") {
+      const count = notes.data?.length ?? 0;
+      return count ? <SidebarCount count={count} label={plural(count, "note")} /> : undefined;
+    }
     const count = counts[id];
     const label =
       id === "mail"
@@ -417,9 +380,11 @@ export function AppSidebar() {
                         </Text>
                         <ProBadge />
                       </div>
-                      <Text variant="small" color={CONNECTION_TEXT[connection.tone]} truncate>
-                        {connection.label}
-                      </Text>
+                      {connection.tone === "ok" ? null : (
+                        <Text variant="small" color={CONNECTION_TEXT[connection.tone]} truncate>
+                          {connection.label}
+                        </Text>
+                      )}
                     </div>
                   </button>
                 </DropdownMenuTrigger>
@@ -464,9 +429,10 @@ export function AppSidebar() {
       }
     >
       <SidebarList role="navigation" aria-label="Main navigation">
-        {mainNav.map((item) => (
+        {rows.map(({ item, nested }) => (
           <SidebarListItem
             key={item.id}
+            className={nested ? "app-sidebar-nested" : undefined}
             icon={navIcon(item.id)}
             title={item.title}
             subtitle={navSubtitle(item.id)}
@@ -489,7 +455,7 @@ export function AppSidebar() {
                   subtitle={
                     settings?.ai.providerChosen === false
                       ? "Choose an AI provider in Settings"
-                      : modelSummary(model)
+                      : undefined
                   }
                   selected={pathname === "/assistant"}
                   onClick={() => void navigate({ to: "/assistant" })}
@@ -507,65 +473,10 @@ export function AppSidebar() {
                   onClick={() => void navigate({ to: "/review" })}
                 />
               ) : null}
-              {showAssistant ? (
-                <SidebarListItem
-                  icon={
-                    <SidebarSymbol>
-                      <Server className="size-[18px]" strokeWidth={1.75} />
-                    </SidebarSymbol>
-                  }
-                  title="MCP Servers"
-                  subtitle={
-                    !mcpCount
-                      ? settings?.ai.useMcpInAssistant === false
-                        ? "Turned off for the Assistant"
-                        : "Add tools for the Assistant"
-                      : !mcpInUse
-                        ? `Not used by ${PROVIDER_LABEL[provider]}`
-                        : mcpCheck.isFetching
-                          ? "Checking…"
-                          : mcpError
-                            ? `${mcpOk}/${mcpCount} available`
-                            : plural(mcpCount, "server")
-                  }
-                  accessory={
-                    mcpCount ? (
-                      <span
-                        role="img"
-                        aria-label={
-                          mcpError
-                            ? "Some servers unavailable"
-                            : mcpOk
-                              ? "Connected"
-                              : "Not checked"
-                        }
-                        className={cn(
-                          "inline-block size-2 rounded-full",
-                          mcpError
-                            ? "bg-support-red"
-                            : mcpOk
-                              ? "bg-support-green"
-                              : "bg-current text-tertiary",
-                        )}
-                      />
-                    ) : undefined
-                  }
-                  onClick={() => setMcpOpen(true)}
-                />
-              ) : null}
             </SidebarListGroup>
           </div>
         ) : null}
       </SidebarList>
-      <McpServersDialog
-        open={mcpOpen}
-        onOpenChange={setMcpOpen}
-        providerNote={
-          mcpInUse
-            ? null
-            : `${PROVIDER_LABEL[provider]} can't use MCP servers from DayBoard yet; switch the Assistant to Claude, ChatGPT, or an API model to use them.`
-        }
-      />
       {upNextOpen && nextEvent ? (
         <EventDetail
           key={nextEvent.id}

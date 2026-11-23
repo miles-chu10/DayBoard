@@ -11,7 +11,7 @@ import {
 } from "react";
 import { Dialog, KeyCaps, Text } from "@renderer/ui";
 
-import { visibleNav, type NavId } from "../lib/navigation";
+import { sidebarNav, type NavId } from "../lib/navigation";
 import { useSettings } from "../lib/settings";
 import { readStored, writeStored } from "../lib/storage";
 import {
@@ -128,7 +128,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const nav = useMemo(() => visibleNav(settings), [settings]);
+  const nav = useMemo(() => sidebarNav(settings), [settings]);
 
   useEffect(() => {
     function keydown(event: KeyboardEvent) {

@@ -14,7 +14,7 @@ function accessStatus(access: RemindersAccess | undefined) {
     return {
       variant: "success" as const,
       label: "Allowed",
-      description: "Your Mac calendars can appear on the dashboard.",
+      description: "Your iCloud calendars can appear on the dashboard.",
     };
   if (access === "not-determined")
     return {
@@ -80,8 +80,8 @@ export function MacCalendarSettings({
 
   return (
     <FieldSet
-      title="Mac Calendars"
-      description="Calendars from the Calendar app on this Mac, such as iCloud. Show the ones you want and add or change events in them."
+      title="iCloud Calendars"
+      description="Your iCloud calendars and any others in the Calendar app on this Mac. Show the ones you want and add or change events in them."
     >
       <Field label="Access" description={status.description}>
         <Status variant={status.variant}>{status.label}</Status>
@@ -104,7 +104,7 @@ export function MacCalendarSettings({
           <Status variant="loading">Loading…</Status>
         </Field>
       ) : calendars.isError ? (
-        <Field label="Calendars" description="Couldn't load your Mac calendars.">
+        <Field label="Calendars" description="Couldn't load your iCloud calendars.">
           <Button size="small" onClick={() => void calendars.refetch()}>
             Retry
           </Button>

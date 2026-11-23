@@ -37,7 +37,7 @@ async function sourceResponse(demo: DemoApp, source: SourceId, result?: unknown,
   );
 }
 
-test("Sidebar distinguishes loading, unavailable, saved, partial and empty sources", async ({
+test("Sidebar rows flag unavailable, failed and partial sources and stay one line otherwise", async ({
   playwright: _playwright,
 }, testInfo) => {
   const demo = await launchDemo();
@@ -58,8 +58,8 @@ test("Sidebar distinguishes loading, unavailable, saved, partial and empty sourc
       );
     });
     await page.reload();
-    await expect(calendar).toContainText("Loading…");
-    await expect(calendar).not.toContainText("Nothing else today");
+    // A row is one line; a second line appears only when its source needs attention.
+    await expect(calendar).toHaveText("Calendar");
     await demo.app.evaluate(() => {
       (globalThis as FixtureGlobal).dayboardUiSourceRelease!({ state: "not-connected" });
     });
@@ -69,21 +69,18 @@ test("Sidebar distinguishes loading, unavailable, saved, partial and empty sourc
     await sourceResponse(demo, "calendar", undefined, "Synthetic calendar failure");
     await page.reload();
     await expect(calendar).toContainText("Unavailable");
-    await expect(calendar).not.toContainText("Nothing else today");
     await sourceResponse(demo, "calendar", { state: "ok", items: [] });
-    await expect(calendar).toContainText("Nothing else today");
+    await expect(calendar).toHaveText("Calendar");
     await sourceResponse(demo, "calendar", undefined, "Synthetic refresh failure");
     await expect(calendar).toContainText("Refresh failed");
-    await expect(calendar).not.toContainText("Nothing else today");
     await sourceResponse(demo, "calendar", {
       state: "ok",
       items: [],
       coverage: { complete: false },
     });
     await expect(calendar).toContainText("Partially loaded");
-    await expect(calendar).not.toContainText("Nothing else today");
     await sourceResponse(demo, "calendar", { state: "ok", items: [] });
-    await expect(calendar).toContainText("Nothing else today");
+    await expect(calendar).toHaveText("Calendar");
     await sourceResponse(demo, "tasks", { state: "needs-setup" });
     await expect(navigation(page, "Tasks")).toContainText("Sign-in unavailable");
     await sourceResponse(demo, "reminders", { state: "no-access", access: "denied" });
@@ -97,7 +94,7 @@ test("Sidebar distinguishes loading, unavailable, saved, partial and empty sourc
   }
 });
 
-test("Sidebar clock advances next events without source refresh and retains saved summaries", async () => {
+test("Sidebar clock advances the next event without a source refresh, and saved events stay through failed refreshes", async () => {
   const demo = await launchDemo();
   try {
     const page = demo.page;
@@ -135,7 +132,7 @@ test("Sidebar clock advances next events without source refresh and retains save
     await page.reload();
     const calendar = navigation(page, "Calendar");
     const next = page.getByRole("button", { name: "Open next event: Fixture clock handoff" });
-    await expect(calendar).toContainText("Fixture clock handoff");
+    await expect(next).toContainText("Fixture clock handoff");
     await expect(next).toContainText("Up next");
     const calls = await demo.app.evaluate(
       () => (globalThis as FixtureGlobal).dayboardUiCalendarCalls,
@@ -146,9 +143,8 @@ test("Sidebar clock advances next events without source refresh and retains save
       await demo.app.evaluate(() => (globalThis as FixtureGlobal).dayboardUiCalendarCalls),
     ).toBe(calls);
     await sourceResponse(demo, "calendar", undefined, "Synthetic refresh failure");
-    await expect(calendar).toContainText("Fixture clock handoff");
+    await expect(next).toContainText("Fixture clock handoff");
     await expect(calendar).toContainText("Refresh failed");
-    await expect(calendar).not.toContainText("Nothing else today");
     await sourceResponse(demo, "calendar", {
       state: "ok",
       items: [
@@ -164,7 +160,7 @@ test("Sidebar clock advances next events without source refresh and retains save
       ],
       coverage: { complete: false },
     });
-    await expect(calendar).toContainText("Fixture clock handoff");
+    await expect(next).toContainText("Fixture clock handoff");
     await expect(calendar).toContainText("Partially loaded");
     await sourceResponse(demo, "calendar", undefined, "Synthetic refresh failure");
     await page.clock.fastForward(120_000);

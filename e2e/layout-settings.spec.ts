@@ -63,7 +63,6 @@ test("Sidebar settings reorder and hide views and turn off counts; ⌃ numbers f
         "Notes",
         "Assistant",
         "Weekly Review",
-        "MCP Servers",
       ]);
     // No count pills once counts are off.
     await expect(sidebarItem(page, "Inbox")).not.toContainText(/\d+$/);

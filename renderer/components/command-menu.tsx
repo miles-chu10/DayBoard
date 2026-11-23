@@ -21,7 +21,7 @@ import { mentionCandidates, MENTION_EVENT_DAYS, type MentionItem } from "../lib/
 import { useNotes } from "../lib/agent-data";
 import { todayISO } from "../lib/dates";
 import { openSettings } from "../lib/ipc";
-import { navTargets, visibleNav } from "../lib/navigation";
+import { navTargets, sidebarNav } from "../lib/navigation";
 import { useCalendarRange, useMail, useReminders, useTasks } from "../lib/queries";
 import { featureOn, sourceOn, useSettings } from "../lib/settings";
 import { SHORTCUTS, shortcutKeys } from "../lib/shortcuts";
@@ -78,7 +78,7 @@ function CommandMenuContent({ close }: { close: () => void }) {
   const reminders = useReminders();
   const mail = useMail();
   const notes = useNotes();
-  const shown = visibleNav(settings);
+  const shown = sidebarNav(settings);
   const events = useCalendarRange(todayISO(), MENTION_EVENT_DAYS);
   const assistantOn = featureOn(settings, "assistant");
   const trimmed = query.trim();

@@ -75,8 +75,25 @@ select,
 }
 
 .app-sidebar [data-slot="sidebar-list-item"] {
-  min-height: var(--density-list-row);
+  min-height: var(--density-row);
   padding-block: var(--density-bar-py);
+}
+
+/* Calendar, Tasks and Reminders sit under the Agenda as smaller, indented rows. */
+.app-sidebar .app-sidebar-nested {
+  min-height: var(--density-bar);
+  padding-left: 1.75rem;
+}
+.app-sidebar .app-sidebar-nested .app-sidebar-symbol {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+.app-sidebar .app-sidebar-nested .app-sidebar-symbol svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.app-sidebar .app-sidebar-nested [data-slot="sidebar-item-title"] {
+  font-weight: 400;
 }
 
 .app-sidebar [data-slot="sidebar-item-title"] {

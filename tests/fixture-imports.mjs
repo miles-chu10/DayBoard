@@ -21,7 +21,7 @@ export async function listCalendarEvents(options) {
     throw error;
   }
 }
-const noAccess = async () => { throw new Error("DayBoard needs access to your Mac calendars."); };
+const noAccess = async () => { throw new Error("DayBoard needs access to your iCloud calendars."); };
 export const createAppleEvent = noAccess;
 export const updateAppleEvent = noAccess;
 export const deleteAppleEvent = noAccess;

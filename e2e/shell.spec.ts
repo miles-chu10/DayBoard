@@ -180,7 +180,8 @@ test("⌥⌘K shows a day calendar beside the page; ? lists shortcuts; ⌃ numbe
 
     await demo.page.keyboard.press("Control+Digit1");
     await expect(sidebarItem(demo.page, "Home")).toHaveAttribute("aria-current", "page");
-    await demo.page.keyboard.press("Control+Digit4");
+    // ⌃ numbers follow the sidebar top to bottom: Calendar, Tasks and Reminders sit under Agenda.
+    await demo.page.keyboard.press("Control+Digit6");
     await expect(sidebarItem(demo.page, "Inbox")).toHaveAttribute("aria-current", "page");
 
     // Typing ? into a field types it.

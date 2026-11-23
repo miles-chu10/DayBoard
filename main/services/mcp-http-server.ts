@@ -304,7 +304,7 @@ function registerReadOnlyTools(server: McpServer): void {
     "list_events",
     {
       title: "List events",
-      description: `List upcoming events from the Google and Mac calendars shown in the app (up to ${MAX_LIST}).`,
+      description: `List upcoming events from the Google and iCloud calendars shown in the app (up to ${MAX_LIST}).`,
       inputSchema: {
         days_ahead: z
           .number()
@@ -558,7 +558,7 @@ function buildMcpServer(allowWrites: boolean): McpServer {
     {
       title: "Create event",
       description:
-        "Add an event where DayBoard adds new events: the primary Google Calendar or the Mac calendar chosen in Settings. Omit start_time for an all-day event.",
+        "Add an event where DayBoard adds new events: the primary Google Calendar or the iCloud calendar chosen in Settings. Omit start_time for an all-day event.",
       inputSchema: {
         title: z.string().min(1),
         date,

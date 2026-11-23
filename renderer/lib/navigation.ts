@@ -115,8 +115,42 @@ export function navTargets(settings: AppSettings | undefined): NavItem[] {
     .map(({ item }) => item);
 }
 
-/** The sidebar's views in order, without the ones hidden in Settings; ⌃1–9 follow this list. */
+/** The views in saved order, without the ones hidden in Settings. */
 export function visibleNav(settings: AppSettings | undefined): NavItem[] {
   const hidden = settings?.general?.sidebar?.hidden ?? [];
   return navTargets(settings).filter((item) => !hidden.includes(item.id as SidebarView));
+}
+
+/** The sources the Agenda combines; in the sidebar they sit under it. */
+const AGENDA_SOURCES: readonly NavId[] = ["calendar", "tasks", "reminders"];
+
+export interface SidebarRow {
+  item: NavItem;
+  /** Indented under the Agenda row. */
+  nested: boolean;
+}
+
+/**
+ * The sidebar's main rows. Calendar, Tasks and Reminders follow the Agenda as nested rows, in
+ * their saved order; with the Agenda hidden they stay where the saved order puts them.
+ */
+export function sidebarRows(settings: AppSettings | undefined): SidebarRow[] {
+  const main = visibleNav(settings).filter((item) => item.group === "main");
+  if (!main.some((item) => item.id === "agenda"))
+    return main.map((item) => ({ item, nested: false }));
+  const nested = main.filter((item) => AGENDA_SOURCES.includes(item.id));
+  return main
+    .filter((item) => !AGENDA_SOURCES.includes(item.id))
+    .flatMap((item) => [
+      { item, nested: false },
+      ...(item.id === "agenda" ? nested.map((source) => ({ item: source, nested: true })) : []),
+    ]);
+}
+
+/** Every sidebar view top to bottom, AI views last; ⌃1–9 follow this list. */
+export function sidebarNav(settings: AppSettings | undefined): NavItem[] {
+  return [
+    ...sidebarRows(settings).map((row) => row.item),
+    ...visibleNav(settings).filter((item) => item.group === "ai"),
+  ];
 }
