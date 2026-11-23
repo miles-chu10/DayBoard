@@ -16,6 +16,12 @@ import {
   updateTask,
 } from "../services/google-api.js";
 import { deleteReminder, updateReminder } from "../services/apple-reminders.js";
+import {
+  deleteAppleEvent,
+  getAppleEventForEditing,
+  isAppleCalendarId,
+  updateAppleEvent,
+} from "../services/apple-calendar.js";
 import { assertNotDemo, demoEventsForDays, isDemoMode } from "../services/demo-data.js";
 import { trackPendingWrite } from "../services/pending-writes.js";
 import { removeDeletedAgendaEvent } from "../services/agenda-store.js";
@@ -267,7 +273,9 @@ export function registerItemEditingHandlers(): void {
     async (_event, payload: unknown): Promise<CalendarEventItem> => {
       const input = eventEdit(payload);
       const updated = await withScope(payload, "calendar:update", () =>
-        calendarWrite(() => updateEvent(input)),
+        isAppleCalendarId(input.calendarId)
+          ? updateAppleEvent(input)
+          : calendarWrite(() => updateEvent(input)),
       );
       ipcMain.broadcast("data:changed", { source: "calendar" });
       return updated;
@@ -292,7 +300,9 @@ export function registerItemEditingHandlers(): void {
         if (!event) throw new Error("This demo calendar event is no longer available.");
         return event;
       }
-      const event = await calendarWrite(() => getEventForEditing(input.calendarId, input.eventId));
+      const event = isAppleCalendarId(input.calendarId)
+        ? await getAppleEventForEditing(input.calendarId, input.eventId)
+        : await calendarWrite(() => getEventForEditing(input.calendarId, input.eventId));
       requireExpectedAgendaScope(raw, await requireAgendaScope(), channel);
       return event;
     },
@@ -305,6 +315,11 @@ export function registerItemEditingHandlers(): void {
       const raw = asObject(payload, "calendar:delete");
       const scope = await requireAgendaScope();
       return withScope(payload, "calendar:delete", async () => {
+        if (isAppleCalendarId(input.calendarId)) {
+          await deleteAppleEvent(input.calendarId, input.eventId);
+          ipcMain.broadcast("data:changed", { source: "calendar" });
+          return {};
+        }
         const calendars = await listCalendars();
         const primary =
           input.calendarId === "primary" ||

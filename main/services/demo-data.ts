@@ -173,6 +173,7 @@ export const demoAccounts: AccountsStatus = {
   },
   gmail: { connected: true, email: "alex.rivera@example.com", rejected: false },
   reminders: "full-access",
+  calendar: "not-determined",
 };
 
 export function demoCalendars(): CalendarListResult {

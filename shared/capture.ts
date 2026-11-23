@@ -75,12 +75,16 @@ function realTime(value: string): boolean {
 export function availableKinds(input: {
   googleConnected: boolean;
   remindersAccess: string | undefined;
+  /** Mac Calendar access: events can go to a Mac calendar without a Google account. */
+  calendarAccess?: string | undefined;
   sources: Record<"tasks" | "reminders" | "calendar", { enabled: boolean }>;
 }): AvailableKinds {
   return {
     task: input.googleConnected && input.sources.tasks.enabled,
     reminder: input.remindersAccess === "full-access" && input.sources.reminders.enabled,
-    event: input.googleConnected && input.sources.calendar.enabled,
+    event:
+      (input.googleConnected || input.calendarAccess === "full-access") &&
+      input.sources.calendar.enabled,
   };
 }
 
@@ -104,7 +108,7 @@ export function buildCapturePrompt(
     available.reminder &&
       '"reminder" — Apple Reminders: things to be reminded about, supports a time',
     available.event &&
-      '"event" — Google Calendar: meetings, calls, appointments, anything at a set time or place',
+      '"event" — Calendar: meetings, calls, appointments, anything at a set time or place',
   ].filter(Boolean);
   return `Now: ${nowContext(now)}
 

@@ -303,10 +303,11 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
   const [fields, setFields] = useState<EventFields>(() => eventFields(event));
   const set = (patch: Partial<EventFields>) => setFields((current) => ({ ...current, ...patch }));
   const busy = writes.busy === `${event.calendarId}/${event.id}`;
+  const readOnly = Boolean(event.readOnly);
   const draft = eventDraft(event, fields);
-  const canSave = Boolean(draft) && eventFieldsChanged(event, fields) && !busy;
+  const canSave = Boolean(draft) && eventFieldsChanged(event, fields) && !busy && !readOnly;
   const joinUrl = extractJoinUrl(event);
-  const tomorrow = eventMovedBy(event, 1);
+  const tomorrow = readOnly ? null : eventMovedBy(event, 1);
   const done = (saved: boolean) => {
     if (saved) onClose();
   };
@@ -326,6 +327,7 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
         autoFocus
         size="small"
         aria-label="Title"
+        disabled={readOnly}
         value={fields.title}
         onChange={(change) => set({ title: change.target.value })}
       />
@@ -337,6 +339,7 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
           <Input
             size="small"
             type={fields.allDay ? "date" : "datetime-local"}
+            disabled={readOnly}
             aria-invalid={field === "end" && !draft && Boolean(fields.title.trim())}
             value={fields[field]}
             onChange={(change) => set({ [field]: change.target.value })}
@@ -347,6 +350,7 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
         size="small"
         aria-label="Location"
         placeholder="Location"
+        disabled={readOnly}
         value={fields.location}
         onChange={(change) => set({ location: change.target.value })}
       />
@@ -382,6 +386,7 @@ function EventEditor({ event, onClose }: { event: CalendarEventItem; onClose: ()
       <div className="flex items-center gap-1">
         <Text as="span" variant="small" color="tertiary" truncate className="min-w-0 flex-1">
           {event.calendarName}
+          {readOnly ? " · Read-only" : ""}
           {guests ? ` · ${guests} ${guests === 1 ? "guest" : "guests"}` : ""}
         </Text>
         <Button size="small" variant="transparent" onClick={onClose}>

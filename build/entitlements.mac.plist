@@ -10,7 +10,7 @@
     <!-- Assistant dictation (hardened runtime blocks the microphone without this). -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
-    <!-- EventKit access for Apple Reminders via the bundled Swift helper. -->
+    <!-- EventKit access for Apple Reminders and Mac calendars via the bundled Swift helper. -->
     <key>com.apple.security.personal-information.calendars</key>
     <true/>
   </dict>

@@ -101,8 +101,13 @@ export interface AppSettings {
   };
   calendar: {
     range: CalendarRange;
-    /** Per-calendar override; calendars without an entry use Google's own visibility. */
+    /**
+     * Per-calendar override; calendars without an entry use their default visibility. Mac Calendar
+     * calendars are keyed `apple:<EventKit calendar id>`.
+     */
     visibility: Record<string, boolean>;
+    /** Where new events go: "" chooses automatically, "google" or an `apple:` calendar ID. */
+    newEvents: string;
   };
   /** Per-list visibility for Google Tasks lists and Apple Reminders lists; a missing entry is shown. */
   lists: {
@@ -347,6 +352,8 @@ export interface AccountsStatus {
   google: GoogleAccountStatus;
   gmail: GmailAccountStatus;
   reminders: RemindersAccess;
+  /** Access to the Mac's Calendar app (iCloud, Exchange and other accounts set up there). */
+  calendar: RemindersAccess;
 }
 
 export interface SourceCoverage {
@@ -446,6 +453,10 @@ export interface CalendarEventItem {
   selfResponse?: "accepted" | "declined" | "tentative" | "needsAction" | null;
   /** Shared by every copy of the event across calendars (and every occurrence of a series). */
   iCalUID?: string;
+  /** Where the event lives; a missing value is Google Calendar. */
+  provider?: "google" | "apple";
+  /** True for events on a Mac calendar that can't be changed, such as a subscribed one. */
+  readOnly?: boolean;
 }
 
 export interface GoogleCalendarInfo {
@@ -461,6 +472,26 @@ export interface ItemListInfo {
   id: string;
   title: string;
   color?: string | null;
+}
+
+/** A calendar from the Mac's Calendar app, such as an iCloud calendar. */
+export interface MacCalendarInfo {
+  /** `apple:<EventKit calendar id>`, the key used for visibility and new events. */
+  id: string;
+  name: string;
+  color: string | null;
+  /** The account the calendar belongs to, as named in Internet Accounts, such as "iCloud". */
+  account: string | null;
+  defaultVisible: boolean;
+  /** False for subscribed, birthday and other read-only calendars. */
+  writable: boolean;
+  /** The calendar seems to be a Google account that DayBoard may already show. */
+  google: boolean;
+}
+
+export interface MacCalendarsResult {
+  access: RemindersAccess;
+  calendars: MacCalendarInfo[];
 }
 
 export interface CalendarListResult {

@@ -1,4 +1,4 @@
-import { fixtureImport } from "./fixture-imports.mjs";
+import { fixtureImport, macCalendarOffStub } from "./fixture-imports.mjs";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { URL } from "node:url";
@@ -155,6 +155,7 @@ function providerPlugin() {
     ["../services/gmail-imap.js", gmailStub],
     ["../services/google-auth.js", authStub],
     ["../services/apple-reminders.js", remindersStub],
+    ["../services/apple-calendar.js", macCalendarOffStub],
     ["../services/settings-store.js", settingsStub],
     ["./file-store.js", fileStoreStub],
   ]);

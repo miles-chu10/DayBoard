@@ -38,6 +38,8 @@ mac:
   extendInfo:
     NSRemindersFullAccessUsageDescription: DayBoard shows your Apple Reminders on the dashboard and lets you complete or add reminders.
     NSRemindersUsageDescription: DayBoard shows your Apple Reminders on the dashboard and lets you complete or add reminders.
+    NSCalendarsFullAccessUsageDescription: DayBoard shows the calendars you choose from the Calendar app, such as iCloud, and lets you add, edit or delete their events.
+    NSCalendarsUsageDescription: DayBoard shows the calendars you choose from the Calendar app, such as iCloud, and lets you add, edit or delete their events.
     NSMicrophoneUsageDescription: Dictate messages to the Assistant. Audio is sent to OpenAI for transcription only when you use dictation.
 # Mac App Store edition (`npm run package:mas`): sandboxed, App Store updates, no subscription
 # CLIs, PTY or updater code in the bundle. mas-dev inherits these settings; the script passes

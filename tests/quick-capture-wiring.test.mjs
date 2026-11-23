@@ -17,7 +17,7 @@ globalThis.__quickCaptureWiring = fixture;
 
 const STUBS = {
   electron: `export class Notification { static isSupported() { return true; } on() { return this; } show() {} close() { globalThis.__quickCaptureWiring.closed += 1; } }`,
-  "productivity.js": `export const getAccountsStatus = async () => ({}); export const requireAgendaScope = async () => "scope"; export const onAccountsChanged = (listener) => globalThis.__quickCaptureWiring.accountListeners.push(listener);`,
+  "productivity.js": `export const createCalendarEvent = async () => ({}); export const getAccountsStatus = async () => ({}); export const requireAgendaScope = async () => "scope"; export const onAccountsChanged = (listener) => globalThis.__quickCaptureWiring.accountListeners.push(listener);`,
   "platform/index.js": `export const ipcMain = { handle() {}, broadcast() {} }; export const logger = { error() {}, warn() {} };`,
   "ipc.js": `export const runGuardedCommand = (_channel, run) => run();
     export const assertAiAccess = async () => { globalThis.__quickCaptureWiring.licenseChecks += 1; };`,
@@ -26,12 +26,13 @@ const STUBS = {
     return { text: "parsed", usage: undefined };
   };`,
   "apple-reminders.js": `export const createReminder = async () => ({}); export const deleteReminder = async () => {};`,
+  "apple-calendar.js": `export const isAppleCalendarId = (id) => id.startsWith("apple:"); export const deleteAppleEvent = async () => {};`,
   "capture-service.js": `export const createCaptureService = (deps) => {
     globalThis.__quickCaptureWiring.deps = deps;
     return { submit: async () => {}, undo: async () => {}, recent: () => [], clear: () => { globalThis.__quickCaptureWiring.cleared += 1; } };
   };`,
   "demo-data.js": `export const isDemoMode = () => false;`,
-  "google-api.js": `export const createEvent = async () => ({}); export const createTask = async () => ({}); export const deleteEvent = async () => {}; export const deleteTask = async () => {};`,
+  "google-api.js": `export const createTask = async () => ({}); export const deleteEvent = async () => {}; export const deleteTask = async () => {};`,
   "pending-writes.js": `export const trackPendingWrite = (run) => run();`,
   "settings-store.js": `export const getSettings = async () => ({});`,
   "notification-status.js": `export const recordNotificationResult = () => {};`,

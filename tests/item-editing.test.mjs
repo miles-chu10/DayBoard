@@ -46,6 +46,15 @@ export async function updateReminder(input) { state().calls.push(["reminder:upda
 export async function deleteReminder(ref) { state().calls.push(["reminder:delete", { ref }]); }
 `;
 
+const appleCalendarStub = `
+const state = () => globalThis.__itemEditFixture;
+export const isAppleCalendarId = (id) => id.startsWith("apple:");
+const item = (calendarId, eventId, input = {}) => ({ id: eventId, calendarId, calendarName: "Home", calendarColor: "#0a0", title: input.title ?? "Dentist", description: null, location: null, start: input.start ?? "2026-10-02T09:00:00.000Z", end: input.end ?? "2026-10-02T10:00:00.000Z", allDay: false, htmlLink: null, meetLink: null, attendees: [], provider: "apple" });
+export async function updateAppleEvent(input) { state().calls.push(["apple:update", input]); return item(input.calendarId, input.eventId, input); }
+export async function getAppleEventForEditing(calendarId, eventId) { state().calls.push(["apple:get", { calendarId, eventId }]); return item(calendarId, eventId); }
+export async function deleteAppleEvent(calendarId, eventId) { state().calls.push(["apple:delete", { calendarId, eventId }]); }
+`;
+
 const demoStub = `
 const state = () => globalThis.__itemEditFixture;
 export function assertNotDemo(channel) { if (state().demo) throw new Error(channel + ": changes are turned off in demo mode."); }
@@ -68,6 +77,7 @@ function plugin() {
     ["../services/agenda-store.js", agendaStub],
     ["../services/google-api.js", googleStub],
     ["../services/apple-reminders.js", remindersStub],
+    ["../services/apple-calendar.js", appleCalendarStub],
     ["../services/demo-data.js", demoStub],
     ["../services/pending-writes.js", pendingStub],
     ["./productivity.js", productivityStub],
@@ -216,6 +226,39 @@ test("delete targets one provider record and calendar permission failures are ex
   await assert.rejects(
     invoke("calendar:delete", { calendarId: "work", eventId: "read-only" }),
     /read-only/,
+  );
+});
+
+test("Mac calendar events are read, edited and deleted through EventKit, never Google", async () => {
+  const state = fixture();
+  const invoke = await harness(state);
+  const ids = { calendarId: "apple:home", eventId: "ek1.occurrence" };
+  const event = await invoke("calendar:getForEditing", ids);
+  assert.equal(event.provider, "apple");
+  const updated = await invoke("calendar:update", {
+    ...ids,
+    title: "Dentist (moved)",
+    location: "",
+    start: "2026-10-02T11:00:00-07:00",
+    end: "2026-10-02T12:00:00-07:00",
+    allDay: false,
+    timeZone: "America/Los_Angeles",
+    timesChanged: true,
+  });
+  assert.equal(updated.title, "Dentist (moved)");
+  const deleted = await invoke("calendar:delete", ids);
+  assert.deepEqual(deleted, {});
+  assert.deepEqual(
+    state.calls.map(([name, input]) => [name, input.calendarId, input.eventId]),
+    [
+      ["apple:get", "apple:home", "ek1.occurrence"],
+      ["apple:update", "apple:home", "ek1.occurrence"],
+      ["apple:delete", "apple:home", "ek1.occurrence"],
+    ],
+  );
+  assert.deepEqual(
+    state.broadcasts.map((broadcast) => broadcast.payload.source),
+    ["calendar", "calendar"],
   );
 });
 

@@ -98,22 +98,23 @@ func selectCalendar<T>(
   id: String?,
   lookup: (String) -> T?,
   defaultCalendar: () -> T?,
-  isUsable: (T) -> Bool
+  isUsable: (T) -> Bool,
+  noun: String = "Reminders list"
 ) throws -> T {
   let calendar: T
   if let id {
     guard !id.isEmpty, let found = lookup(id) else {
-      throw HelperError.message("Reminders list \"\(id)\" was not found.")
+      throw HelperError.message("\(noun) \"\(id)\" was not found.")
     }
     calendar = found
   } else {
     guard let found = defaultCalendar() else {
-      throw HelperError.message("No default Reminders list is configured.")
+      throw HelperError.message("No default \(noun) is configured.")
     }
     calendar = found
   }
   guard isUsable(calendar) else {
-    throw HelperError.message("Reminders list is not writable.")
+    throw HelperError.message("\(noun) is not writable.")
   }
   return calendar
 }
@@ -131,4 +132,59 @@ func pageReminders<T>(
     return (dueDate(left) ?? .distantFuture) < (dueDate(right) ?? .distantFuture)
   }
   return (Array(sorted.prefix(limit)), reminders.count > limit)
+}
+
+// MARK: - Calendar event times
+
+/// Parses an RFC 3339 instant, with or without fractional seconds.
+func parseInstant(_ value: String) -> Date? {
+  let plain = ISO8601DateFormatter()
+  plain.formatOptions = [.withInternetDateTime]
+  if let date = plain.date(from: value) { return date }
+  let fractional = ISO8601DateFormatter()
+  fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  return fractional.date(from: value)
+}
+
+/// A timed event boundary: an RFC 3339 instant string, or a wall-clock `EventTime` in a zone.
+func eventInstant(_ value: Any?, field: String) throws -> Date {
+  if let text = value as? String {
+    guard let date = parseInstant(text) else { throw HelperError.message("invalid \(field) \"\(text)\"") }
+    return date
+  }
+  guard let input = try parseEventTime(value), input.hour != nil else {
+    throw HelperError.message("\"\(field)\" must be a date and time")
+  }
+  // toDateComponents carries the zone, which Calendar.date(from:) honors.
+  guard let date = Calendar(identifier: .gregorian).date(from: toDateComponents(input)) else {
+    throw HelperError.message("invalid \(field)")
+  }
+  return date
+}
+
+/// Local midnight at the start of a YYYY-MM-DD day.
+func dayStart(_ value: Any?, field: String, calendar: Calendar = .current) throws -> Date {
+  guard let text = value as? String, let input = try parseEventTime(["kind": "date", "date": text]) else {
+    throw HelperError.message("\"\(field)\" must be a date")
+  }
+  guard let date = calendar.date(from: DateComponents(year: input.year, month: input.month, day: input.day)) else {
+    throw HelperError.message("invalid \(field)")
+  }
+  return date
+}
+
+func dayString(_ date: Date, calendar: Calendar = .current) -> String {
+  let c = calendar.dateComponents([.year, .month, .day], from: date)
+  return "\(pad4(c.year ?? 0))-\(pad2(c.month ?? 0))-\(pad2(c.day ?? 0))"
+}
+
+private func pad2(_ n: Int) -> String { n < 10 ? "0\(n)" : String(n) }
+private func pad4(_ n: Int) -> String { String(repeating: "0", count: max(0, 4 - String(n).count)) + String(n) }
+
+/// EventKit stores an all-day event's end inside its last day (often 23:59:59), and some CalDAV
+/// servers store the next midnight. Both become the exclusive next day, the wire format.
+func allDayExclusiveEnd(start: Date, end: Date, calendar: Calendar = .current) -> Date {
+  let inclusive = end > start ? end.addingTimeInterval(-1) : start
+  let lastDay = calendar.startOfDay(for: inclusive)
+  return calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
 }

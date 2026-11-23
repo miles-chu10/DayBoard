@@ -621,7 +621,7 @@ test("demo MCP endpoints reject before any source service can run", async () => 
     export const createEvent = async () => { throw new Error("live source called"); };
     export const createReplyDraft = createEvent; export const createTask = createEvent;
     export const getMessageBody = createEvent; export const listCompletedTasks = createEvent;
-    export const listEvents = createEvent; export const listEventsBetween = createEvent;
+    export const listEventsBetweenWithCoverage = createEvent;
     export const listInbox = createEvent; export const listTasks = createEvent;
     export const modifyMessage = createEvent; export const setTaskCompleted = createEvent;
   `;
@@ -644,6 +644,10 @@ test("demo MCP endpoints reject before any source service can run", async () => 
           `export const createReminder = async () => { throw new Error("live source called"); }; export const getRemindersAccess = async () => "full-access"; export const listCompletedReminders = createReminder; export const listReminders = createReminder; export const setReminderCompleted = createReminder;`,
         ],
         ["./calendar-range.js", `export const calendarRangeDays = () => 7;`],
+        [
+          "./apple-calendar.js",
+          `export const createAppleEvent = async () => { throw new Error("live source called"); }; export const getCalendarAccess = createAppleEvent; export const listCalendarEvents = createAppleEvent;`,
+        ],
         [
           "./license/index.js",
           `export const assertLicenseAccess = async () => { throw new Error("demo must not inspect licensing"); };`,

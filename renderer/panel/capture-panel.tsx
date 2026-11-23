@@ -59,6 +59,7 @@ export function CapturePanel() {
         ? availableKinds({
             googleConnected: accounts.google.connected,
             remindersAccess: accounts.reminders,
+            calendarAccess: accounts.calendar,
             sources: settings.sources,
           })
         : NONE,

@@ -2,12 +2,10 @@
 
 import { Notification, shell } from "electron";
 
-import { onAccountsChanged } from "../handlers/productivity.js";
+import { calendarEvents, onAccountsChanged } from "../handlers/productivity.js";
 import { logger } from "../platform/index.js";
 import { isExternalWebUrl } from "../platform/window-policy.js";
 import { isDemoMode } from "../services/demo-data.js";
-import { getGoogleStatus } from "../services/google-auth.js";
-import { listEventsBetween } from "../services/google-api.js";
 import { createMeetingAlerts, type MeetingAlert } from "../services/meetings/meeting-alerts.js";
 import { getSettings, onSettingsChanged } from "../services/settings-store.js";
 import { focusMainWindow } from "../window.js";
@@ -23,16 +21,15 @@ async function upcomingEvents() {
   if (isDemoMode()) return null;
   const settings = await getSettings();
   if (!settings.sources.calendar.enabled) return null;
-  const { connected, email } = await getGoogleStatus();
-  if (!connected) return null;
   const now = new Date();
   try {
-    return await listEventsBetween(
+    const result = await calendarEvents(
+      "meetings:upcoming",
       now,
       new Date(now.getTime() + DAY_MS),
       settings.calendar.visibility,
-      email,
     );
+    return result.state === "ok" ? result.items : null;
   } catch (error) {
     logger.warn("meetings", "Could not read upcoming meetings for alerts", error);
     return null;
