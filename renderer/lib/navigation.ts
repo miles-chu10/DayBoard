@@ -154,3 +154,47 @@ export function sidebarNav(settings: AppSettings | undefined): NavItem[] {
     ...visibleNav(settings).filter((item) => item.group === "ai"),
   ];
 }
+
+export interface SidebarOrderRow {
+  id: SidebarView;
+  nested: boolean;
+}
+
+/**
+ * Settings' list of the main views, laid out as the sidebar draws them: with the Agenda shown,
+ * its sources follow it as nested rows. Hidden and turned-off views stay in the list.
+ */
+export function sidebarOrderRows(
+  order: readonly SidebarView[],
+  hidden: readonly SidebarView[],
+): SidebarOrderRow[] {
+  if (!order.includes("agenda") || hidden.includes("agenda"))
+    return order.map((id) => ({ id, nested: false }));
+  const nested = order.filter((id) => AGENDA_SOURCES.includes(id));
+  return order
+    .filter((id) => !AGENDA_SOURCES.includes(id))
+    .flatMap((id) => [
+      { id, nested: false },
+      ...(id === "agenda" ? nested.map((source) => ({ id: source, nested: true })) : []),
+    ]);
+}
+
+/**
+ * The saved order after moving a view one place up (-1) or down (1) in Settings' list. A view
+ * trades places with the nearest row of its own kind, so each press changes what the sidebar
+ * shows; the same array comes back when there is nowhere to go.
+ */
+export function moveSidebarView(
+  order: readonly SidebarView[],
+  hidden: readonly SidebarView[],
+  id: SidebarView,
+  delta: -1 | 1,
+): readonly SidebarView[] {
+  const rows = sidebarOrderRows(order, hidden);
+  const self = rows.find((row) => row.id === id);
+  if (!self) return order;
+  const peers = rows.filter((row) => row.nested === self.nested);
+  const other = peers[peers.indexOf(self) + delta];
+  if (!other) return order;
+  return order.map((item) => (item === id ? other.id : item === other.id ? id : item));
+}

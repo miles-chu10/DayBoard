@@ -1,8 +1,8 @@
-import { Button, Field, FieldSet, Switch, Text } from "@renderer/ui";
+import { Button, Field, FieldSet, Switch, Text, cn } from "@renderer/ui";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SidebarView } from "@main/shared-types";
 
-import { NAV_ITEMS } from "../lib/navigation";
+import { NAV_ITEMS, moveSidebarView, sidebarOrderRows } from "../lib/navigation";
 import { sourceOn, useSettingsEditor } from "../lib/settings";
 
 function title(id: SidebarView): string {
@@ -15,14 +15,10 @@ export function SidebarSettings() {
   if (!settings) return null;
   const { order, hidden, counts } = settings.general.sidebar;
 
-  function move(id: SidebarView, delta: number) {
+  function move(id: SidebarView, delta: -1 | 1) {
     edit((draft) => {
-      const list = draft.general.sidebar.order;
-      const from = list.indexOf(id);
-      const to = from + delta;
-      if (from < 0 || to < 0 || to >= list.length) return;
-      list.splice(from, 1);
-      list.splice(to, 0, id);
+      const { order: list, hidden: off } = draft.general.sidebar;
+      draft.general.sidebar.order = [...moveSidebarView(list, off, id, delta)];
     });
   }
 
@@ -36,7 +32,7 @@ export function SidebarSettings() {
   return (
     <FieldSet
       title="Sidebar"
-      description="Order the views and choose which appear. ⌃1–9 follow this order; hidden views stay in ⌘K."
+      description="Order the views and choose which appear. Calendar, Tasks and Reminders sit under Agenda. ⌃1–9 follow this order; hidden views stay in ⌘K."
     >
       <Field label="Show counts" orientation="horizontal">
         <Switch
@@ -50,14 +46,14 @@ export function SidebarSettings() {
         />
       </Field>
       <ul aria-label="Sidebar views" className="flex flex-col">
-        {order.map((id, index) => {
+        {sidebarOrderRows(order, hidden).map(({ id, nested }) => {
           const name = title(id);
           const sourceOff =
             id !== "home" && id !== "agenda" && id !== "notes" && !sourceOn(settings, id);
           return (
             <li key={id}>
               <Field orientation="horizontal">
-                <div className="flex min-w-0 flex-col gap-0.5">
+                <div className={cn("flex min-w-0 flex-col gap-0.5", nested && "pl-5")}>
                   <Text variant="regular">{name}</Text>
                   {sourceOff ? (
                     <Text variant="small" color="secondary">
@@ -71,7 +67,7 @@ export function SidebarSettings() {
                     size="small"
                     variant="transparent"
                     aria-label={`Move ${name} up`}
-                    disabled={index === 0}
+                    disabled={moveSidebarView(order, hidden, id, -1) === order}
                     onClick={() => move(id, -1)}
                   >
                     <ChevronUp />
@@ -81,7 +77,7 @@ export function SidebarSettings() {
                     size="small"
                     variant="transparent"
                     aria-label={`Move ${name} down`}
-                    disabled={index === order.length - 1}
+                    disabled={moveSidebarView(order, hidden, id, 1) === order}
                     onClick={() => move(id, 1)}
                   >
                     <ChevronDown />

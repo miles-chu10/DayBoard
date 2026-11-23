@@ -57,7 +57,7 @@ function sidebarMarkers(page) {
       .first();
   return [
     page.getByRole("button", { name: "Profile menu for Alex Rivera" }),
-    page.getByText("Latest: Priya Shah"),
+    count("Inbox", "3"),
     count("Tasks", "10"),
     count("Reminders", "5"),
   ];
