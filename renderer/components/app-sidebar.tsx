@@ -58,9 +58,16 @@ import { ProviderMark } from "./provider-logo";
 import { LicenseStatusControl } from "./license-gate";
 import { sourceStatusShort } from "./source-gate";
 
-/** The name from Settings, or one derived from the Google address ("first.last" → "First Last"). */
-export function knownName(settings: AppSettings | undefined, email?: string | null): string {
-  const configured = settings?.general.userName.trim();
+/**
+ * The name from Settings, else the name on this Mac's user account, else one derived from the
+ * Google address ("first.last" → "First Last").
+ */
+export function knownName(
+  settings: AppSettings | undefined,
+  email?: string | null,
+  macName?: string,
+): string {
+  const configured = settings?.general.userName.trim() || macName?.trim();
   if (configured) return configured;
   const local = email?.split("@", 1)[0] ?? "";
   const words = local.split(/[._-]+/).filter((word) => /^[a-z]+$/i.test(word));
@@ -70,8 +77,12 @@ export function knownName(settings: AppSettings | undefined, email?: string | nu
 }
 
 /** A name to show for the person; "You" when DayBoard knows neither a name nor an address. */
-export function displayName(settings: AppSettings | undefined, email?: string | null): string {
-  return knownName(settings, email) || "You";
+export function displayName(
+  settings: AppSettings | undefined,
+  email?: string | null,
+  macName?: string,
+): string {
+  return knownName(settings, email, macName) || "You";
 }
 
 function initials(name: string): string {
@@ -196,7 +207,7 @@ export function AppSidebar() {
   }
 
   const google = accounts.data?.google;
-  const name = knownName(settings, google?.email) || "DayBoard";
+  const name = knownName(settings, google?.email, accounts.data?.macName) || "DayBoard";
   const remindersOk = accounts.data?.reminders === "full-access";
   const connected = Boolean(google?.connected);
   const connectionDetail = [

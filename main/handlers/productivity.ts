@@ -59,6 +59,7 @@ import {
   drainPendingWrites,
   hasPendingWrites,
 } from "../services/pending-writes.js";
+import { macUserName } from "../services/mac-user-name.js";
 import { getSettings } from "../services/settings-store.js";
 import {
   completeAgendaBlock,
@@ -646,7 +647,12 @@ async function createAgendaBlock(
 
 export function registerProductivityHandlers(): void {
   // Accounts
-  ipcMain.handle("accounts:getStatus", () => getAccountsStatus());
+  ipcMain.handle("accounts:getStatus", async () => {
+    const status = await getAccountsStatus();
+    // The demo keeps its fictional person.
+    const macName = isDemoMode() ? "" : await macUserName();
+    return macName ? { ...status, macName } : status;
+  });
 
   ipcMain.handle("google:connect", async () => {
     assertNotDemo("google:connect");

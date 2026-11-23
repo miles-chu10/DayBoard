@@ -93,7 +93,7 @@ export function GeneralTab() {
   const avatar = useProfileAvatar();
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
   const startAtLogin = useStartAtLogin();
-  const profileName = displayName(settings, accounts.data?.google.email);
+  const profileName = displayName(settings, accounts.data?.google.email, accounts.data?.macName);
 
   const refreshThemeInfo = async () => {
     try {

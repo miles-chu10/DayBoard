@@ -349,6 +349,8 @@ export interface GmailAccountStatus {
 }
 
 export interface AccountsStatus {
+  /** The full name on this Mac's user account, when it has one. Never set in demo mode. */
+  macName?: string;
   google: GoogleAccountStatus;
   gmail: GmailAccountStatus;
   reminders: RemindersAccess;

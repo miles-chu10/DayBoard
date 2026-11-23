@@ -8,7 +8,7 @@ import { errorMessage, invoke } from "../lib/ipc";
 import { queryKeys, useAccountScope } from "../lib/queries";
 import { removeSourceItem, replaceSourceItem, sourceKey } from "../lib/source-cache";
 import type { Todo } from "../lib/todos";
-import type { EventDraft } from "./event-edit";
+import { eventDraft, eventFields, type EventDraft } from "./event-edit";
 import { movedDraft, todoDelete, todoDraft, todoUpdate, type TodoDraft } from "./todo-edit";
 
 /** `busy` while a bulk move runs. */
@@ -158,11 +158,14 @@ export function usePanelWrites() {
     }
   }
 
-  /** Saves an event's title, place and time. Its description and guests are left untouched. */
-  async function saveEvent(event: CalendarEventItem, draft: EventDraft): Promise<boolean> {
+  /** Writes an event's title, place and time. Its description and guests are left untouched. */
+  async function writeEvent(
+    event: CalendarEventItem,
+    draft: EventDraft,
+  ): Promise<CalendarEventItem | null> {
     const scope = scopeFor();
     const title = draft.title.trim();
-    if (!scope || !title) return false;
+    if (!scope || !title) return null;
     const key = `${event.calendarId}/${event.id}`;
     setBusy(key);
     try {
@@ -183,17 +186,52 @@ export function usePanelWrites() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.calendar });
         void queryClient.invalidateQueries({ queryKey: queryKeys.review });
       }
-      toast.success(`Saved “${updated.title}”`);
-      return true;
+      return updated;
     } catch (error) {
       toast.error(`Couldn’t save “${event.title}”: ${errorMessage(error)}`);
-      return false;
+      return null;
     } finally {
       setBusy(null);
     }
   }
 
-  return { busy, saveTodo, moveTodo, moveAll, deleteTodo, saveEvent };
+  async function saveEvent(event: CalendarEventItem, draft: EventDraft): Promise<boolean> {
+    const updated = await writeEvent(event, draft);
+    if (updated) toast.success(`Saved “${updated.title}”`);
+    return Boolean(updated);
+  }
+
+  /** Moves an event to another day, with Undo back to the time it had. */
+  async function moveEvent(
+    event: CalendarEventItem,
+    draft: EventDraft,
+    label: string,
+  ): Promise<boolean> {
+    const before = eventDraft(event, eventFields(event));
+    const moved = await writeEvent(event, draft);
+    if (!moved) return false;
+    let undone = false;
+    toast.success(
+      `Moved “${moved.title}” to ${label.toLowerCase()}`,
+      before
+        ? {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                if (undone) return;
+                undone = true;
+                void writeEvent(moved, { ...before, timesChanged: true }).then((back) => {
+                  if (!back) undone = false;
+                });
+              },
+            },
+          }
+        : undefined,
+    );
+    return true;
+  }
+
+  return { busy, saveTodo, moveTodo, moveAll, deleteTodo, saveEvent, moveEvent };
 }
 
 export type PanelWrites = ReturnType<typeof usePanelWrites>;

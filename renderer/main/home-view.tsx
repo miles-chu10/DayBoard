@@ -233,7 +233,7 @@ export function HomeView() {
   const agendaLoading = (calendarOn && calendar.isPending) || tasks.isPending;
   const untriaged = messages.some((message) => !triage.map[message.id]);
 
-  const name = firstName(knownName(settings, accounts.data?.google.email));
+  const name = firstName(knownName(settings, accounts.data?.google.email, accounts.data?.macName));
   const dateLine = now.toLocaleDateString([], {
     weekday: "long",
     month: "long",

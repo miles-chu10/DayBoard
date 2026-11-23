@@ -519,7 +519,7 @@ function AssistantSession({
       mail: mail.data,
       triage: readTriageMap(),
       userEmail: accounts.data?.google.email ?? null,
-      userName: displayName(settings, accounts.data?.google.email),
+      userName: displayName(settings, accounts.data?.google.email, accounts.data?.macName),
       permission,
       canCreate: {
         task: googleConnected && sourceOn(settings, "tasks"),
