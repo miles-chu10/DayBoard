@@ -118,7 +118,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     undoSendSeconds: 5,
     followUpDays: 3,
   },
-  calendar: { range: "next-7-days", visibility: {} },
+  calendar: { range: "next-7-days", visibility: {}, newEvents: "" },
   lists: { tasks: {}, reminders: {} },
   privacy: { usageCheckIn: true },
   mcpServer: { enabled: false, allowWrites: false },
@@ -296,6 +296,12 @@ export function normalizeSettings(value: unknown): AppSettings {
         LEGACY_CALENDAR_DAYS[Number(calendar.daysAhead)] ?? defaults.calendar.range,
       ),
       visibility,
+      newEvents:
+        typeof calendar.newEvents === "string" &&
+        (calendar.newEvents === "google" ||
+          (calendar.newEvents.startsWith("apple:") && calendar.newEvents.length <= 400))
+          ? calendar.newEvents
+          : "",
     },
     lists: {
       tasks: visibilityMap(lists.tasks),

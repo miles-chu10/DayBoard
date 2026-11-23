@@ -113,7 +113,10 @@ export function suggestedTasks(input: {
 /** True once it is known that no account is connected, so Home can say how to start. */
 export function nothingConnected(accounts: AccountsStatus | undefined): boolean {
   return (
-    accounts !== undefined && !accounts.google.connected && accounts.reminders !== "full-access"
+    accounts !== undefined &&
+    !accounts.google.connected &&
+    accounts.reminders !== "full-access" &&
+    accounts.calendar !== "full-access"
   );
 }
 

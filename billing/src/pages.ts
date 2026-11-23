@@ -81,7 +81,7 @@ button:disabled{opacity:.6;cursor:wait;box-shadow:none;transform:none}
 .hero{text-align:center}
 .hero h1{font-size:clamp(2.2rem,5.4vw,3.3rem);text-wrap:balance}
 .hero p{max-width:32em;margin:16px auto 0;font-size:1.12rem}
-.hero .button{margin-top:26px}
+.hero .button,.hero form{margin-top:26px}
 .wait{display:inline-flex;gap:8px;margin-bottom:26px}
 .wait i{width:10px;height:10px;border-radius:50%;background:var(--calendar)}
 .wait i:nth-child(2){background:var(--tasks)}
@@ -168,4 +168,40 @@ export const receiptScript =
   `const title=document.getElementById('title'),message=document.getElementById('message'),wait=document.getElementById('wait'),box=document.getElementById('license'),key=document.getElementById('key'),copyButton=document.getElementById('copy'),copied=document.getElementById('copied'),orderId=new URL(location.href).searchParams.get('order');let licenseKey='';const show=(heading,text)=>{title.textContent=heading;message.textContent=text;wait.hidden=true};const checking=(heading,text,delay)=>{show(heading,text);wait.hidden=false;setTimeout(poll,delay)};async function poll(){if(!orderId||!%ORDER_PATTERN%.test(orderId)){show('Order access unavailable','Open the return link from your checkout in the browser you paid with, or email support with your Stripe receipt.');return}try{const response=await fetch('/v1/checkout/status?order='+encodeURIComponent(orderId),{credentials:'same-origin',cache:'no-store'});if(response.status===401){show('Order access unavailable','This page works only in the browser you used for checkout, for ${ORDER_ACCESS_DAYS} days. Email support with your Stripe receipt to recover your key.');return}if(!response.ok)throw new Error();const status=await response.json();if(status.state==='pending'){checking('Checking your order','Your payment may take a moment to confirm.',2500);return}if(status.state==='revoked'){show('License unavailable','This payment was refunded or disputed, so the license is turned off. Email support if you need help.');return}if(status.state==='failed'){show('Payment incomplete','No license was issued. Start a new checkout, or email support.');document.getElementById('retry').hidden=false;return}const claim=await fetch('/v1/checkout/claim',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId})});if(!claim.ok)throw new Error();const claimed=await claim.json();licenseKey=claimed.licenseKey;key.textContent=licenseKey;document.getElementById('emailed').hidden=!claimed.email;box.hidden=false;document.title='Your DayBoard Pro license';show('Your DayBoard Pro license','Payment confirmed. Your license key is below.')}catch{checking('Still checking','The order could not be checked right now. Retrying…',4000)}}poll();const selectKey=()=>{const range=document.createRange();range.selectNodeContents(key);const selection=getSelection();selection.removeAllRanges();selection.addRange(range)};copyButton.onclick=async()=>{let done=false;try{await navigator.clipboard.writeText(licenseKey);done=true}catch{selectKey();try{done=document.execCommand('copy')}catch{}}if(done){copied.textContent='License copied.';copyButton.textContent='Copied';setTimeout(()=>{copyButton.textContent='Copy license'},2000)}else copied.textContent='This browser blocked copying. Your key is selected: press ⌘C to copy it, or use Download license.'};document.getElementById('download').onclick=()=>{const url=URL.createObjectURL(new Blob([licenseKey+'\\n'],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='dayboard-license.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};`.replace(
     "%ORDER_PATTERN%",
     "/^[A-Za-z0-9_-]{32}$/",
+  );
+
+// The three states of an update email's unsubscribe link. Plain forms, so they work without
+// scripts: the button posts back to the same address.
+const updatesPage = (site: string, title: string, body: string) => {
+  const origin = escapeHtml(site);
+  return layout(`<div class="hero">${body}</div>`, {
+    title,
+    site: origin,
+    nav: `<a href="${origin}/changelog">What's new</a>`,
+    page: "receipt",
+  });
+};
+export const unsubscribeConfirmPage = (site: string) =>
+  updatesPage(
+    site,
+    "Unsubscribe from DayBoard updates",
+    `<h1>Stop DayBoard update emails?</h1><p>You won't get an email when a new version comes out. This doesn't affect the app or a license.</p><form method="post"><button type="submit">Unsubscribe</button></form>`,
+  );
+export const unsubscribedPage = (site: string) =>
+  updatesPage(
+    site,
+    "Unsubscribed from DayBoard updates",
+    `<h1>You're unsubscribed.</h1><p role="status">We won't email you about new versions. Changed your mind?</p><form method="post"><input type="hidden" name="action" value="resubscribe"><button class="secondary" type="submit">Subscribe again</button></form>`,
+  );
+export const resubscribedPage = (site: string) =>
+  updatesPage(
+    site,
+    "Subscribed to DayBoard updates",
+    `<h1>You're subscribed again.</h1><p role="status">We'll email you when a new DayBoard version comes out. Every email has an unsubscribe link.</p>`,
+  );
+export const unsubscribeUnknownPage = (site: string) =>
+  updatesPage(
+    site,
+    "DayBoard updates",
+    `<h1>This link doesn't work.</h1><p>It may be incomplete. To stop update emails, email ${supportLink} from the address that gets them.</p>`,
   );

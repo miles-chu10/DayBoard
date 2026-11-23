@@ -30,7 +30,10 @@
     // Optional. With the RESEND_API_KEY secret, emails each buyer their license key. Leave it
     // out to keep the email off. See "License key email" in README.md.
     // "MAIL_FROM": "REPLACE_WITH_SENDER_NAME <REPLACE_WITH_ADDRESS_ON_A_RESEND_VERIFIED_DOMAIN>",
+    // Optional. A postal address line for the footer of release emails. See "Update newsletter"
+    // in README.md.
+    // "UPDATES_POSTAL_ADDRESS": "REPLACE_WITH_POSTAL_ADDRESS",
   },
-  // Retries license key emails that haven't been sent. It does nothing while the email is off.
+  // Retries license key emails and sends queued release emails. It does nothing while email is off.
   "triggers": { "crons": ["*/15 * * * *"] },
 }

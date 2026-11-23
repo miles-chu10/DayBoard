@@ -68,6 +68,60 @@ export function licenseMessage(
   return { subject, text, html };
 }
 
+const URL_PATTERN = /https:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g;
+/** Escapes one line of a release email and turns its **bold** runs and https links into HTML. */
+function inline(line: string): string {
+  let html = "";
+  let last = 0;
+  for (const match of line.matchAll(URL_PATTERN)) {
+    const url = escapeHtml(match[0]);
+    html += `${escapeHtml(line.slice(last, match.index))}<a href="${url}">${url}</a>`;
+    last = match.index + match[0].length;
+  }
+  return (html + escapeHtml(line.slice(last))).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+/**
+ * The email subscribers get when a version is published. `body` is plain text: blocks separated
+ * by blank lines, where a block of "- " lines is a list and a "## " line is a heading. Every copy
+ * ends with why the person is getting it and their own unsubscribe link.
+ */
+export function updateMessage(
+  subject: string,
+  body: string,
+  {
+    site,
+    unsubscribeUrl,
+    postalAddress,
+  }: { site: string; unsubscribeUrl: string; postalAddress?: string },
+): Message {
+  const blocks = body
+    .replaceAll("\r\n", "\n")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const host = site.replace(/^https:\/\//, "");
+  const why = `You're getting this because you signed up for DayBoard updates at ${host}.`;
+  const text = [
+    ...blocks.map((block) => block.replace(/^## /, "").replaceAll("**", "")),
+    `${why}\nUnsubscribe: ${unsubscribeUrl}`,
+    ["DayBoard", site, ...(postalAddress ? [postalAddress] : [])].join("\n"),
+  ].join("\n\n");
+  const p = "margin:0 0 16px";
+  const muted = "margin:24px 0 0;color:#5b6472;font-size:14px";
+  const parts = blocks.map((block) => {
+    const lines = block.split("\n");
+    if (lines.every((line) => line.startsWith("- ")))
+      return `<ul style="margin:0 0 16px;padding-left:22px">${lines.map((line) => `<li style="margin:0 0 6px">${inline(line.slice(2))}</li>`).join("")}</ul>`;
+    if (lines.length === 1 && block.startsWith("## "))
+      return `<h2 style="margin:24px 0 8px;font-size:18px">${inline(block.slice(3))}</h2>`;
+    return `<p style="${p}">${lines.map(inline).join("<br>")}</p>`;
+  });
+  const origin = escapeHtml(site);
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:24px;background:#ffffff;color:#1b1f24;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55"><div style="max-width:560px;margin:0 auto"><p style="margin:0 0 24px;color:#5b6472;font-size:13px;letter-spacing:.08em;text-transform:uppercase">DayBoard</p><h1 style="margin:0 0 16px;font-size:24px;line-height:1.2">${escapeHtml(subject)}</h1>${parts.join("")}<p style="${muted}">${escapeHtml(why)} <a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a>.</p><p style="${muted}"><a href="${origin}">${escapeHtml(host)}</a>${postalAddress ? `<br>${escapeHtml(postalAddress)}` : ""}</p></div></body></html>`;
+  return { subject, text, html };
+}
+
 /**
  * Sends one email through Resend. Returns null when Resend accepted it, otherwise a short reason
  * that is safe to log: an HTTP status and Resend's error name, never the address or the message.
@@ -79,6 +133,7 @@ export async function sendMail(
   to: string,
   message: Message,
   idempotencyKey: string,
+  headers?: Record<string, string>,
 ): Promise<string | null> {
   let response: Response;
   try {
@@ -91,7 +146,13 @@ export async function sendMail(
         "User-Agent": "dayboard-billing/1",
         "Idempotency-Key": idempotencyKey,
       },
-      body: JSON.stringify({ from: mail.from, to: [to], reply_to: SUPPORT_EMAIL, ...message }),
+      body: JSON.stringify({
+        from: mail.from,
+        to: [to],
+        reply_to: SUPPORT_EMAIL,
+        ...message,
+        ...(headers ? { headers } : {}),
+      }),
       signal: AbortSignal.timeout(10000),
     });
   } catch {

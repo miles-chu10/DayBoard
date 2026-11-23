@@ -1,0 +1,13 @@
+{
+  // Receives mail for support@getdayboard.com. Email Routing sends that address to this Worker
+  // ("Send to a Worker"), which forwards each message to the inbox as before and then starts the
+  // feedback scheduled task once. Deploy from this folder: npx --prefix ../billing wrangler deploy
+  // Secrets (never in this file): FORWARD_TO, FEEDBACK_TASK_ID, FEEDBACK_TASK_TOKEN. See README.md.
+  "name": "dayboard-support-mail",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Logs say only whether the task started, never who wrote or what they said.
+  "observability": { "enabled": true },
+}

@@ -15,22 +15,20 @@ export class LocalDb {
   }
   prepare(query: string) {
     const sql = this.sql;
-    return {
-      bind(...params: unknown[]) {
-        return {
-          async first<T>() {
-            return (sql.prepare(query).get(...(params as [])) ?? null) as T | null;
-          },
-          async all<T>() {
-            return { success: true, results: sql.prepare(query).all(...(params as [])) as T[] };
-          },
-          async run() {
-            const result = sql.prepare(query).run(...(params as []));
-            return { success: true, meta: { changes: Number(result.changes) } };
-          },
-        };
+    const bound = (params: unknown[]) => ({
+      async first<T>() {
+        return (sql.prepare(query).get(...(params as [])) ?? null) as T | null;
       },
-    };
+      async all<T>() {
+        return { success: true, results: sql.prepare(query).all(...(params as [])) as T[] };
+      },
+      async run() {
+        const result = sql.prepare(query).run(...(params as []));
+        return { success: true, meta: { changes: Number(result.changes) } };
+      },
+    });
+    // Like D1, a statement without parameters runs without bind().
+    return { ...bound([]), bind: (...params: unknown[]) => bound(params) };
   }
   async batch(statements: Array<{ run(): Promise<unknown> }>) {
     this.sql.exec("BEGIN IMMEDIATE");

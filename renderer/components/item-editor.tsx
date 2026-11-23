@@ -50,12 +50,9 @@ function isCalendarEvent(item: EditableItem): item is CalendarEventItem {
   return "calendarId" in item;
 }
 
-function sourceLabel(kind: ItemKind): string {
-  return kind === "task"
-    ? "Google Tasks"
-    : kind === "reminder"
-      ? "Apple Reminders"
-      : "Google Calendar";
+function sourceLabel(item: EditableItem): string {
+  if (isCalendarEvent(item)) return item.provider === "apple" ? "Mac Calendar" : "Google Calendar";
+  return item.source === "tasks" ? "Google Tasks" : "Apple Reminders";
 }
 
 function initialFields(item: EditableItem): ItemEditorFields {
@@ -86,6 +83,19 @@ export function ItemEditButton({
   variant?: "filled" | "transparent";
 }) {
   const [open, setOpen] = useState(false);
+  if (isCalendarEvent(item) && item.readOnly) {
+    return (
+      <Button
+        size="small"
+        variant={variant}
+        disabled
+        title="This calendar is read-only, so its events can't be changed."
+      >
+        <Pencil />
+        Edit
+      </Button>
+    );
+  }
   if (!isCalendarEvent(item) && item.reminder?.recurring) {
     return (
       <Button
@@ -132,7 +142,7 @@ function ItemEditor({
   const queryClient = useQueryClient();
   const fieldId = useId();
   const kind = kindFor(item);
-  const source = sourceLabel(kind);
+  const source = sourceLabel(item);
   const [fields, setFields] = useState(() => initialFields(item));
   // The scope is deliberately captured once when the editor opens. A late account
   // switch must reject the write rather than applying it to the new account.
@@ -328,7 +338,7 @@ function ItemEditor({
       <Dialog
         open
         onOpenChange={(next) => !next && onClose()}
-        title={`Edit ${source === "Google Calendar" ? "event" : "item"}`}
+        title={`Edit ${kind === "event" ? "event" : "item"}`}
         description={source}
         confirmLabel="Save"
         confirmDisabled={saveDisabled}
@@ -386,7 +396,7 @@ function ItemEditor({
                 rows={4}
               />
             </Field>
-            {kind === "event" ? (
+            {kind === "event" && source === "Google Calendar" ? (
               <Text variant="small" color="secondary">
                 Editing the description replaces Google Calendar formatting with plain text. Leave
                 it unchanged to preserve formatting.

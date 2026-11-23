@@ -375,7 +375,9 @@ function CalendarProblem({ calendar }: { calendar: ReturnType<typeof useCalendar
         </Button>
       }
     >
-      {sourceHint(data, "Google Calendar")}
+      {data.state === "not-connected"
+        ? "Sign in with Google or allow access to your Mac calendars in Settings to see your calendar."
+        : sourceHint(data, "Google Calendar")}
     </Callout>
   );
 }

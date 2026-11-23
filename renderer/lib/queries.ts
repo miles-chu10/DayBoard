@@ -13,6 +13,7 @@ import type {
   CalendarEventItem,
   CalendarListResult,
   DataChangedEvent,
+  MacCalendarsResult,
   MailItem,
   McpServerConfig,
   ReminderItem,
@@ -38,6 +39,7 @@ export const queryKeys = {
   calendarRange: (startDate: string, days: number) =>
     ["calendar", "range", startDate, days] as const,
   calendars: ["calendars"],
+  macCalendars: ["mac-calendars"],
   itemLists: (source: "tasks" | "reminders") => ["item-lists", source] as const,
   review: ["review"],
   mcpServers: ["mcp-servers"],
@@ -53,6 +55,7 @@ const DATA_KEYS = [
   queryKeys.mail,
   queryKeys.calendar,
   queryKeys.calendars,
+  queryKeys.macCalendars,
   queryKeys.review,
 ];
 
@@ -159,6 +162,16 @@ export function useCalendars(enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.calendars,
     queryFn: () => invoke<CalendarListResult>("calendar:listCalendars"),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Calendar access and the calendars in the Mac Calendar app, such as iCloud ones. */
+export function useMacCalendars(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.macCalendars,
+    queryFn: () => invoke<MacCalendarsResult>("calendar:listMacCalendars"),
     enabled,
     staleTime: 5 * 60_000,
   });
@@ -663,6 +676,22 @@ export function useConnectGoogle() {
       );
     },
     onError: (error) => toast.error(`Couldn't sign in with Google: ${errorMessage(error)}`),
+  });
+}
+
+export function useRequestCalendarAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => invoke<AccountsStatus>("calendar:requestAccess"),
+    onSuccess: (status) => {
+      queryClient.setQueryData(queryKeys.accounts, status);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.calendar });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.macCalendars });
+      if (status.calendar !== "full-access") {
+        toast.error("Calendar access wasn't granted. You can turn it on in System Settings.");
+      }
+    },
+    onError: (error) => toast.error(`Couldn't request Calendar access: ${errorMessage(error)}`),
   });
 }
 

@@ -10,10 +10,8 @@ import {
   createTask,
   listCalendars,
   listCompletedTasks,
-  listEventsBetween,
   listTasksWithCoverage,
   listTaskLists,
-  listEventsWithCoverage,
   listEventsBetweenWithCoverage,
   setTaskCompleted,
 } from "../services/google-api.js";
@@ -45,6 +43,15 @@ import {
   requestRemindersAccess,
   setReminderCompleted,
 } from "../services/apple-reminders.js";
+import {
+  createAppleEvent,
+  getCalendarAccess,
+  getMacCalendars,
+  listCalendarEvents,
+  openCalendarPrivacySettings,
+  requestCalendarAccess,
+} from "../services/apple-calendar.js";
+import { newEventDestination } from "../../shared/apple-calendar.js";
 import { calendarRangeDays } from "../services/calendar-range.js";
 import {
   trackPendingWrite as trackProductivityWrite,
@@ -90,8 +97,11 @@ import type {
   AgendaScopedState,
   AgendaState,
   AccountsStatus,
+  CalendarEventItem,
   CalendarListResult,
+  CreateEventInput,
   ItemListInfo,
+  MacCalendarsResult,
   ReminderItem,
   ReviewData,
   SourceResult,
@@ -198,12 +208,13 @@ function requireUUID(value: unknown, channel: string): string {
 
 export async function getAccountsStatus(): Promise<AccountsStatus> {
   if (isDemoMode()) return demoAccounts;
-  const [google, gmail, reminders] = await Promise.all([
+  const [google, gmail, reminders, calendar] = await Promise.all([
     getGoogleStatus(),
     getGmailStatus(),
     getRemindersAccess(),
+    getCalendarAccess(),
   ]);
-  return { google, gmail, reminders };
+  return { google, gmail, reminders, calendar };
 }
 
 async function agendaScope(): Promise<string | null> {
@@ -219,6 +230,26 @@ async function agendaScope(): Promise<string | null> {
 
 function scopedAgenda(scope: string, state: AgendaState): AgendaScopedState {
   return { scope, state };
+}
+
+/** Where a new event goes: the "New events go to" setting, Google's connection and Mac access. */
+export async function newEventTarget() {
+  const [settings, google, access] = await Promise.all([
+    getSettings(),
+    getGoogleStatus(),
+    getCalendarAccess(),
+  ]);
+  return newEventDestination(settings.calendar.newEvents, google.connected, access);
+}
+
+/** Adds an event where new events go: Google Calendar or a Mac calendar. Returns its identity. */
+export async function createCalendarEvent(
+  input: CreateEventInput,
+): Promise<{ calendarId: string; eventId: string }> {
+  const destination = await newEventTarget();
+  return destination.kind === "google"
+    ? createEvent(input)
+    : createAppleEvent(input, destination.calendarId ?? undefined);
 }
 
 export async function requireAgendaScope(): Promise<string> {
@@ -316,6 +347,43 @@ async function googleBoundedList<T>(
     logger.error("productivity", `${channel} failed`, error);
     throw error;
   }
+}
+
+function googleAuthReason(error: unknown) {
+  return error instanceof GoogleAuthError ? error.reason : null;
+}
+
+/** Google Calendar and Mac calendar events between two instants, as the one calendar source. */
+export async function calendarEvents(
+  channel: string,
+  start: Date,
+  end: Date,
+  visibility: Record<string, boolean>,
+): Promise<SourceResult<CalendarEventItem>> {
+  const { email, connected } = await getGoogleStatus();
+  try {
+    return await listCalendarEvents({
+      start,
+      end,
+      visibility,
+      googleEmail: email,
+      googleConnected: connected,
+      google: () => listEventsBetweenWithCoverage(start, end, visibility, email),
+      authReason: googleAuthReason,
+    });
+  } catch (error) {
+    logger.error("productivity", `${channel} failed`, error);
+    throw error;
+  }
+}
+
+/** Local midnight today through `days` days later. */
+function daysFromToday(days: number): { start: Date; end: Date } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + days);
+  return { start, end };
 }
 
 async function remindersList<T>(load: () => Promise<T[]>): Promise<SourceResult<T>> {
@@ -432,8 +500,17 @@ async function verifyAgendaAvailability(input: AgendaCreateBlockInput): Promise<
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date(`${input.date}T00:00:00.000Z`);
   end.setUTCDate(end.getUTCDate() + 2);
-  const result = await listEventsBetweenWithCoverage(start, end, settings.calendar.visibility);
-  if (!result.coverage.complete) {
+  const result = await calendarEvents(
+    "agenda:createBlock",
+    start,
+    end,
+    settings.calendar.visibility,
+  );
+  if (result.state !== "ok")
+    throw new Error(
+      "Calendar availability couldn't be checked. Reconnect your calendar and try again.",
+    );
+  if (!result.coverage?.complete) {
     throw new Error(
       "Calendar availability is only partially loaded. Refresh the calendar and try again.",
     );
@@ -789,18 +866,12 @@ export function registerProductivityHandlers(): void {
     ipcMain.broadcast("data:changed", { source: "mail" });
   });
 
-  // Google Calendar
+  // Calendar: Google Calendar plus the calendars in the Mac's Calendar app.
   ipcMain.handle("calendar:list", async () => {
     const settings = await getSettings();
     if (isDemoMode()) return demoEventsForDays(calendarRangeDays(settings.calendar.range));
-    const { email } = await getGoogleStatus();
-    return googleBoundedList("calendar:list", () =>
-      listEventsWithCoverage(
-        calendarRangeDays(settings.calendar.range),
-        settings.calendar.visibility,
-        email,
-      ),
-    );
+    const { start, end } = daysFromToday(calendarRangeDays(settings.calendar.range));
+    return calendarEvents("calendar:list", start, end, settings.calendar.visibility);
   });
 
   ipcMain.handle("calendar:listRange", async (_event, payload: unknown) => {
@@ -815,10 +886,7 @@ export function registerProductivityHandlers(): void {
     if (!settings.sources.calendar.enabled) return { state: "disabled" as const };
     const { start, end } = localDateRange(startDate, days as number);
     if (isDemoMode()) return demoEventsBetween(start, end);
-    const { email } = await getGoogleStatus();
-    return googleBoundedList(channel, () =>
-      listEventsBetweenWithCoverage(start, end, settings.calendar.visibility, email),
-    );
+    return calendarEvents(channel, start, end, settings.calendar.visibility);
   });
 
   ipcMain.handle("calendar:listCalendars", async (): Promise<CalendarListResult> => {
@@ -830,6 +898,25 @@ export function registerProductivityHandlers(): void {
       logger.error("productivity", "calendar:listCalendars failed", error);
       throw error;
     }
+  });
+
+  ipcMain.handle("calendar:listMacCalendars", async (): Promise<MacCalendarsResult> => {
+    if (isDemoMode()) return { access: "not-determined", calendars: [] };
+    const { email } = await getGoogleStatus();
+    return getMacCalendars(email);
+  });
+
+  ipcMain.handle("calendar:requestAccess", async () => {
+    assertNotDemo("calendar:requestAccess");
+    await requestCalendarAccess();
+    const status = await broadcastAccounts();
+    ipcMain.broadcast("data:changed", { source: "calendar" });
+    return status;
+  });
+
+  ipcMain.handle("calendar:openSettings", () => {
+    assertNotDemo("calendar:openSettings");
+    return openCalendarPrivacySettings();
   });
 
   ipcMain.handle("calendar:create", async (_event, payload: unknown) => {
@@ -845,7 +932,12 @@ export function registerProductivityHandlers(): void {
       notes: optionalString(input, "notes", channel),
     };
     if (!event.date) throw new Error("Events need a date.");
-    await trackProductivityWrite(() => googleMutation(channel, () => createEvent(event)));
+    const destination = await newEventTarget();
+    await trackProductivityWrite(() =>
+      destination.kind === "google"
+        ? googleMutation(channel, () => createEvent(event))
+        : createAppleEvent(event, destination.calendarId ?? undefined),
+    );
     ipcMain.broadcast("data:changed", { source: "calendar" });
   });
 
@@ -972,9 +1064,7 @@ export function registerProductivityHandlers(): void {
         ? remindersList(() => listCompletedReminders(since))
         : Promise.resolve({ state: "disabled" as const }),
       settings.sources.calendar.enabled
-        ? googleList("review:events", () =>
-            listEventsBetween(since, new Date(), settings.calendar.visibility),
-          )
+        ? calendarEvents("review:events", since, new Date(), settings.calendar.visibility)
         : Promise.resolve({ state: "disabled" as const }),
     ]);
     return { since: since.toISOString(), tasks, reminders, events };

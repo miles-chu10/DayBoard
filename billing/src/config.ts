@@ -17,6 +17,8 @@ export interface Env {
   RESEND_API_KEY?: string;
   /** Optional sender of the license key email: an address, or `Name <address>`. */
   MAIL_FROM?: string;
+  /** Optional postal address shown at the foot of update emails, on one line. */
+  UPDATES_POSTAL_ADDRESS?: string;
 }
 
 export interface Config {

@@ -524,7 +524,9 @@ function AssistantSession({
       canCreate: {
         task: googleConnected && sourceOn(settings, "tasks"),
         reminder: accounts.data?.reminders === "full-access" && sourceOn(settings, "reminders"),
-        event: googleConnected && sourceOn(settings, "calendar"),
+        event:
+          (googleConnected || accounts.data?.calendar === "full-access") &&
+          sourceOn(settings, "calendar"),
       },
       meetingNotes: notesOn
         ? Object.fromEntries(
