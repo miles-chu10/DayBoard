@@ -35,6 +35,7 @@ import type { AppSettings, SourceId, SourceResult } from "@main/shared-types";
 import { assistantProvider, useAssistantModel } from "../lib/ai-models";
 import { eventDayKey, formatTimeOfDay, isEventPast, toISODate } from "../lib/dates";
 import { modelSummary } from "../lib/model-choices";
+import { connectionStatus } from "../lib/connection-status";
 import { visibleNav, type NavItem } from "../lib/navigation";
 import { needsYou } from "../lib/home";
 import { readTriageMap, useTriageChanges } from "../lib/triage";
@@ -114,6 +115,9 @@ function sourceSubtitle(
   if (loaded) return loaded;
   return empty;
 }
+
+const CONNECTION_BADGE = { ok: "green", attention: "orange", off: "gray" } as const;
+const CONNECTION_TEXT = { ok: "green", attention: "orange", off: "secondary" } as const;
 
 type MainNavId = "home" | "agenda" | "notes" | SourceId;
 
@@ -209,17 +213,19 @@ export function AppSidebar() {
   const google = accounts.data?.google;
   const name = knownName(settings, google?.email, accounts.data?.macName) || "DayBoard";
   const remindersOk = accounts.data?.reminders === "full-access";
-  const connected = Boolean(google?.connected);
+  const connection = connectionStatus({
+    google,
+    googleSources: [
+      sourceOn(settings, "tasks") ? tasks.data : undefined,
+      sourceOn(settings, "calendar") ? calendar.data : undefined,
+    ],
+    remindersOk: remindersOk || !sourceOn(settings, "reminders"),
+  });
   const connectionDetail = [
-    google?.connected ? `Google: ${google.email ?? "connected"}` : "Google: not connected",
+    connection.googleDetail,
     `Apple Reminders: ${remindersOk ? "allowed" : "not allowed"}`,
     "Change your name or picture in Settings → General.",
   ].join("\n");
-  const status = !connected
-    ? "Google not connected"
-    : remindersOk || !sourceOn(settings, "reminders")
-      ? "Connected"
-      : "Connected · Reminders off";
   const showAssistant = featureOn(settings, "assistant");
   const showReview = featureOn(settings, "weeklyReview");
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -402,7 +408,7 @@ export function AppSidebar() {
                     <Avatar size="small" className="shrink-0">
                       {avatar.dataUrl ? <AvatarImage src={avatar.dataUrl} alt={name} /> : null}
                       <AvatarFallback>{initials(name)}</AvatarFallback>
-                      <AvatarBadge color={connected ? "green" : "gray"} />
+                      <AvatarBadge color={CONNECTION_BADGE[connection.tone]} />
                     </Avatar>
                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-1.5">
@@ -411,8 +417,8 @@ export function AppSidebar() {
                         </Text>
                         <ProBadge />
                       </div>
-                      <Text variant="small" color={connected ? "green" : "secondary"} truncate>
-                        {status}
+                      <Text variant="small" color={CONNECTION_TEXT[connection.tone]} truncate>
+                        {connection.label}
                       </Text>
                     </div>
                   </button>
