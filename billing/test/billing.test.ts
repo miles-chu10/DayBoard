@@ -983,7 +983,7 @@ test("receipt page gives the app's activation steps, the 7-day browser limit and
     menu,
     /label: "DayBoard",\s*submenu:[\s\S]*?label: "Settings…",\s*accelerator: "Command\+,"/,
   );
-  assert.match(tabs, /<TabsTrigger value="license">License<\/TabsTrigger>/);
+  assert.match(tabs, /\{ id: "license", title: "License", icon: \w+ \}/);
   assert.match(tab, /<Field label="License key"[\s>]/);
   assert.match(tab, /"Activating…" : "Activate"/);
   assert.match(tab, /"Deactivate this device"/);
