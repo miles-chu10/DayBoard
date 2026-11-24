@@ -43,14 +43,42 @@ if (launchDaysLeft > 0 && launchDaysLeft <= 60) {
   }
 }
 
-// After a download starts, show the next step and the Pro offer nearest that download button.
+// A download button first opens the thanks page, which starts the download. That page view is how
+// started downloads are counted (Cloudflare Web Analytics, no cookies), because GitHub's own
+// download count also includes the Terminal installer, release checks and bots. Only the version
+// travels, in the URL fragment, so the thanks page can only ever fetch a DayBoard release DMG.
+const RELEASE_VERSION = /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
+const dmgUrl = (version) =>
+  `https://github.com/miles-chu10/DayBoard/releases/download/v${version}/DayBoard-${version}-arm64.dmg`;
 for (const link of document.querySelectorAll("a[data-download]")) {
-  link.addEventListener("click", () => {
+  link.addEventListener("click", (event) => {
+    const version = /\/releases\/download\/v([^/]+)\//.exec(link.href ?? "")?.[1] ?? "";
+    const plain = !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (plain && RELEASE_VERSION.test(version) && link.href === dmgUrl(version)) {
+      event.preventDefault();
+      location.assign(`thanks.html#${version}`);
+      return;
+    }
+    // Otherwise the browser downloads the file directly: show the next step beside the button.
     let scope = link.parentElement;
     while (scope && !scope.querySelector("[data-download-started]")) scope = scope.parentElement;
     const note = scope?.querySelector("[data-download-started]");
     if (note) note.hidden = false;
   });
+}
+const downloadStart = document.querySelector("[data-download-start]");
+if (downloadStart) {
+  const version = (location.hash ?? "").slice(1);
+  if (RELEASE_VERSION.test(version)) {
+    const url = dmgUrl(version);
+    const link = downloadStart.querySelector("[data-download-link]");
+    if (link) link.href = url;
+    downloadStart.hidden = false;
+    const idle = document.querySelector("[data-download-idle]");
+    if (idle) idle.hidden = true;
+    // The response is a file, so the page stays put while the download begins.
+    setTimeout(() => location.assign(url), 1000);
+  }
 }
 
 const contactEmail = /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(SITE_CONFIG.contactEmail)

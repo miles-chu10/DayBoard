@@ -87,7 +87,7 @@ test("the download page offers DayBoard Pro beside the download, in its HTML", a
 test("every site buy link names where it sits, and its HTML link carries that tag", async () => {
   const address = source.match(/buyUrl: "([^"]*)"/)[1];
   const tags = new Set();
-  for (const name of ["index.html", "download.html", "pricing.html"]) {
+  for (const name of ["index.html", "download.html", "pricing.html", "thanks.html"]) {
     const page = await readFile(new URL(`../website/${name}`, import.meta.url), "utf8");
     const links = [...page.matchAll(/<a\b[^>]*\bdata-buy\b[^>]*>/g)].map(([tag]) => tag);
     assert.ok(links.length > 0, name);
@@ -101,6 +101,7 @@ test("every site buy link names where it sits, and its HTML link carries that ta
   assert.deepEqual([...tags].sort(), [
     "download-page",
     "download-started",
+    "download-thanks",
     "home-download-started",
     "pricing",
   ]);
