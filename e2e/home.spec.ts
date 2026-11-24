@@ -1,7 +1,7 @@
 import type { DayboardBridge } from "../shared/bridge-protocol";
 import type { AppSettings } from "../main/shared-types";
 import { expect, test, type Page } from "@playwright/test";
-import { launchDemo } from "./fixtures";
+import { launchDemo, waitUntilClearOfMidnight } from "./fixtures";
 
 function sidebarItem(page: Page, title: string) {
   return page
@@ -13,6 +13,9 @@ function sidebarItem(page: Page, title: string) {
 test("Home greets, ranks what needs you, suggests tasks from mail and shows the Agenda", async ({
   playwright: _playwright,
 }, testInfo) => {
+  // Checks today's Agenda, so it must not straddle midnight.
+  testInfo.setTimeout(testInfo.timeout + 95_000);
+  await waitUntilClearOfMidnight();
   const demo = await launchDemo();
   try {
     const page = demo.page;

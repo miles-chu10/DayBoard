@@ -131,7 +131,7 @@ export function MailView() {
           leading={<HistoryNav />}
           viewportClassName="[&>div]:block!"
           title={<SourceHeading source="mail">Inbox</SourceHeading>}
-          subtitle={messages ? `Gmail · ${messages.length} recent · ${unread} unread` : "Gmail"}
+          subtitle={messages ? `${messages.length} recent · ${unread} unread` : undefined}
           actions={
             <>
               <WindowActions />

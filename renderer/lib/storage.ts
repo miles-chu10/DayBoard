@@ -24,3 +24,11 @@ export function readStored<T>(key: string, guard: (value: unknown) => value is T
 export function writeStored(key: string, value: unknown): void {
   localStorage.setItem(namespace + key, JSON.stringify(value));
 }
+
+export function removeStored(key: string): void {
+  try {
+    localStorage.removeItem(namespace + key);
+  } catch {
+    // Storage unavailable: there is nothing to remove.
+  }
+}

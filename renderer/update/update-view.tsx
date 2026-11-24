@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Wrench, ListChecks } from "lucide-react";
 import type { AppUpdateState, UpdateWindowState } from "@shared/app-updates";
-import {
-  CHANGELOG_URL,
-  displayVersion,
-  sectionTitle,
-  type ReleaseNoteInline,
-  type ReleaseNotes,
-} from "@shared/release-notes";
+import { CHANGELOG_URL, displayVersion, type ReleaseNotes } from "@shared/release-notes";
 import { Button, Callout, Checkbox } from "@renderer/ui";
 import appIcon from "../../app-icon.png";
 import { appUpdatesQueryKey, useAppUpdates } from "../lib/app-updates";
 import { errorMessage, invoke, openExternal } from "../lib/ipc";
+import { NotesBody } from "../components/release-notes-body";
 
 const windowKey = ["update-window"] as const;
 
@@ -41,79 +35,6 @@ export function UpdateView() {
     <PromptView state={windowState} update={update} version={windowState.version} />
   ) : (
     <ProgressView update={update} />
-  );
-}
-
-function Inline({ parts }: { parts: readonly ReleaseNoteInline[] }) {
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.kind === "strong" ? (
-          <strong key={index} className="font-semibold text-primary">
-            {part.text}
-          </strong>
-        ) : part.kind === "code" ? (
-          <code key={index} className="rounded bg-control-subtle px-1 font-mono text-[0.92em]">
-            {part.text}
-          </code>
-        ) : part.kind === "link" ? (
-          <button
-            key={index}
-            type="button"
-            className="text-link underline-offset-2 hover:underline"
-            onClick={() => void openExternal(part.href)}
-          >
-            {part.text}
-          </button>
-        ) : (
-          <span key={index}>{part.text}</span>
-        ),
-      )}
-    </>
-  );
-}
-
-function NotesBody({ notes }: { notes: ReleaseNotes }) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-large font-semibold text-primary">
-        DayBoard {displayVersion(notes.version)}
-        {notes.subtitle ? (
-          <span className="block text-regular font-normal text-secondary">{notes.subtitle}</span>
-        ) : null}
-      </h2>
-      {notes.summary.map((paragraph, index) => (
-        <p key={index} className="text-regular text-secondary">
-          <Inline parts={paragraph} />
-        </p>
-      ))}
-      {notes.sections.map((section, index) => {
-        const Icon =
-          section.kind === "new" ? Sparkles : section.kind === "fixed" ? Wrench : ListChecks;
-        return (
-          <section key={index} className="space-y-2">
-            <h3 className="flex items-center gap-1.5 text-regular font-semibold text-primary">
-              <Icon className="size-4 text-accent" aria-hidden />
-              {sectionTitle(section)}
-            </h3>
-            {section.paragraphs.map((paragraph, p) => (
-              <p key={p} className="text-regular text-secondary">
-                <Inline parts={paragraph} />
-              </p>
-            ))}
-            {section.items.length ? (
-              <ul className="list-disc space-y-1.5 pl-5 text-regular text-secondary marker:text-tertiary">
-                {section.items.map((item, i) => (
-                  <li key={i}>
-                    <Inline parts={item} />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-        );
-      })}
-    </div>
   );
 }
 

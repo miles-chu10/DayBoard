@@ -28,6 +28,7 @@ import { debounce } from "../../shared/debounce";
 
 import { clearAccountScopedQueries, refreshMeetingNotes } from "./account-scoped-queries";
 import { errorMessage, invoke } from "./ipc";
+import { clearLaunchCache } from "./launch-cache";
 import { settingsQueryKey, settingsSaveInFlight, sourceOn, useSettings } from "./settings";
 import { buildTodos, linkedKeys, type Todo } from "./todos";
 
@@ -232,6 +233,7 @@ export function useBackendSync() {
       }),
       ipc.onNotification("accounts:changed", () => {
         // Never show a prior account's cached data during a reconnect or switch.
+        clearLaunchCache();
         for (const queryKey of [...DATA_KEYS, queryKeys.agendaScope])
           void queryClient.resetQueries({ queryKey });
         void queryClient.cancelQueries({ queryKey: ["agenda", "state"] });

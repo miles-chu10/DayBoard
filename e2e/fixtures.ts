@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import packageJson from "../package.json" with { type: "json" };
 import {
   prepareIsolatedProfile,
   resolveProfileOverride,
@@ -113,6 +114,26 @@ async function launchIsolated(profile?: string, demoMode = true): Promise<DemoAp
   };
 }
 
+/**
+ * Demo data is dated when the app builds it and "today" is read again as views render. A run
+ * that crosses local midnight sees today's items turn overdue mid-test, so a test that checks
+ * today's items waits until the new day has started. Returns how long it waited.
+ */
+export async function waitUntilClearOfMidnight(marginMs = 90_000): Promise<number> {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const untilMidnight = midnight.getTime() - now.getTime();
+  if (untilMidnight > marginMs) return 0;
+  const wait = untilMidnight + 2_000;
+  await new Promise((resolve) => setTimeout(resolve, wait));
+  return wait;
+}
+
+export function packageVersion(): string {
+  return packageJson.version;
+}
+
 export function launchDemo(profile?: string): Promise<DemoApp> {
   return launchIsolated(profile);
 }
@@ -132,6 +153,12 @@ export async function createEmptyProfile(
       ai: { enabled: false, providerChosen: false },
       mcpServer,
     }),
+  );
+  // This profile stands in for an existing install of this version, not the first launch after
+  // an update; e2e/whats-new.spec.ts removes the record to test that launch.
+  await writeFile(
+    path.join(profile, "whats-new.json"),
+    JSON.stringify({ seenVersion: packageVersion() }),
   );
   return profile;
 }

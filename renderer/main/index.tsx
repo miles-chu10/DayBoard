@@ -7,6 +7,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Text, TooltipProvider, Toaster } from "@renderer/ui";
 import { applyCachedAppearance } from "../lib/appearance";
 import { initializeDemoMode } from "../lib/demo";
+import { invoke } from "../lib/ipc";
+import { hydrateLaunchCache, startLaunchCacheWriter } from "../lib/launch-cache";
+import { queryKeys } from "../lib/queries";
+import type { AccountsStatus } from "@main/shared-types";
 import { UpdateBoundary } from "../components/update-boundary";
 
 declare const __APP_DISPLAY_NAME__: string | undefined;
@@ -22,8 +26,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 try {
   // Fail closed if the backend cannot determine the mode: no cached real data may render first.
-  await initializeDemoMode();
+  const demo = await initializeDemoMode();
   applyCachedAppearance();
+  // Demo data is already instant and must never mix with a real account's saved copy.
+  if (!demo) await restoreLastDashboard();
   root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
@@ -49,6 +55,26 @@ try {
       </div>
     </main>,
   );
+}
+
+/**
+ * Shows the last session's dashboard at once when it belongs to the account signed in now. The
+ * account check is bounded: if it is slow, DayBoard starts empty and loads as it always did.
+ */
+async function restoreLastDashboard(): Promise<void> {
+  try {
+    const accounts = await Promise.race([
+      invoke<AccountsStatus>("accounts:getStatus"),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500)),
+    ]);
+    if (accounts) {
+      queryClient.setQueryData(queryKeys.accounts, accounts);
+      hydrateLaunchCache(queryClient, accounts);
+    }
+  } catch {
+    // Without a known account nothing saved is shown.
+  }
+  startLaunchCacheWriter(queryClient, queryKeys.accounts);
 }
 
 // Hot Module Replacement (HMR) support

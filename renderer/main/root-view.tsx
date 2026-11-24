@@ -19,6 +19,10 @@ import { useSettingsEditor } from "../lib/settings";
 import { OnboardingDialog } from "../components/onboarding-dialog";
 import { invoke } from "../lib/ipc";
 import { TabStrip, TabsProvider } from "../components/tab-strip";
+import { SavedCopyNotice } from "../components/saved-copy-notice";
+import { WhatsNewDialog } from "../components/whats-new-dialog";
+import { useWhatsNewState, type WhatsNewState } from "../lib/whats-new";
+import { useQueryClient } from "@tanstack/react-query";
 
 const LAUNCH_ROUTE: Record<
   LaunchView,
@@ -53,6 +57,23 @@ export function RootView() {
   // A new install shows the welcome until it's finished or skipped; Help reopens it.
   const [welcomeRequested, setWelcomeRequested] = React.useState(false);
   const welcomeOpen = welcomeRequested || settings?.general.onboarded === false;
+  // What's New opens once after an update, and again from Help or Settings.
+  const queryClient = useQueryClient();
+  const whatsNewState = useWhatsNewState();
+  const [whatsNewRequested, setWhatsNewRequested] = React.useState(false);
+  const whatsNewVersion =
+    !welcomeOpen && (whatsNewRequested || whatsNewState.data?.show)
+      ? whatsNewState.data?.version
+      : undefined;
+  const closeWhatsNew = () => {
+    setWhatsNewRequested(false);
+    const state = whatsNewState.data;
+    if (!state) return;
+    if (state.show) {
+      queryClient.setQueryData<WhatsNewState>(["whats-new"], { ...state, show: false });
+      void invoke("whatsNew:seen", state.version).catch(() => undefined);
+    }
+  };
   const finishWelcome = () => {
     setWelcomeRequested(false);
     if (settings?.general.onboarded === false)
@@ -71,7 +92,9 @@ export function RootView() {
         welcome?: unknown;
         item?: unknown;
         date?: unknown;
+        whatsNew?: unknown;
       } | null;
+      if (target?.whatsNew === true) setWhatsNewRequested(true);
       if (!target || typeof target.to !== "string" || !(target.to in ROUTE_BY_PATH)) return;
       launched.current = true;
       if (target.welcome === true) setWelcomeRequested(true);
@@ -111,6 +134,9 @@ export function RootView() {
                   <Shell />
                 </TabsProvider>
                 {welcomeOpen ? <OnboardingDialog onDone={finishWelcome} /> : null}
+                {whatsNewVersion ? (
+                  <WhatsNewDialog version={whatsNewVersion} onClose={closeWhatsNew} />
+                ) : null}
               </ShellProvider>
             </MeetingPrepProvider>
           </SubscriptionsProvider>
@@ -136,6 +162,7 @@ function Shell() {
       <CommandMenu />
       <div data-window-content className="flex h-full min-h-0 flex-col bg-background">
         <TabStrip />
+        <SavedCopyNotice />
         <div className="min-h-0 flex-1">
           <Outlet />
         </div>

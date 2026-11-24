@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import { app, ipcMain } from "../platform/index.js";
 import { isAppStoreBuild } from "../../shared/app-store-build.js";
 import { isDemoMode } from "../services/demo-data.js";
@@ -6,6 +8,10 @@ import { createReleaseNotesReader } from "../services/release-notes.js";
 import { updatePreferences } from "../services/update-preferences.js";
 import { createUpdatePrompt } from "../services/update-prompt.js";
 import { createUpdateWindowHost } from "../update-window.js";
+import { getSettings } from "../services/settings-store.js";
+import { createJsonStore } from "../services/json-store.js";
+import { parseWhatsNew, whatsNewDecision } from "../services/whats-new.js";
+import { focusMainWindow, isMainRoute } from "../window.js";
 
 export interface UpdateHandlerOptions {
   prepareForInstall: () => Promise<void>;
@@ -57,5 +63,34 @@ export function registerUpdateHandlers(options: UpdateHandlerOptions) {
   );
   ipcMain.handle("updates:closeWindow", () => host.close());
   ipcMain.handle("updates:preferences", () => updatePreferences.read());
+  registerWhatsNewHandlers();
   return Object.assign(updates, { checkNow: () => prompt.checkNow() });
+}
+
+/** What's New: shown once in the dashboard after each update, and on request from Help or Settings. */
+function registerWhatsNewHandlers() {
+  const current = app.getVersion();
+  const whatsNewStore = createJsonStore({
+    path: () => path.join(app.getPath("userData"), "whats-new.json"),
+    parse: parseWhatsNew,
+  });
+  ipcMain.handle("whatsNew:state", async () => {
+    const [{ seenVersion }, settings] = await Promise.all([whatsNewStore.read(), getSettings()]);
+    const decision = whatsNewDecision({
+      current,
+      seen: seenVersion,
+      onboarded: settings.general.onboarded,
+      demo: isDemoMode(),
+    });
+    if (decision.record) await whatsNewStore.update(() => ({ seenVersion: decision.record }));
+    return { version: current, show: decision.show };
+  });
+  ipcMain.handle("whatsNew:seen", async (_event, version: unknown) => {
+    if (version !== current) throw new Error("whatsNew:seen: not the running version");
+    if (isDemoMode()) return;
+    await whatsNewStore.update(() => ({ seenVersion: current }));
+  });
+  ipcMain.handle("whatsNew:open", async (_event, to: unknown) => {
+    await focusMainWindow({ ...(isMainRoute(to) ? { to } : {}), whatsNew: true });
+  });
 }
