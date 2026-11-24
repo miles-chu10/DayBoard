@@ -18,19 +18,19 @@
   <a href="LICENSE">GPL-3.0-only</a>
 </p>
 
-[![DayBoard 1.3.9 Home: Needs you, Suggested, Meetings and Your tasks, using fictional demo data](docs/screenshots/light-home.png)](https://getdayboard.com)
+[![DayBoard 1.3.14 Home: Needs you, Suggested, Meetings and Your tasks, using fictional demo data](docs/screenshots/light-home.png)](https://getdayboard.com)
 
 DayBoard brings your tasks, reminders, calendar, and inbox into a standalone macOS app. Home shows
 what needs your attention, suggested tasks, meetings and your to-dos for today or this week. Open
 the optional Assistant beside any page, keep your work in tabs, and save useful conversations as
 Markdown notes.
 
-> **Beta 18:** [1.3.0-beta.18](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.0-beta.18)
-> is a free community beta for **macOS 14+ on Apple Silicon**. The app and its disk image are
-> signed with an Apple Developer ID, notarized by Apple and stapled. Starting with beta 12,
-> DayBoard updates itself from GitHub releases. Existing beta 12 and later installations download
-> updates in the background and install on restart or quit. See
-> [what changed in beta 18](docs/release-notes-1.3.0-beta.18.md).
+> **DayBoard 1.3.14** ([release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.14))
+> is free for **macOS 14+ on Apple Silicon**. AI features need DayBoard Pro, $5 once at the launch
+> price, after a 14-day free trial ([pricing](https://getdayboard.com/pricing)). The app and its
+> disk image are signed with an Apple Developer ID, notarized by Apple and stapled. DayBoard
+> updates itself from GitHub releases in the background and installs on restart or quit. See
+> [what changed in 1.3.14](docs/release-notes-1.3.14.md).
 > Google hasn't verified DayBoard yet, so Google shows an "unverified app" warning when you
 > connect and limits how many accounts can connect.
 
@@ -53,14 +53,16 @@ Markdown notes.
 
 The current packaged app requires **an Apple Silicon Mac running macOS 14 or later**.
 
-1. **Download beta 18** from its
-   [GitHub release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.0-beta.18) and follow
-   the [install guide](https://getdayboard.com/beta), or [build from source](#development).
-   [SHA256SUMS.txt](https://github.com/miles-chu10/DayBoard/releases/download/v1.3.0-beta.18/SHA256SUMS.txt)
-   lists the download checksums. If you have beta 11 or earlier, install the current beta over it
-   once; your DayBoard data stays in place.
+1. **Download DayBoard 1.3.14** from its
+   [GitHub release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.14) or
+   [getdayboard.com](https://getdayboard.com) and follow the
+   [install guide](https://getdayboard.com/beta), or [build from source](#development).
+   [SHA256SUMS.txt](https://github.com/miles-chu10/DayBoard/releases/download/v1.3.14/SHA256SUMS.txt)
+   lists the download checksums. If you have beta 11 or earlier, install the current version over
+   it once; your DayBoard data stays in place.
 2. **Connect your sources.** On first launch, a short welcome walks you through signing in with
-   Google for Tasks, Gmail, and Calendar and allowing Apple Reminders. Skip anything and do it later
+   Google for Tasks and Calendar, connecting Gmail with an app password from your Google account,
+   and allowing Apple Reminders. Skip anything and do it later
    in **Settings → Sources**; **Help → Welcome to DayBoard…** shows the welcome again.
 3. **Choose your AI provider**, if you want AI features, in the welcome or **Settings → AI**. Each
    AI feature can be turned off.

@@ -1,12 +1,12 @@
 # Screenshot gallery
 
-Captured November 17, 2026 (Pacific) from DayBoard `1.3.9`, app source
-`319c08a` (tag `v1.3.9` at `631275c` plus a billing-only commit), using the repository's fictional
-demo fixtures.
+Captured November 24, 2026 (Pacific) on a Mac from app source `232f072` (main after #184, the
+code that ships as DayBoard 1.3.14; its package version still read 1.3.13), using the repository's
+fictional demo fixtures. Captured with Node 26.
 
 Each theme includes Home, the docked Assistant, Agenda, Calendar week/month, Tasks, Reminders,
-Inbox, the full Assistant and Settings. Main windows are 1280×820 logical pixels, captured at
-2560×1640 on a Retina display. Settings uses its own window size.
+Inbox, the full Assistant, Settings and the menu bar panel. Main windows are 1280×820 logical pixels, captured at
+2560×1640 on a Retina display. Settings (1640×1416) and the menu bar panel (720×1240) use their own window sizes.
 
 Regenerate on macOS with `npm run screenshots`. The script builds with `DAYBOARD_TEST=1`, creates
 a disposable demo profile for each theme, checks that profile isolation is active, waits for
