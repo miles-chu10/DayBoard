@@ -1,101 +1,101 @@
 # DayBoard Product Hunt launch plan
 
-Launch DayBoard 1.0 on Product Hunt once five gates are green; run the free beta by email invite until then.
+Launch DayBoard on Product Hunt once Google has approved the Calendar and Tasks scopes and a clean-Mac dry run passes. Nothing is scheduled. Scheduling, posting and every launch-day email or post need Miles's OK at the time.
 
-## Recommendation
+Rewritten 2026-11-23. The first version (2026-09-23) predated notarized releases, pricing, the Sunbeam icon and the Gmail change, and several of its Product Hunt rules had gone stale.
 
-- **Launch 1.0 on Product Hunt, not the beta.** Product Hunt allows a relaunch only after a major update, about 6 months later. Launch-day visitors must be able to download, open DayBoard without a security warning, sign in with Google, and (if 1.0 is paid) buy it. The beta can't give the public that yet: it opens only through the Open Anyway flow, Google sign-in is limited to invited test users and shows an unverified-app warning, and there's nothing to buy.
-- **Until then, run the private beta** through the website's signup list. Invite testers in small batches, fix what they find, and collect quotes you may use at launch.
-- **Launch day:** a Tuesday–Thursday gives the most traffic and the most competition; a weekend is easier to rank on, and Product Hunt reports about 15% more "Visit" clicks on weekends. For a first indie launch, favor Saturday or Sunday unless your audience is already large. Go live at 12:01 AM Pacific.
+## Where things stand
 
-## Gates (all required before scheduling)
+| Gate                      | State on 2026-11-23                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Signed, notarized build   | Done. Releases are Developer ID signed and notarized, and the site's installer checks both.                                                                                    |
+| Purchase path             | Done. DayBoard Pro is a one-time license through Stripe, for up to 3 Macs, with a 14-day refund. Only the AI features are paid.                                                |
+| Free trial                | Done. Every new user gets AI free for 14 days with no card. The clock starts on first AI use, not on install (`shared/license.ts`).                                            |
+| Website and privacy page  | Done. `https://getdayboard.com`, with the privacy policy at `/privacy.html`.                                                                                                   |
+| Gmail                     | Done without a restricted scope. Mail uses IMAP and SMTP with an app password, so Google reviews only Calendar and Tasks. See `docs/launch/google-verification.md`.            |
+| Google OAuth verification | Open. Scope review was submitted on 2026-11-23. Until it is approved, new users see "Google hasn't verified this app" and the project is limited to 100 users in its lifetime. |
+| Fresh screenshots         | Open. The sidebar and Settings changed in 1.3.13, so gallery captures must be retaken on a Mac with `npm run screenshots`.                                                     |
+| Clean-Mac dry run         | Open. Download, open, Google sign-in, first AI use (trial starts), purchase, activation. Run it within a week of the launch date.                                              |
 
-| Gate                               | Why it blocks launch                                                                                                                                                                                                                                                  | Owner                    | Lead time                                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| **Google OAuth verification**      | The consent screen is in **Testing**: only listed test users can sign in (100 max), and they must sign in again every 7 days. Published but unverified, every visitor sees "Google hasn't verified this app" and the project gets only 100 new users in its lifetime. | Miles                    | Brand verification 2–3 business days; sensitive scopes days to weeks; restricted scope "several weeks" |
-| **Gmail decision**                 | Decided: Gmail ships after 1.0. `gmail.modify` is a **restricted** scope: a longer review, perhaps a security assessment (see below). Calendar (`calendar.events`, `calendar.calendarlist.readonly`) and `tasks` are sensitive: verification only.                    | Miles                    | None for 1.0. Gmail later: longer review, plus an assessment if Google requires one                    |
-| **Notarized build**                | Without Developer ID signing and notarization, every new user hits the "Open Anyway" flow. PR #8's release workflow automates this once secrets exist.                                                                                                                | Miles (Apple enrollment) | Enrollment + secrets                                                                                   |
-| **Purchase path** (if 1.0 is paid) | Price, activation limit, live Stripe product, deployed license service, refund and support policy.                                                                                                                                                                    | Miles                    | After pricing                                                                                          |
-| **Website live**                   | Domain, hosting, signup endpoint, **privacy policy page** (Google verification requires one that discloses Limited Use), support contact, absolute `og:image`. Deploy runbook: `docs/launch/website-deploy.md`.                                                       | Miles + agent            | Days once hosting is chosen                                                                            |
+Google verification is the hard gate. A launch that sends a few hundred strangers into an unverified-app warning, with a 100-user cap, wastes a day that cannot easily be repeated.
 
-Google's verification needs: a verified domain homepage, the privacy policy linked on the consent screen, and a demo video of the OAuth flow showing the app name, the client ID in the address bar, and each scope's feature. Ship 1.0 with Calendar, Tasks and Reminders, and add Gmail after its own review. Requirements, review times and their sources: `docs/launch/google-verification.md`.
+## Product Hunt rules
 
-**Gmail and the security assessment:** Google requires a security assessment (CASA) when an app accesses restricted-scope data from or through a third-party server ([Google's rules](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)). DayBoard reads Gmail directly on the Mac, but its optional AI features send the mail a user asks about to the AI provider they chose. Whether Google counts that as server access is unresolved and is Google's call in review, so ask when Gmail is submitted.
+Read from Product Hunt's help pages on 2026-11-23. Recheck them when scheduling.
 
-## Timeline (from the day all gates are green, "L")
+| Rule                                                                                         | What it means for DayBoard                                               |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| A launch runs 12:01 AM to midnight Pacific and can be scheduled up to 30 days ahead          | Schedule once Google approves. The maker comment goes up at 12:01 AM.    |
+| Makers can launch their own product                                                          | No hunter needed.                                                        |
+| Being featured is an editorial decision; an unfeatured launch still goes live                | The homepage cannot be guaranteed.                                       |
+| Never ask for upvotes, never pay for them, no extra accounts, no giveaways tied to votes     | Emails and posts say "we're live, I'd love your feedback" with the link. |
+| Name up to 40 characters, tagline up to 60, description up to 500, first comment up to 5,000 | The copy below fits.                                                     |
+| Logo 240 by 240; at least one gallery image, 1270 by 760 recommended; video optional         | Sunbeam icon from `brand/`, plus 5 to 6 gallery images.                  |
+| Optional promo offer: 25 characters of text and a 15 character code                          | Skip. Checkout has no promo codes.                                       |
+| The same URL launched in the last two months needs a relaunch request                        | A weak first launch cannot simply be redone the next week.               |
 
-| When         | Work                                                                                                                                                                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Now → gates  | Private beta by invite (≤100 Google test users). Weekly builds. Feedback via GitHub Issues. Collect quotes with permission. Set up your Product Hunt maker profile and take part in the community (comment on other launches). Share progress on X, Bluesky or Mastodon. |
-| L − 6 weeks  | Pick the launch window. Start the assets below. Decide on a launch offer.                                                                                                                                                                                                |
-| L − 4 weeks  | Finish the gallery, thumbnail, video, tagline, description and first comment. Schedule the launch (Product Hunt allows up to one month ahead).                                                                                                                           |
-| L − 2 weeks  | Full dry run on a clean Mac: download → open → Google sign-in → purchase → activation. Prepare the beta-list email and social posts.                                                                                                                                     |
-| L − 1 week   | Tell beta testers the date and ask for honest feedback on the page, never upvotes. Freeze features and keep a hotfix path ready.                                                                                                                                         |
-| Launch day   | 12:01 AM PT: launch goes live; post the maker comment right away. Email the list, post on socials, show a "Live on Product Hunt" banner on the site. Reply to every comment for 24 hours. Watch downloads, sign-ins, crashes and Stripe.                                 |
-| L + 1 week   | Thank supporters. Post Show HN on a separate day (open source, local-first angle). Pitch Mac sites' tip lines. Add a Product Hunt badge to the site if you ranked. Write a retro.                                                                                        |
-| L + 6 months | Eligible to relaunch with a major update (for example, Gmail or an iPhone companion).                                                                                                                                                                                    |
+A different product named Dayboard (dayboard.co, team task management) launched on Product Hunt in 2014. `getdayboard.com` resolves as a new product, so it does not block the launch, but a search for the name shows both.
 
-## Launch assets
+## Which day
 
-| Asset                         | Spec                                                                                 | Source                                                                                                                                                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Thumbnail                     | 240×240, under 3 MB (GIF allowed)                                                    | App icon. The current speedometer icon reads as a system monitor; consider a refresh before launch.                                                                                                                 |
-| Gallery                       | 5–7 images at 1270×760                                                               | From `docs/screenshots/`, retaken without Gmail and framed in the website's style: board overview, three sources into one agenda, calendar, linked tasks and reminders, assistant and MCP, privacy and open source. |
-| Video (optional, recommended) | 60–90 s, YouTube, no talking head                                                    | Problem → one board → calendar → linking → optional AI → privacy and open source → call to action. Record from demo mode, with Gmail out of frame.                                                                  |
-| Tagline                       | ≤60 characters                                                                       | "Google Calendar, Tasks & Apple Reminders in one Mac app" (55) or "Your whole day, on one board" (28)                                                                                                               |
-| Description                   | ≤500 characters                                                                      | Draft below.                                                                                                                                                                                                        |
-| Maker's first comment         | The most-read text on the page; 70% of Product of the Day/Week/Month winners had one | Draft below. Rewrite it in your own words.                                                                                                                                                                          |
-| Topics                        | 3–4                                                                                  | Productivity, Mac, Task Management, Open Source (confirm names when submitting).                                                                                                                                    |
+Product Hunt says no weekday guarantees a top spot. Third-party analyses of 2026 launches found weekends need a lower score to rank and have fewer launches, while weekdays bring more visitors. For a first launch without an audience, Saturday gives a better chance at a respectable rank. Avoid the last two weeks of December.
 
-**Description draft (≤500):**
-DayBoard brings Google Calendar, Google Tasks and Apple Reminders into one calm Mac app. See today's events and to-dos in a single agenda, spot a crowded week in month and week views, and link a task that lives in both Google Tasks and Apple Reminders. An optional assistant works with the Claude or ChatGPT account you already have. Your calendar, tasks and reminders stay between your Mac, Google, Apple and, when you use AI, the provider you choose. Open source under GPL-3.0.
+## Listing copy
 
-**First comment draft:**
-Hi Product Hunt! I built DayBoard because my day was split across four apps: Google Calendar for meetings, Google Tasks for work, Apple Reminders for errands, and Gmail for everything else. Planning a day meant checking all four. DayBoard puts your calendar, tasks and reminders on one board, in time order, and keeps every change in sync with Google and Apple. Gmail joins them in an update after 1.0. It's a native-feeling Mac app, the AI is optional and uses accounts you already have, and no DayBoard server sees your calendar, tasks, reminders or mail. The source is open under GPL-3.0; the signed build is how I fund the work. I'd love your feedback: what's missing from your daily setup?
+Drafts. Rewrite them in your own words before submitting.
 
-## Channels
+- **Name:** DayBoard
+- **Tagline (58):** Your day on one Mac board, with the AI you already pay for
+- **Alternative tagline (51):** Calendar, tasks, reminders and mail on one Mac board
+- **Topics:** Productivity, Mac, Task Management (confirm the names in the form)
+- **Pricing type:** free with paid options
 
-- **Owned:** the beta email list (needs a sending tool; the signup service stores addresses but doesn't send email), the website, GitHub README and release notes, your social accounts.
-- **Communities:** Mac and productivity subreddits and Indie Hackers. Read each community's self-promotion rules before posting, and take part before you promote. Some forbid promotion outright.
-- **Hacker News:** Show HN on a different day from Product Hunt.
-- **Press:** tip lines of Mac-focused sites and newsletters, with the gallery and a download link.
-- **Never ask for upvotes** anywhere. Ask people to take a look and share feedback.
+**Description (recount when pasting, limit 500):**
 
-## Metrics
+DayBoard puts Google Calendar, Google Tasks, Apple Reminders and your mail on one board on your Mac. See the day in one agenda, capture a task from the menu bar, and link a task that lives in both Google and Apple. The optional assistant runs on the Claude or ChatGPT subscription you already have, with no API key, and a local MCP server lets your AI tools read and change your day. Your data stays on your Mac. Free, with AI free for 14 days, then a one-time license. Open source.
 
-- **Primary:** launch-week activations: installs that complete Google sign-in or add a source. If 1.0 is paid, also purchases.
-- **Secondary:** site visits, beta and launch signups, downloads, GitHub stars, feedback items, Product Hunt rank (a vanity metric).
-- **Tracking:** the signup table, Stripe, GitHub. If you add cookie-free site analytics, update the privacy policy first; it says the site runs none.
+**First comment:**
+
+Hi, I'm Miles. I built DayBoard because planning my day meant checking four apps: Google Calendar, Google Tasks, Apple Reminders and email. DayBoard puts them on one board on the Mac and keeps every change in sync with Google and Apple.
+
+Two things are different from the planners I tried. Your data stays on your Mac, with no DayBoard server in the middle. And the assistant uses the Claude or ChatGPT subscription you already pay for, so there's no second AI bill.
+
+Everything except AI is free. AI is free for 14 days from the first time you use it, then a one-time license on up to 3 Macs.
+
+It's Mac only for now and there's no iPhone app. What I'd most like to know: what's the one thing in your daily setup this doesn't cover?
+
+## Assets
+
+| Asset   | Spec                         | State                                                                                                                                                                              |
+| ------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Logo    | 240 by 240                   | Export from `brand/dayboard-icon-square.svg`.                                                                                                                                      |
+| Gallery | 5 to 6 images at 1270 by 760 | To make, from fresh screenshots: the board, four sources into one agenda, menu bar and Quick Capture, the assistant on your own subscription, the MCP server, privacy and pricing. |
+| Video   | Optional                     | Skip for the first launch unless the Google review demo is recut without the consent flow.                                                                                         |
+
+## Launch day
+
+1. 12:01 AM Pacific: the launch goes live. Post the first comment.
+2. Morning: one plain email to the list, one post on your own accounts, and a "Live on Product Hunt" strip on the site.
+3. All day: reply to every comment.
+4. Watch downloads, installs, trials started and purchases with `npm --prefix billing run kpis -- --json`.
+
+## Measuring it
+
+- **Primary:** installs in launch week, and how many of them start the AI trial. The anonymous usage check-in records the license state per install per day, so a launch cohort can be followed from trial to paid.
+- **Secondary:** purchases, site visits, reviews and comments on the listing, GitHub stars. Rank is a vanity number.
+- GitHub's download count is not a reliable step in this funnel. It counts every fetch of the disk image, including the installer script, release checks and bots.
 
 ## Risks
 
-| Risk                                          | Mitigation                                                                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------- |
-| Google sign-in capped or warned on launch day | Verification is a hard gate; don't schedule until it's done.                 |
-| Gatekeeper warning scares visitors off        | Notarization is a hard gate.                                                 |
-| "Another Electron app" criticism              | Measure launch time and memory on the release build and answer with numbers. |
-| Confusion about paid plus open source         | Plain FAQ: the source is free under GPL; the signed build funds the work.    |
-| Community bans for self-promotion             | Follow each community's rules; participate first.                            |
-| Launch-day bugs                               | Feature freeze a week out; hotfix through the release workflow.              |
-
-## Costs
-
-No paid ads planned. Known costs: Apple Developer Program ($99/year), a domain, and optionally an email sending tool. Possible later cost: a CASA assessment, if Google requires one when Gmail is submitted after 1.0 (get quotes then, and check whether it must be repeated).
-
-## Decisions
-
-Made (2026-09-23):
-
-- **Hold the launch** until Miles approves the website.
-- **Gmail ships after 1.0.** The 1.0 build must stop requesting `gmail.modify` at sign-in, so Google verifies only the Calendar and Tasks scopes. This keeps the restricted scope, its longer review and any security assessment out of the 1.0 path. Before submitting for verification, change the website so Gmail reads as coming later, and record a demo video for Calendar and Tasks only. Beta testers keep Gmail while the consent screen stays in Testing. When Gmail is submitted, ask Google whether it needs the security assessment.
-
-Open:
-
-1. Weekday or weekend launch.
-2. Launch offer (needs pricing).
-3. Email sending tool for the list.
+| Risk                                  | Mitigation                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------- |
+| Google sign-in warned or capped       | Verification is the hard gate. Do not schedule before approval.                       |
+| "Another Electron app" criticism      | Measure launch time and memory on the release build and answer with numbers.          |
+| Confusion about paid plus open source | Plain answer: the source is free under GPL-3.0; the license pays for the AI features. |
+| Launch-day bugs                       | No feature releases in the week before. Keep a patch release path ready.              |
+| Low revenue disappoints               | At a one-time price, expect installs, feedback and reviews from the day, not income.  |
 
 ## Sources
 
-- Product Hunt's rules, asset specs and statistics: Product Hunt's launch guide, researched 2026-09-23. Recheck them when you schedule.
-- Google's verification requirements and review times: `docs/launch/google-verification.md`.
+- Product Hunt's help pages (launch timing, scheduling, featuring, voting rules, field limits, relaunch), read 2026-11-23.
+- Google verification state and requirements: `docs/launch/google-verification.md`.
