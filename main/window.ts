@@ -175,13 +175,16 @@ export type MainRoute =
   | "/review"
   | "/notes";
 export interface MainNavigation {
-  to: MainRoute;
+  /** The view to show; when absent the dashboard stays where it is. */
+  to?: MainRoute;
   prompt?: string;
   /** An agenda item to select, and the day (YYYY-MM-DD) it is listed under. */
   item?: string;
   date?: string;
   /** Also opens the first-run welcome over the view (Help → Welcome to DayBoard…). */
   welcome?: true;
+  /** Also opens What's New for the running version (Help → What's New in DayBoard…). */
+  whatsNew?: true;
 }
 
 export function isMainRoute(value: unknown): value is MainRoute {
@@ -329,6 +332,15 @@ export function setupApplicationMenu(options: {
           click: () => {
             void focusMainWindow({ to: "/", welcome: true }).catch((error) =>
               logger.warn("welcome", "Could not open the welcome", error),
+            );
+          },
+        },
+        {
+          label: "What’s New in DayBoard…",
+          id: "whats-new",
+          click: () => {
+            void focusMainWindow({ whatsNew: true }).catch((error) =>
+              logger.warn("whats-new", "Could not open What's New", error),
             );
           },
         },

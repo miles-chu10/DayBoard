@@ -377,6 +377,8 @@ export type SourceResult<T> =
       refreshedAt?: string;
       /** A refresh failed after the items above were successfully loaded. */
       refreshError?: string;
+      /** Shown from the launch cache: what the last session had, until a refresh replaces it. */
+      savedCopy?: true;
     }
   | { state: "needs-setup" }
   | { state: "not-connected" }

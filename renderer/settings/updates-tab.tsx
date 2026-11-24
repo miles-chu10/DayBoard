@@ -55,8 +55,13 @@ export function UpdatesTab() {
         </Field>
       ) : (
         <>
-          <Field label="Installed version">
-            <span>{state.currentVersion}</span>
+          <Field label="Installed version" orientation="horizontal">
+            <div className="flex items-center gap-3">
+              <span>{state.currentVersion}</span>
+              <Button size="small" onClick={() => void invoke("whatsNew:open")}>
+                What’s New
+              </Button>
+            </div>
           </Field>
           {state.phase === "unavailable" ? null : (
             <Field

@@ -58,7 +58,7 @@ export function AgendaSourceStatus({
                     : query.isError
                       ? "Unavailable"
                       : ok
-                        ? `${ok.items.length} loaded${ok.coverage?.complete === false ? " · partial" : ""}${ok.refreshError ? " · refresh failed; showing saved results" : ""}${ok.refreshedAt ? ` · updated ${formatTimeOfDay(ok.refreshedAt)}` : ""}`
+                        ? `${ok.items.length} loaded${ok.coverage?.complete === false ? " · partial" : ""}${ok.refreshError ? " · refresh failed; showing saved results" : ok.savedCopy ? " · saved from last session" : ""}${ok.refreshedAt ? ` · updated ${formatTimeOfDay(ok.refreshedAt)}` : ""}`
                         : sourceStatusShort(data)}
                 </Text>
                 {issue ? (
