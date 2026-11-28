@@ -29,11 +29,14 @@ Tag releases build with licensing on (`DAYBOARD_LICENSE=on`). The workflow itsel
 
 ## Release process
 
-1. Merge and review the app version on `main`; update `package.json` and its lockfile version together.
-2. Push a matching `v…` tag on that commit. The tag is the explicit release trigger.
+Codex and Claude use the same release workflow. From a clean checkout of the intended revision, verify the `package.json` and lockfile versions, run the [offline checks](../.claude/commands/verify.md) and credential-free Electron E2E on macOS, and report the candidate commit SHA and results. Confirm the active GitHub identity and its repository access for the intended push. Authentication alone cannot establish that a tag push is permitted. If access cannot be verified, report it as unverified.
+
+1. Update `package.json` and its lockfile version together. Get Miles's approval for any required merge. Confirm the intended release commit is on `main` and the proposed tag is unused.
+2. Get Miles's explicit approval to create and push that exact tag for that commit, including the Developer ID signing, notarization and public GitHub release the push triggers. Get separate approval for [website deployment](../website/README.md#publishing).
 3. CI runs typecheck, formatting, lint, app/native/billing tests and credential-free Electron E2E.
 4. CI builds with the approved app configuration, forces Developer ID signing, and notarizes and staples both the app and the signed DMG. Because stapling changes the DMG, it regenerates the DMG blockmap and update metadata before checksumming the final assets. It verifies the app, the copies inside both download formats, and the DMG's signature, stapled ticket and Gatekeeper assessment. Packaged demo tests run before upload.
 5. A separate publishing job without Apple/Google credentials verifies file hashes, uploads all downloads into a draft release, and publishes it only after uploads finish. Missing configuration, signing/notarization failures or failing checks produce **no public release**. There is no unsigned fallback.
+6. Read back the workflow result for that tag and SHA, then check the published assets, hashes, update metadata and Apple verification using the [release checklist](../.claude/commands/release-check.md). Check the DMG's stapled ticket with `xcrun stapler validate` and confirm `release-manifest.json` names the approved SHA. Record the run and release URLs and any checks still pending.
 
 Published releases are immutable to this workflow: reruns refuse to replace them. A failed upload can resume only the workflow-created draft with the same source SHA; unrelated/manual drafts are preserved. Keep older assets available for installed users' updates.
 

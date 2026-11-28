@@ -30,10 +30,17 @@ Buy buttons (`a[data-buy]`) ship hidden, and `[data-buy-pending]` notes say chec
 
 ## Publishing
 
-Follow `docs/launch/website-deploy.md`. It deploys the signup endpoint, sets `SITE_CONFIG`, makes each `og:image` absolute, publishes this folder with the site Worker in `website-worker/` and verifies the result. Before publishing:
+Codex and Claude use the same Wrangler command to publish `website/` through the `dayboard-website` Worker on `getdayboard.com`. Use a clean checkout of the reviewed site commit and the Wrangler version locked in `billing/package-lock.json`.
 
-- Review `privacy.html` (a draft, not legal advice); Google's verification needs it linked from the consent screen.
-- Check that the copy still matches the shipped app, especially the requirements and install steps on `beta.html`.
+1. Run `node --test tests/website-*.test.mjs` from the repository root and preview the changed pages. Review `privacy.html` and check that the copy, install steps and download links match the verified app release. For a local bundle check, run Wrangler with `deploy --dry-run` against a disposable copy of the site config with a local Worker name and no production routes.
+2. From `website-worker/`, use `npx --prefix ../billing wrangler whoami` to identify the existing Wrangler session and `npx --prefix ../billing wrangler deployments list` to confirm access to the intended Worker and record its active deployment. A deployment listing verifies read access. The approved deployment and its readback verify write access. Keep credentials out of logs and reports.
+3. Get Miles's approval to deploy the exact site commit to `dayboard-website`, separate from the app release. From `website-worker/`, run:
+
+   ```sh
+   npx --prefix ../billing wrangler deploy
+   ```
+
+4. Read back the active deployment. Check the live home, download, privacy and changed pages, installer version and checksum, HTTPS and `www` redirects, security headers and 404 status using read-only requests. Record the site commit, deployment version and checks. The old signup procedure in [website-deploy.md](../docs/launch/website-deploy.md) is historical.
 
 ## Download buttons and the Terminal installer
 
