@@ -171,6 +171,10 @@ test("QA packaging preflights before builder and preserves its separate identity
       `export function verifyBetaBuild(){throw Error("unexpected beta");} export const verifyBetaApp=verifyBetaBuild; export const verifyBetaArtifacts=verifyBetaBuild;`,
     ],
     [
+      "./electron-fuses.mjs",
+      "export function verifyAppFuses(app,label){globalThis.__qaPackageCalls.push({fuses:app,label});}",
+    ],
+    [
       "./verify-qa-package.mjs",
       `export function verifyQaBuild(read){globalThis.__qaPackageCalls.push("preflight");read("qa-build.json");if(globalThis.__qaPackageReject)throw Error("synthetic stale proof");}
       export function verifyQaApp(app){globalThis.__qaPackageCalls.push({verifyApp:app});}`,
@@ -219,6 +223,9 @@ test("QA packaging preflights before builder and preserves its separate identity
   assert.deepEqual(options.config.directories, { output: "release-qa" });
   assert.equal(options.config.mac.identity, null);
   assert.equal(options.config.mac.notarize, false);
-  assert.match(calls[2].verifyApp, /release-qa\/mac-arm64\/DayBoard QA\.app$/);
-  assert.equal(calls[3].sign.identity, "-");
+  // The fuses are read back from the packaged app before it is signed.
+  assert.match(calls[2].fuses, /release-qa\/mac-arm64\/DayBoard QA\.app$/);
+  assert.equal(calls[2].label, "QA app");
+  assert.match(calls[3].verifyApp, /release-qa\/mac-arm64\/DayBoard QA\.app$/);
+  assert.equal(calls[4].sign.identity, "-");
 });

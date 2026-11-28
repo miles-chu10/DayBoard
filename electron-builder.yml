@@ -51,6 +51,27 @@ mas:
   files:
     - "!node_modules/node-pty{,/**/*}"
     - "!node_modules/electron-updater{,/**/*}"
+# Electron fuses, flipped in the Electron binary before signing, for every packaged build
+# (release, beta, preview, test and QA), so the builds testers run match what ships.
+# scripts/electron-fuses.mjs holds the same values: release and preview packaging read them back
+# from the packaged app, and tests/electron-fuses.test.mjs fails when the two fall out of step.
+# - runAsNode / enableNodeOptionsEnvironmentVariable off: ELECTRON_RUN_AS_NODE and NODE_OPTIONS
+#   can no longer turn the signed app into a general Node runtime. DayBoard never relies on either:
+#   the CLIs, MCP server and Reminders helper run as their own binaries or in-process.
+# - enableCookieEncryption: Chromium cookies are encrypted at rest with the app's Keychain key.
+# - enableEmbeddedAsarIntegrityValidation + onlyLoadAppFromAsar: app code loads only from the
+#   app.asar whose hash electron-builder writes into Info.plist.
+# - enableNodeCliInspectArguments stays on: the release and beta workflows smoke-test the signed
+#   app with Playwright, which attaches through --inspect. See docs/proposals/electron-fuses.md.
+# - grantFileProtocolExtraPrivileges stays on: DayBoard's windows load from file://.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: true
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: true
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
 # Electron's SHA-256 checksums, copied from node_modules/electron/checksums.json. With them,

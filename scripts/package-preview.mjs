@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { signAsync } from "@electron/osx-sign";
 import { Arch, Platform, build } from "electron-builder";
+import { verifyAppFuses } from "./electron-fuses.mjs";
 import { verifyBetaApp, verifyBetaArtifacts, verifyBetaBuild } from "./verify-beta-package.mjs";
 import { verifyQaApp, verifyQaBuild } from "./verify-qa-package.mjs";
 
@@ -51,6 +52,7 @@ export async function packagePreview(testOnly = false, qaOnly = false) {
     },
   };
   await build({ ...options, targets: Platform.MAC.createTarget("dir", Arch.arm64) });
+  verifyAppFuses(app, qaOnly ? "QA app" : testOnly ? "test app" : "preview app");
   if (qaOnly) verifyQaApp(app);
   else if (!testOnly) verifyBetaApp(app);
 

@@ -1,6 +1,10 @@
 # Proposal: set Electron fuses for release builds
 
-Status: proposal for Miles. No build or release configuration has changed.
+Status: step A plus ASAR lock-down approved by Miles on 2026-11-24 and implemented in
+`electron-builder.yml` (`electronFuses`). `EnableNodeCliInspectArguments` stays on for now; see
+"Inspector fuse" below. `scripts/electron-fuses.mjs` reads the fuse wire back from every packaged
+app (preview, test, QA, and the signed app, ZIP and DMG copies in the release and beta workflows)
+and fails the build when it differs.
 
 ## Current state
 
@@ -50,3 +54,15 @@ Changing that needs a custom protocol first.
 
 If approved: add the block behind the release build path, build the signed beta, re-run REA
 `inspect_electron_fuses` on the result, and run the packaged smoke tests against the preview build.
+
+## Inspector fuse (not yet off)
+
+Playwright's `_electron.launch` always passes `--inspect=0` and `--remote-debugging-port=0`
+(playwright-core 1.63 `coreBundle.js`), and the release and beta workflows smoke-test the signed
+app that way before publishing. Turning `EnableNodeCliInspectArguments` off would make that step
+fail. Options for a follow-up, each Miles's call because it changes what the release smoke test
+proves:
+
+1. Smoke-test an ad-hoc re-signed copy with only the inspector fuse turned back on, then ship the
+   untouched signed app.
+2. Move the packaged smoke test to a check that drives the app without the Node inspector.
