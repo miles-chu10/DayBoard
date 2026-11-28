@@ -257,13 +257,41 @@ test("slash menu runs actions and prompts from the keyboard", async ({
   }
 });
 
+test("demo Assistant offers fictional Calendar mentions with Claude Code selected", async () => {
+  const demo = await launchDemo();
+  try {
+    await navigate(demo.page, "Assistant");
+    await expect(
+      demo.page.getByRole("button", { name: /^Model and effort:/ }),
+    ).toHaveAccessibleName("Model and effort: Claude Code default");
+    const input = demo.page.getByRole("textbox", { name: /^Message / });
+    await input.fill("@sprint");
+    await expect(
+      demo.page.getByRole("listbox", { name: "Mentions" }).getByRole("option", {
+        name: /^Sprint planning/,
+      }),
+    ).toBeVisible();
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
 test("@ mentions preserve Google chips for an eligible provider and withhold their data from Claude Code", async ({
   playwright: _playwright,
 }, testInfo) => {
   const demo = await launchDemo();
   try {
+    // Exercise the live renderer's sharing rules with the backend still latched in demo mode.
+    // Only this window sees the override, so all data and both responses remain synthetic.
+    await demo.app.evaluate(({ BrowserWindow }) => {
+      const main = BrowserWindow.getAllWindows().find(({ webContents }) =>
+        webContents.getURL().includes("main-window.html"),
+      );
+      if (!main) throw new Error("The main window is missing");
+      main.webContents.ipc.handle("app:isDemo", () => false);
+    });
     // The list covers today and the next 7 days even when Calendar shows only today.
-    // OpenAI API can receive Google data, and demo mode answers without using a real provider.
     await demo.page.evaluate(async () => {
       const ipc = (globalThis as AppGlobal).dayboard.ipc;
       const settings = await ipc.invoke<AppSettings>("settings:get");
