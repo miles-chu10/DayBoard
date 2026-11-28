@@ -25,12 +25,12 @@ what needs your attention, suggested tasks, meetings and your to-dos for today o
 the optional Assistant beside any page, keep your work in tabs, and save useful conversations as
 Markdown notes.
 
-> **DayBoard 1.3.14** ([release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.14))
+> **DayBoard 1.3.15** ([release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.15))
 > is free for **macOS 14+ on Apple Silicon**. AI features need DayBoard Pro, $5 once at the launch
 > price, after a 14-day free trial ([pricing](https://getdayboard.com/pricing)). The app and its
 > disk image are signed with an Apple Developer ID, notarized by Apple and stapled. DayBoard
 > updates itself from GitHub releases in the background and installs on restart or quit. See
-> [what changed in 1.3.14](docs/release-notes-1.3.14.md).
+> [what changed in 1.3.15](docs/release-notes-1.3.15.md).
 > Google hasn't verified DayBoard yet, so Google shows an "unverified app" warning when you
 > connect and limits how many accounts can connect.
 
@@ -53,11 +53,11 @@ Markdown notes.
 
 The current packaged app requires **an Apple Silicon Mac running macOS 14 or later**.
 
-1. **Download DayBoard 1.3.14** from its
-   [GitHub release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.14) or
+1. **Download DayBoard 1.3.15** from its
+   [GitHub release](https://github.com/miles-chu10/DayBoard/releases/tag/v1.3.15) or
    [getdayboard.com](https://getdayboard.com) and follow the
    [install guide](https://getdayboard.com/beta), or [build from source](#development).
-   [SHA256SUMS.txt](https://github.com/miles-chu10/DayBoard/releases/download/v1.3.14/SHA256SUMS.txt)
+   [SHA256SUMS.txt](https://github.com/miles-chu10/DayBoard/releases/download/v1.3.15/SHA256SUMS.txt)
    lists the download checksums. If you have beta 11 or earlier, install the current version over
    it once; your DayBoard data stays in place.
 2. **Connect your sources.** On first launch, a short welcome walks you through signing in with

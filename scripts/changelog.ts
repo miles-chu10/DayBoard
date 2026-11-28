@@ -98,9 +98,15 @@ function article(release: ChangelogRelease, notes: ReleaseNotes): string {
             <time datetime="${escape(release.date)}">${escape(formatDate(release.date))}</time>
             ${beta ? '<span class="release-badge">Beta</span>' : '<span class="release-badge is-stable">Release</span>'}
           </p>
-          <h2 id="${escape(id)}-title"><a href="#${escape(id)}">DayBoard ${escape(displayVersion(release.version))}</a></h2>
-          ${beta ? `<p class="release-version"><code>${escape(release.version)}</code></p>` : ""}
-          ${release.image && notes.subtitle ? `<p class="release-subtitle">${escape(notes.subtitle)}</p>` : ""}
+          <h2 id="${escape(id)}-title"><a href="#${escape(id)}">DayBoard ${escape(displayVersion(release.version))}</a></h2>${
+            beta
+              ? `\n          <p class="release-version"><code>${escape(release.version)}</code></p>`
+              : ""
+          }${
+            release.image && notes.subtitle
+              ? `\n          <p class="release-subtitle">${escape(notes.subtitle)}</p>`
+              : ""
+          }
         </div>
         <div class="release-body">
           ${hero(release, notes)}
