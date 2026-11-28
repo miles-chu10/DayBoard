@@ -33,7 +33,7 @@ Buy buttons (`a[data-buy]`) ship hidden, and `[data-buy-pending]` notes say chec
 Codex and Claude use the same Wrangler command to publish `website/` through the `dayboard-website` Worker on `getdayboard.com`. Use a clean checkout of the reviewed site commit and the Wrangler version locked in `billing/package-lock.json`.
 
 1. Run `node --test tests/website-*.test.mjs` from the repository root and preview the changed pages. Review `privacy.html` and check that the copy, install steps and download links match the verified app release. For a local bundle check, run Wrangler with `deploy --dry-run` against a disposable copy of the site config with a local Worker name and no production routes.
-2. From `website-worker/`, use `npx --prefix ../billing wrangler whoami` to identify the existing Wrangler session and `npx --prefix ../billing wrangler deployments list` to confirm access to the intended Worker and record its active deployment. A successful account lookup or deployment listing establishes identity or read access. Confirm deployment permission separately and report any access you could not verify. Keep credentials out of logs and reports.
+2. From `website-worker/`, use `npx --prefix ../billing wrangler whoami` to identify the existing Wrangler session and `npx --prefix ../billing wrangler deployments list` to confirm access to the intended Worker and record its active deployment. A deployment listing verifies read access. The approved deployment and its readback verify write access. Keep credentials out of logs and reports.
 3. Get Miles's approval to deploy the exact site commit to `dayboard-website`, separate from the app release. From `website-worker/`, run:
 
    ```sh
