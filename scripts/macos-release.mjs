@@ -5,6 +5,7 @@ import { appendFile, copyFile, lstat, mkdir, readFile, rm, writeFile } from "nod
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { verifyAppFuses } from "./electron-fuses.mjs";
 
 export const repository = "miles-chu10/dayboard";
 // GitHub names are case-insensitive, and Actions reports the repository as it is currently spelled.
@@ -471,11 +472,13 @@ async function main(command) {
   const team = process.env.APPLE_TEAM_ID;
   const app = resolve("release/mac-arm64/DayBoard.app");
   verifyApp(app, team, plan.version, run, "release app");
+  verifyAppFuses(app, "release app");
   const zipDirectory = join(temp, "dayboard-release-zip");
   await mkdir(zipDirectory);
   const zip = resolve("release", plan.files[1]);
   run("ditto", ["-x", "-k", zip, zipDirectory], { label: "ZIP", path: zip });
   verifyApp(join(zipDirectory, "DayBoard.app"), team, plan.version, run, "ZIP app");
+  verifyAppFuses(join(zipDirectory, "DayBoard.app"), "ZIP app");
   const mount = join(temp, "dayboard-release-dmg");
   await mkdir(mount);
   const dmg = resolve("release", plan.files[0]);
@@ -485,7 +488,10 @@ async function main(command) {
     path: dmg,
   });
   verifyThenDetach(
-    () => verifyApp(join(mount, "DayBoard.app"), team, plan.version, run, "DMG app"),
+    () => {
+      verifyApp(join(mount, "DayBoard.app"), team, plan.version, run, "DMG app");
+      verifyAppFuses(join(mount, "DayBoard.app"), "DMG app");
+    },
     () => run("hdiutil", ["detach", mount], { label: "mounted DMG", path: mount }),
   );
 }
