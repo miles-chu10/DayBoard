@@ -1,8 +1,8 @@
 import { AlertDialog } from "@renderer/ui";
 import type { AIProvider } from "@main/shared-types";
 
-import { GOOGLE_DATA_WITHHELD_NOTICE } from "@shared/ai-google-data";
-import { mayShareGoogleData } from "../lib/google-data";
+import { GOOGLE_DATA_WITHHELD_NOTICE, aiMayReceiveGoogleData } from "@shared/ai-google-data";
+import { isRendererDemoMode } from "../lib/demo";
 import { PROVIDER_LABEL } from "../lib/settings";
 
 /**
@@ -20,35 +20,45 @@ export function AIConsentDialog({
   provider: AIProvider;
   onConfirm: () => void;
 }) {
+  const demo = isRendererDemoMode();
   return (
     <AlertDialog
       open={open}
       onOpenChange={onOpenChange}
       size="medium"
       title="Turn on AI features?"
-      description="AI features send some of your data to the AI provider you choose."
+      description={
+        demo
+          ? "Demo mode uses sample data and sample AI responses on this Mac."
+          : "AI features send some of your data to the AI provider you choose."
+      }
       confirmLabel="Turn On AI"
       onConfirm={() => {
         onOpenChange(false);
         onConfirm();
       }}
     >
-      <div className="flex flex-col gap-2 text-regular text-secondary" data-testid="ai-disclosure">
-        <p>
-          When you use an AI feature, DayBoard sends the tasks, email, calendar events and notes
-          that feature needs to {PROVIDER_LABEL[provider]}, using your own account or API key.
-          Assistant messages go to the provider you pick in the composer.
-        </p>
-        <p>
-          {mayShareGoogleData(provider)
-            ? "This can include your Google Calendar and Google Tasks, which DayBoard sends only to AI APIs whose terms say they don’t train on your data."
-            : GOOGLE_DATA_WITHHELD_NOTICE}{" "}
-          Data goes straight from this Mac to the provider and never passes through a DayBoard
-          server. DayBoard doesn’t use it to train AI models. The provider’s own terms and privacy
-          policy apply.
-        </p>
-        <p>Nothing is sent while AI is off, and you can turn it off at any time in Settings.</p>
-      </div>
+      {demo ? null : (
+        <div
+          className="flex flex-col gap-2 text-regular text-secondary"
+          data-testid="ai-disclosure"
+        >
+          <p>
+            When you use an AI feature, DayBoard sends the tasks, email, calendar events and notes
+            that feature needs to {PROVIDER_LABEL[provider]}, using your own account or API key.
+            Assistant messages go to the provider you pick in the composer.
+          </p>
+          <p>
+            {aiMayReceiveGoogleData(provider)
+              ? "This can include your Google Calendar and Google Tasks, which DayBoard sends only to AI APIs whose terms say they don’t train on your data."
+              : GOOGLE_DATA_WITHHELD_NOTICE}{" "}
+            Data goes straight from this Mac to the provider and never passes through a DayBoard
+            server. DayBoard doesn’t use it to train AI models. The provider’s own terms and privacy
+            policy apply.
+          </p>
+          <p>Nothing is sent while AI is off, and you can turn it off at any time in Settings.</p>
+        </div>
+      )}
     </AlertDialog>
   );
 }

@@ -3,8 +3,8 @@ import { aiMayReceiveGoogleData } from "../../shared/ai-google-data";
 import { isRendererDemoMode } from "./demo";
 
 /**
- * Whether this window may send Google Calendar and Google Tasks items to the AI provider. Demo
- * mode's sample items never come from Google, so the rule doesn't hold them back there.
+ * Whether to include Calendar and Tasks items in the local AI context. Demo fixtures may
+ * appear regardless of provider because the backend keeps demo requests on this Mac.
  */
 export function mayShareGoogleData(provider: AIProvider | "" | undefined | null): boolean {
   return isRendererDemoMode() || aiMayReceiveGoogleData(provider);

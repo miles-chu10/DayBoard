@@ -394,16 +394,19 @@ export function MenuBarPanel() {
     planning.data?.duplicateLinks,
     on,
   );
-  const ask = usePanelAsk(() => ({
-    todos,
-    todosAvailable: tasks.data?.state === "ok" || reminders.data?.state === "ok",
-    calendar: calendar.data,
-    mail: mail.data,
-    triage: featureOn(settings, "triage") ? readTriageMap() : {},
-    userEmail: accounts?.google.email ?? null,
-    // One-shot asks use the default provider, like every useAITask feature.
-    googleData: mayShareGoogleData(settings?.ai.provider),
-  }));
+  const ask = usePanelAsk(
+    () => ({
+      todos,
+      todosAvailable: tasks.data?.state === "ok" || reminders.data?.state === "ok",
+      calendar: calendar.data,
+      mail: mail.data,
+      triage: featureOn(settings, "triage") ? readTriageMap() : {},
+      userEmail: accounts?.google.email ?? null,
+      // One-shot asks use the default provider, like every useAITask feature.
+      googleData: mayShareGoogleData(settings?.ai.provider),
+    }),
+    settings?.ai.provider,
+  );
 
   useEffect(
     () =>

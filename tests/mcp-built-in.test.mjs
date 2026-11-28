@@ -23,7 +23,7 @@ export async function createEvent() { throw new Error("write should not run"); }
 export async function createReplyDraft() { throw new Error("write should not run"); }
 export async function createTask() { throw new Error("write should not run"); }
 export async function getMessageBody() { return "body"; }
-export async function listCompletedTasks() { return []; }
+export async function listCompletedTasks() { return globalThis.__mcpCompletedGoogleTasks ?? []; }
 export async function listEventsBetweenWithCoverage() {
   globalThis.__mcpGoogleCalendarCalls = (globalThis.__mcpGoogleCalendarCalls ?? 0) + 1;
   const items = globalThis.__mcpGoogleEvents ?? [];
@@ -790,48 +790,78 @@ test("Google Calendar and Google Tasks reach only Assistant providers that don't
   };
   globalThis.__mcpGoogleEvents = [googleEvent];
   globalThis.__mcpGoogleTasks = [{ id: "t-1", title: "Google tax filing" }];
+  globalThis.__mcpCompletedGoogleTasks = [{ id: "t-2", title: "Google budget review" }];
   globalThis.__mcpServerSettings = { enabled: true, allowWrites: true };
   globalThis.__mcpGoogleStatus = { connected: true, email: "user@example.test" };
-  const connect = async (path, headers) => {
+  const connect = async (path, headers, inProcessTransport = null) => {
     const client = new Client({ name: "google-gate", version: "1.0.0" });
-    const transport = new StreamableHTTPClientTransport(
-      new URL(`http://127.0.0.1:${port}${path}`),
-      { requestInit: { headers } },
-    );
+    const transport =
+      inProcessTransport ??
+      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}${path}`), {
+        requestInit: { headers },
+      });
     await client.connect(transport);
     return {
       call: async (name, args = {}) =>
         (await client.callTool({ name, arguments: args })).content[0].text,
       result: (name, args = {}) => client.callTool({ name, arguments: args }),
       close: async () => {
-        await transport.terminateSession().catch(() => undefined);
+        if (!inProcessTransport) await transport.terminateSession().catch(() => undefined);
         await client.close();
       },
     };
   };
   try {
-    const assistantHeaders = module.getAssistantMcpServerConfig("fixture").headers;
+    const assistantConfig = module.getAssistantMcpServerConfig("fixture");
+    const assistantHeaders = assistantConfig.headers;
+    globalThis.__mcpAiSettings = { provider: "claude", assistantProvider: "" };
+    const cli = await connect("/assistant-mcp", assistantHeaders);
+    try {
+      assert.doesNotMatch(await cli.call("list_tasks"), /Google tax filing/);
+      globalThis.__mcpAiSettings = { provider: "openai", assistantProvider: "" };
+      assert.doesNotMatch(await cli.call("list_tasks"), /Google tax filing/);
+      assert.doesNotMatch(await cli.call("list_events"), /Google board meeting/);
+      assert.doesNotMatch(
+        await cli.call("get_weekly_review"),
+        /Google board meeting|Google budget review/,
+      );
+      assert.equal(globalThis.__mcpGoogleCalendarCalls ?? 0, 0, "CLI never read Google Calendar");
+    } finally {
+      await cli.close();
+    }
+    assert.equal(await module.createAssistantMcpTransport({ ...assistantConfig }, "openai"), null);
     const cases = [
-      // [default provider, Assistant provider, Google data shared]
-      ["openai", "", true],
-      ["anthropic", "", true],
-      ["claude", "", false],
-      ["openai", "codex", false],
-      ["claude", "groq", true],
-      ["google", "", false],
-      ["deepseek", "", false],
+      ["openai", true],
+      ["anthropic", true],
+      ["groq", true],
+      ["xai", true],
+      ["openrouter", true],
+      ["claude", false],
+      ["codex", false],
+      ["google", false],
+      ["deepseek", false],
     ];
-    for (const [provider, assistantProvider, shared] of cases) {
-      globalThis.__mcpAiSettings = { provider, assistantProvider };
-      const assistant = await connect("/assistant-mcp", assistantHeaders);
+    for (const [provider, shared] of cases) {
+      // Deliberately set the global preference to the opposite access decision.
+      globalThis.__mcpAiSettings = {
+        provider: shared ? "claude" : "openai",
+        assistantProvider: "",
+      };
+      const inProcess = await module.createAssistantMcpTransport(assistantConfig, provider);
+      assert.equal(Boolean(inProcess), shared, `${provider} private connection`);
+      const assistant = await connect("/assistant-mcp", assistantHeaders, inProcess);
       try {
-        const label = `${provider}/${assistantProvider || "default"}`;
         const tasks = await assistant.call("list_tasks");
         const events = await assistant.call("list_events");
         const review = await assistant.call("get_weekly_review");
-        assert.equal(tasks.includes("Google tax filing"), shared, `${label} tasks`);
-        assert.equal(events.includes("Google board meeting"), shared, `${label} events`);
-        assert.equal(review.includes("Google board meeting"), shared, `${label} review`);
+        assert.equal(tasks.includes("Google tax filing"), shared, `${provider} tasks`);
+        assert.equal(events.includes("Google board meeting"), shared, `${provider} events`);
+        assert.equal(review.includes("Google board meeting"), shared, `${provider} review`);
+        assert.equal(
+          review.includes("Google budget review"),
+          shared,
+          `${provider} completed tasks`,
+        );
         if (!shared) {
           assert.match(tasks, /aren't shared with this AI provider/);
           assert.match(events, /aren't shared with this AI provider/);
@@ -866,6 +896,7 @@ test("Google Calendar and Google Tasks reach only Assistant providers that don't
   } finally {
     delete globalThis.__mcpGoogleEvents;
     delete globalThis.__mcpGoogleTasks;
+    delete globalThis.__mcpCompletedGoogleTasks;
     delete globalThis.__mcpGoogleCalendarCalls;
     delete globalThis.__mcpAiSettings;
     delete globalThis.__mcpServerSettings;

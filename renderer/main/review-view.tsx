@@ -107,6 +107,7 @@ export function ReviewView() {
     if (!data) return;
     void ai.run({
       system: REVIEW_SYSTEM,
+      expectedProvider: settings?.ai.provider,
       prompt: buildWeeklyReviewPrompt({
         since: data.since,
         completed,

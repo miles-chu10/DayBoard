@@ -109,6 +109,7 @@ export function useMeetingPrep(event: CalendarEventItem) {
     if (unavailable) return;
     void ai.run({
       system: PREP_SYSTEM,
+      expectedProvider: settings?.ai.provider,
       prompt: buildMeetingPrepPrompt({ event, attendees, relatedMail, relatedTodos, googleData }),
       maxOutputTokens: 800,
     });

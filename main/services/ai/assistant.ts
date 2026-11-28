@@ -17,6 +17,7 @@ import type {
   AssistantResult,
 } from "../../shared-types.js";
 import { demoAssistantReply, isDemoMode } from "../demo-data.js";
+import { createAssistantMcpTransport } from "../mcp-http-server.js";
 import { getMcpServers, getSettings } from "../settings-store.js";
 import { isApiProvider } from "./api-keys.js";
 import { apiLanguageModel, resolveApiModel } from "./api-providers.js";
@@ -85,6 +86,7 @@ function apiSnapshot(snapshot: string | undefined, session: McpSession | null): 
 export async function runAssistant(
   params: {
     messages: AssistantMessageInput[];
+    expectedProvider?: string;
     system: string;
     snapshot?: string;
     attachments?: string[];
@@ -99,9 +101,10 @@ export async function runAssistant(
   }
   const settings = await getSettings();
   if (!settings.ai.enabled || !settings.ai.providerChosen) return { blocked: "not-configured" };
-  const provider = await resolveConfiguredProvider(
-    settings.ai.assistantProvider || settings.ai.provider,
-  );
+  const selectedProvider = settings.ai.assistantProvider || settings.ai.provider;
+  if (params.expectedProvider !== undefined && params.expectedProvider !== selectedProvider)
+    throw new Error("The AI provider changed. Try again to send with the current provider.");
+  const provider = await resolveConfiguredProvider(selectedProvider);
   if (!provider) return { blocked: "not-configured" };
   const codexModels = provider === "codex" ? await listCodexModels().catch(() => []) : [];
   const apiModel = isApiProvider(provider)
@@ -200,7 +203,9 @@ export async function runAssistant(
     return { text, usage: requestUsage, model: replyModel };
   }
 
-  const session = servers.length ? await openMcpSession(servers) : null;
+  const session = servers.length
+    ? await openMcpSession(servers, (config) => createAssistantMcpTransport(config, provider))
+    : null;
   try {
     const displayNames = new Map(
       session?.tools.map((handle) => [handle.qualifiedName, `${handle.server}: ${handle.tool}`]),

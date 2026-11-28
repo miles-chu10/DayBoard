@@ -1,3 +1,4 @@
+import type { AIProvider } from "@main/shared-types";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -38,12 +39,14 @@ export function BriefingCard({
   ready,
   autoGenerate,
   buildPrompt,
+  expectedProvider,
   summary,
 }: {
   ready: boolean;
   /** Generate once per day, the first time the dashboard opens with data loaded. */
   autoGenerate: boolean;
   buildPrompt: () => string;
+  expectedProvider: AIProvider | undefined;
   summary?: string;
 }) {
   const ai = useAITask();
@@ -67,11 +70,21 @@ export function BriefingCard({
   useEffect(() => {
     if (!autoGenerate || !ready || autoStarted.current || stored?.date === todayISO()) return;
     autoStarted.current = true;
-    void ai.run({ system: BRIEFING_SYSTEM, prompt: buildPrompt(), maxOutputTokens: 600 });
-  }, [autoGenerate, ready, stored, ai, buildPrompt]);
+    void ai.run({
+      system: BRIEFING_SYSTEM,
+      prompt: buildPrompt(),
+      expectedProvider,
+      maxOutputTokens: 600,
+    });
+  }, [autoGenerate, ready, stored, ai, buildPrompt, expectedProvider]);
 
   function generate() {
-    void ai.run({ system: BRIEFING_SYSTEM, prompt: buildPrompt(), maxOutputTokens: 600 });
+    void ai.run({
+      system: BRIEFING_SYSTEM,
+      prompt: buildPrompt(),
+      expectedProvider,
+      maxOutputTokens: 600,
+    });
   }
 
   const text = ai.isRunning || ai.isDone ? ai.output : (stored?.markdown ?? "");

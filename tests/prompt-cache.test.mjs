@@ -19,10 +19,10 @@ const stubs = {
   "codex-models.js": `export const listCodexModels=async()=>globalThis.__cacheFixture.codexModels??[];`,
   "cli-providers.js": `export const runCliCompletion=async(options)=>{const run=globalThis.__cacheFixture.cli; if(!run) throw Error('CLI must not run'); return run(options)}; export const checkCliProvider=()=>{}; export const isCancelled=()=>false; export const listGeminiModels=()=>[]; export const resolveCli=async()=>null;`,
   "assistant-mcp.js": `export const resolveAssistantMcpServers=()=>{const f=globalThis.__cacheFixture; return f.tools.length||f.mcpErrors?.length ? [{}] : []};`,
-  "mcp-client.js": `export const testMcpServer=async()=>({}); export const openMcpSession=async()=>{const f=globalThis.__cacheFixture; if(f.mcpDelay) await new Promise(r=>setTimeout(r,f.mcpDelay)); return {tools:f.tools,errors:f.mcpErrors??[],close:async()=>{f.closed++}}};`,
+  "mcp-client.js": `export const testMcpServer=async()=>({}); export const openMcpSession=async(servers, transportForServer)=>{const f=globalThis.__cacheFixture; if(f.testMcpTransport) await f.testMcpTransport(servers,transportForServer); if(f.mcpDelay) await new Promise(r=>setTimeout(r,f.mcpDelay)); return {tools:f.tools,errors:f.mcpErrors??[],close:async()=>{f.closed++}}};`,
   "provider-resolution.js": `export const resolveConfiguredProvider=async p=>p;`,
   "dictation.js": `export const transcribe=async()=>{throw Error('Transcription must not run')};`,
-  "mcp-http-server.js": `export const checkAssistantMcpConnection=()=>{}; export const getActiveAssistantMcpServerConfig=()=>null; export const getAssistantMcpStatus=()=>({}); export const getExternalMcpUrl=()=>''; export const getExternalMcpStartError=()=>null;`,
+  "mcp-http-server.js": `export const checkAssistantMcpConnection=()=>{}; export const getActiveAssistantMcpServerConfig=()=>null; export const getAssistantMcpStatus=()=>({}); export const getExternalMcpUrl=()=>''; export const getExternalMcpStartError=()=>null; export const createAssistantMcpTransport=async(config,provider)=>globalThis.__cacheFixture.createTransport?.(config,provider);`,
   "mcp-access-key.js": `export const getMcpAccessKey=()=>''; export const regenerateMcpAccessKey=()=>'';`,
   "agent-stores.js": `export const listMemories=async()=>globalThis.__cacheFixture.memories??[];`,
 };
@@ -938,6 +938,46 @@ test("actual Assistant request uses stable boundary, latest snapshot and aggrega
   assert.ok(first.value.usage.durationMs >= 0);
   assert.equal(first.bodies[0].prompt_cache_key, undefined);
 });
+test("API Assistant opens built-in MCP using the provider selected for the request", async () => {
+  fixture("gpt-6-sol", [
+    {
+      server: "fixture",
+      tool: "lookup",
+      qualifiedName: "lookup",
+      description: "fixture lookup",
+      inputSchema: { type: "object", properties: {} },
+      call: async () => "synthetic result",
+    },
+  ]);
+  const assistant = await load("main/services/ai/assistant.ts", { fixtures: true });
+  const fixtureState = globalThis.__cacheFixture;
+  const inProcessTransport = {};
+  let transportProvider;
+  fixtureState.createTransport = (config, provider) => {
+    assert.equal(config, fixtureState.builtIn);
+    transportProvider = provider;
+    return inProcessTransport;
+  };
+  fixtureState.testMcpTransport = async ([config], transportForServer) => {
+    fixtureState.builtIn = config;
+    fixtureState.settings.ai.assistantProvider = "codex";
+    assert.equal(typeof transportForServer, "function");
+    assert.equal(await transportForServer(config), inProcessTransport);
+  };
+  const { value } = await withFetch(() =>
+    assistant.runAssistant(
+      {
+        system: "policy",
+        expectedProvider: "openai",
+        messages: [{ role: "user", content: "hello" }],
+      },
+      () => {},
+      new AbortController().signal,
+    ),
+  );
+  assert.equal(transportProvider, "openai");
+  assert.equal(value.usage.route, "openai");
+});
 test("Assistant tool steps count each usage once and close the session", async () => {
   fixture("gpt-6-sol", [
     {
@@ -1488,6 +1528,41 @@ test("Assistant tool steps total a counter only when every step reported it", as
   });
   assert.equal(run.chunks.filter((chunk) => chunk.type === "usage").length, 1);
   assert.equal(globalThis.__cacheFixture.closed, 1);
+});
+test("AI requests reject a stale prompt provider before any provider dispatch", async () => {
+  const dispatched = [];
+  cliFixture("codex", {}, async (options) => {
+    dispatched.push(options.provider);
+    return "CLI answer";
+  });
+  const handlers = await load("main/handlers/ai.ts", { fixtures: true });
+  handlers.registerAIHandlers();
+  const { bodies } = await withFetch(async () => {
+    const run = globalThis.__cacheFixture.handlers;
+    const context = { signal: new AbortController().signal };
+    const request = { system: "policy", expectedProvider: "openai" };
+    const inputs = {
+      "ai:run": { ...request, prompt: "protected source fixture" },
+      "ai:assistant": {
+        ...request,
+        messages: [{ role: "user", content: "hello" }],
+        snapshot: "protected source fixture",
+      },
+    };
+    for (const [channel, input] of Object.entries(inputs)) {
+      await assert.rejects(
+        run[channel](input, () => {}, context),
+        /AI provider changed/,
+      );
+    }
+    assert.deepEqual(dispatched, []);
+    for (const [channel, input] of Object.entries(inputs)) {
+      const result = await run[channel]({ ...input, expectedProvider: "codex" }, () => {}, context);
+      assert.equal(result.text, "CLI answer");
+    }
+    assert.deepEqual(dispatched, ["codex", "codex"]);
+  });
+  assert.deepEqual(bodies, []);
 });
 test("one-shot usage comes from each step's raw usage even when the SDK aggregate has none", async () => {
   fixture();

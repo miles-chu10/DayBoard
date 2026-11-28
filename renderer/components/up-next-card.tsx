@@ -48,7 +48,8 @@ export function UpNextCard({
   onChoose?: (todo: Todo) => void;
 }) {
   const ai = useAITask();
-  const googleData = mayShareGoogleData(useSettings().data?.ai.provider);
+  const provider = useSettings().data?.ai.provider;
+  const googleData = mayShareGoogleData(provider);
   const keyMap = useRef(new Map<string, string>());
   const [stored, setStored] = useState(() => readStored(STORAGE_KEY, isStoredPriorities));
   const [parseFailed, setParseFailed] = useState(false);
@@ -124,6 +125,7 @@ export function UpNextCard({
     setParseFailed(false);
     void ai.run({
       system: PRIORITY_SYSTEM,
+      expectedProvider: provider,
       prompt: buildPriorityPrompt(candidates, todayEvents, messages, googleData),
       maxOutputTokens: 700,
     });

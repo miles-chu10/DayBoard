@@ -88,7 +88,17 @@ import {
 import { PROVIDER_LABEL, featureOn, providerUsesMcp, sourceOn, useSettings } from "../lib/settings";
 import { buildTodos } from "../lib/todos";
 import { readTriageMap } from "../lib/triage";
+import { isGoogleCalendarEvent } from "@shared/ai-google-data";
 import { mayShareGoogleData } from "../lib/google-data";
+
+function shareableDraftMentions(mentions: MentionItem[], googleData: boolean): MentionItem[] {
+  if (googleData) return mentions;
+  return mentions.filter(
+    (mention) =>
+      mention.kind !== "task" &&
+      (mention.kind !== "event" || (mention.event && !isGoogleCalendarEvent(mention.event))),
+  );
+}
 
 /**
  * Earlier chips name Google events and tasks by title; drop them for a provider that may not
@@ -396,6 +406,7 @@ function AssistantSession({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AssistantAttachment[]>([]);
   const [mentions, setMentions] = useState<MentionItem[]>([]);
+  const draftMentions = shareableDraftMentions(mentions, googleData);
   const candidates = mentionCandidates({
     calendar: shareableCalendar(mentionEvents.data, googleData),
     todos: shareableTodos(buildTodos(tasks.data, reminders.data), googleData),
@@ -435,7 +446,8 @@ function AssistantSession({
   }, [panel, contextKey]);
   function changeMentions(next: MentionItem[] | ((current: MentionItem[]) => MentionItem[])) {
     setMentions((current) => {
-      const value = typeof next === "function" ? next(current) : next;
+      const value =
+        typeof next === "function" ? next(shareableDraftMentions(current, googleData)) : next;
       const auto = autoContextRef.current;
       if (auto && current.some((m) => m.key === auto) && !value.some((m) => m.key === auto))
         dismissedContextRef.current = auto;
@@ -495,8 +507,8 @@ function AssistantSession({
     const content = text.trim();
     if (!content || cancelRef.current || history.switching || !enabled) return;
 
-    // Chips are checked against the data loaded now; an item gone since is sent as unavailable.
-    const resolved = resolveMentions(mentions, candidates);
+    // Filter for this provider first, so an ineligible draft chip can't send even its title.
+    const resolved = resolveMentions(draftMentions, candidates);
     const userMessage: AssistantMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -586,6 +598,7 @@ function AssistantSession({
       const result = await window.dayboard.ipc.stream<AIStreamChunk, AssistantResult>(
         "ai:assistant",
         {
+          expectedProvider: provider,
           messages: requestMessages,
           system,
           snapshot,
@@ -923,7 +936,7 @@ function AssistantSession({
                 setInput={setInput}
                 attachments={attachments}
                 setAttachments={setAttachments}
-                mentions={mentions}
+                mentions={draftMentions}
                 setMentions={changeMentions}
                 mentionCandidates={candidates}
                 onSend={() => void send(input)}

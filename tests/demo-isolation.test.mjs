@@ -429,6 +429,10 @@ test("demo Assistant replies locally without CLI, provider API, or MCP access", 
           `export const attachmentContext = async () => { globalThis.__demoLiveCalls += 1; };`,
         ],
         [
+          "../mcp-http-server.js",
+          `export const createAssistantMcpTransport = async () => { globalThis.__demoLiveCalls += 1; };`,
+        ],
+        [
           "./provider-resolution.js",
           `export const resolveConfiguredProvider = async () => { globalThis.__demoLiveCalls += 1; };`,
         ],

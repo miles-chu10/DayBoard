@@ -1,5 +1,10 @@
 import { expect, test, type ElectronApplication, type Locator, type Page } from "@playwright/test";
-import type { DayboardBridge } from "../shared/bridge-protocol";
+import type { AppSettings } from "../main/shared-types";
+import {
+  BridgeChannel,
+  type DayboardBridge,
+  type StreamStartRequest,
+} from "../shared/bridge-protocol";
 import { launchDemo } from "./fixtures";
 
 type AppGlobal = typeof globalThis & { dayboard: DayboardBridge };
@@ -252,23 +257,53 @@ test("slash menu runs actions and prompts from the keyboard", async ({
   }
 });
 
-test("@ mentions add a chip, and the sent message keeps it", async ({
+test("demo Assistant offers fictional Calendar mentions with Claude Code selected", async () => {
+  const demo = await launchDemo();
+  try {
+    await navigate(demo.page, "Assistant");
+    await expect(
+      demo.page.getByRole("button", { name: /^Model and effort:/ }),
+    ).toHaveAccessibleName("Model and effort: Claude Code default");
+    const input = demo.page.getByRole("textbox", { name: /^Message / });
+    await input.fill("@sprint");
+    await expect(
+      demo.page.getByRole("listbox", { name: "Mentions" }).getByRole("option", {
+        name: /^Sprint planning/,
+      }),
+    ).toBeVisible();
+    expect(demo.errors).toEqual([]);
+  } finally {
+    await demo.close();
+  }
+});
+
+test("@ mentions preserve Google chips for an eligible provider and withhold their data from Claude Code", async ({
   playwright: _playwright,
 }, testInfo) => {
   const demo = await launchDemo();
   try {
-    // The list covers today and the next 7 days even when the Calendar setting shows only today.
+    // Exercise the live renderer's sharing rules with the backend still latched in demo mode.
+    // Only this window sees the override, so all data and both responses remain synthetic.
+    await demo.app.evaluate(({ BrowserWindow }) => {
+      const main = BrowserWindow.getAllWindows().find(({ webContents }) =>
+        webContents.getURL().includes("main-window.html"),
+      );
+      if (!main) throw new Error("The main window is missing");
+      main.webContents.ipc.handle("app:isDemo", () => false);
+    });
+    // The list covers today and the next 7 days even when Calendar shows only today.
     await demo.page.evaluate(async () => {
       const ipc = (globalThis as AppGlobal).dayboard.ipc;
-      const settings = await ipc.invoke<{ calendar: Record<string, unknown> }>("settings:get");
+      const settings = await ipc.invoke<AppSettings>("settings:get");
       await ipc.invoke("settings:update", {
         ...settings,
         calendar: { ...settings.calendar, range: "today" },
+        ai: { ...settings.ai, assistantProvider: "openai" },
       });
     });
     await demo.page.reload();
     await navigate(demo.page, "Assistant");
-    await demo.page.getByRole("button", { name: "New chat" }).click();
+    await expect(demo.page.locator('[data-from="user"]')).toHaveCount(0);
     const input = demo.page.getByRole("textbox", { name: /^Message / });
     const list = demo.page.getByRole("listbox", { name: "Mentions" });
     await input.fill("@sprint");
@@ -296,9 +331,83 @@ test("@ mentions add a chip, and the sent message keeps it", async ({
     // Demo replies report no model, and the panel says so rather than borrowing the next request's.
     await demo.page.getByRole("button", { name: /^Model and effort:/ }).click();
     const panel = demo.page.getByRole("dialog", { name: "Model and effort" });
-    await expect(panel).toContainText("Next request: Claude Code default");
+    await expect(panel).toContainText("Next request: Newest model");
     await expect(panel).toContainText("Last reply: model not recorded");
-    await demo.page.keyboard.press("Escape");
+    await dismissWithEscape(demo.page, panel);
+
+    await input.fill("@sprint");
+    await list.getByRole("option", { name: /^Sprint planning/ }).click();
+    await expect(demo.page.getByRole("button", { name: "Remove Sprint planning" })).toBeVisible();
+    await expect(list).toHaveCount(0);
+
+    await input.fill("@lun");
+    const emailOption = list.getByRole("option", { name: /^Lunch today\?/ });
+    await emailOption.hover();
+    await expect(emailOption).toHaveAttribute("aria-selected", "true");
+    await emailOption.click();
+    const emailChip = demo.page.getByRole("button", { name: "Remove Lunch today?" });
+    await expect(emailChip).toBeVisible();
+    await expect(list).toHaveCount(0);
+    await input.fill("What should I do next?");
+
+    await demo.page.evaluate(async () => {
+      const ipc = (globalThis as AppGlobal).dayboard.ipc;
+      const settings = await ipc.invoke<AppSettings>("settings:get");
+      await ipc.invoke("settings:update", {
+        ...settings,
+        ai: { ...settings.ai, assistantProvider: "claude" },
+      });
+    });
+    await expect(
+      demo.page.getByRole("button", { name: /^Model and effort:/ }),
+    ).toHaveAccessibleName("Model and effort: Claude Code default");
+    await expect(input).toHaveValue("What should I do next?");
+    await input.fill("@lun");
+    await expect(list.getByRole("option", { name: /^Lunch today\?/ })).toBeVisible();
+    await expect(list.getByRole("option", { name: /^Lunch with Sam/ })).toHaveCount(0);
+    await expect(user).toContainText("Lunch with Sam");
+    await expect(demo.page.getByRole("button", { name: "Remove Sprint planning" })).toHaveCount(0);
+    await expect(emailChip).toBeVisible();
+
+    // Capture the follow-up at the renderer-to-main boundary. Demo replies don't use the snapshot.
+    await demo.app.evaluate(({ BrowserWindow }, channels) => {
+      const main = BrowserWindow.getAllWindows().find(({ webContents }) =>
+        webContents.getURL().includes("main-window.html"),
+      );
+      if (!main) throw new Error("The main window is missing");
+      main.webContents.ipc.handleOnce(
+        channels.streamStart,
+        (event, request: StreamStartRequest) => {
+          Object.assign(globalThis, { assistantRequest: request });
+          event.sender.send(channels.streamChunk, { id: request.id, end: true });
+          return { text: "Follow-up received" };
+        },
+      );
+    }, BridgeChannel);
+    await input.fill("What should I do next?");
+    await demo.page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(demo.page.locator('[data-from="assistant"]').last()).toContainText(
+      "Follow-up received",
+    );
+    const request = await demo.app.evaluate(
+      () =>
+        (
+          globalThis as typeof globalThis & {
+            assistantRequest: StreamStartRequest;
+          }
+        ).assistantRequest,
+    );
+    expect(request.channel).toBe("ai:assistant");
+    expect(request.args).toMatchObject({ expectedProvider: "claude" });
+    const payload = JSON.stringify(request.args);
+    expect(payload).toContain(
+      "Google Calendar and Google Tasks are not shared with this AI provider",
+    );
+    expect(payload).toContain("What should I do next?");
+    expect(payload).toContain("- Email: Lunch today?");
+    expect(payload).not.toContain("Lunch with Sam");
+    expect(payload).not.toContain("Finalize launch announcement");
+    expect(payload).not.toMatch(/Sprint planning|\be13\b/);
     expect(demo.errors).toEqual([]);
   } finally {
     await demo.close();
