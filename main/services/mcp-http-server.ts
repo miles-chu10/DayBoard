@@ -9,14 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import {
-  createEvent,
-  createTask,
-  listCompletedTasks,
-  listEventsBetweenWithCoverage,
-  listTasks,
-  setTaskCompleted,
-} from "./google-api.js";
+import { listCompletedTasks, listEventsBetweenWithCoverage, listTasks } from "./google-api.js";
 import { createReplyDraft, getMessageBody, listInbox, modifyMessage } from "./gmail-imap.js";
 import { GoogleAuthError, getGoogleStatus } from "./google-auth.js";
 import {
@@ -51,6 +44,7 @@ import type {
   Note,
   SourceId,
 } from "../shared-types.js";
+import { aiMayReceiveGoogleData } from "../../shared/ai-google-data.js";
 import { newEventDestination } from "../../shared/apple-calendar.js";
 import { replacementAgendaKey } from "../../shared/agenda-identities.js";
 
@@ -143,8 +137,15 @@ async function ensureSource(source: SourceId): Promise<void> {
   }
 }
 
-/** Google Calendar and Mac calendar events between two instants, as the app's calendar shows them. */
-async function calendarEventsBetween(start: Date, end: Date): Promise<CalendarEventItem[]> {
+/**
+ * Google Calendar and Mac calendar events between two instants, as the app's calendar shows them.
+ * Without `includeGoogle`, Google Calendar isn't read at all and only Mac calendar events return.
+ */
+async function calendarEventsBetween(
+  start: Date,
+  end: Date,
+  includeGoogle: boolean,
+): Promise<CalendarEventItem[]> {
   const [settings, google] = await Promise.all([getSettings(), getGoogleStatus()]);
   const visibility = settings.calendar.visibility;
   const result = await listCalendarEvents({
@@ -153,10 +154,16 @@ async function calendarEventsBetween(start: Date, end: Date): Promise<CalendarEv
     visibility,
     googleEmail: google.email,
     googleConnected: google.connected,
-    google: () => listEventsBetweenWithCoverage(start, end, visibility, google.email),
+    google: () =>
+      includeGoogle
+        ? listEventsBetweenWithCoverage(start, end, visibility, google.email)
+        : Promise.resolve({ items: [], coverage: { complete: true, loaded: 0 } }),
     authReason: (error) => (error instanceof GoogleAuthError ? error.reason : null),
   });
-  if (result.state === "ok") return result.items;
+  if (result.state === "ok")
+    return includeGoogle
+      ? result.items
+      : result.items.filter((event) => event.provider === "apple");
   const reason =
     result.state === "needs-setup" || result.state === "not-granted"
       ? result.state
@@ -245,16 +252,43 @@ function capped<T>(items: T[], label: string) {
   return { total: items.length, [label]: items.slice(0, MAX_LIST) };
 }
 
-function registerReadOnlyTools(server: McpServer): void {
-  server.registerTool(
-    "list_tasks",
-    {
-      title: "List tasks",
-      description: `List open Google Tasks across all task lists (up to ${MAX_LIST}), with list, due date, and notes.`,
-      inputSchema: {},
-    },
-    run("tasks", async () => text(capped(await listTasks(), "tasks"))),
-  );
+/**
+ * Google Calendar and Google Tasks data goes only to AI that doesn't train on it (see
+ * shared/ai-google-data.ts). DayBoard's Assistant checks its provider on every call. Outside AI
+ * tools are unknown, so the external server never offers Google data.
+ */
+type GoogleDataGate = () => Promise<boolean>;
+
+const assistantMayReadGoogle: GoogleDataGate = async () => {
+  const { ai } = await getSettings();
+  return aiMayReceiveGoogleData(ai.assistantProvider || ai.provider);
+};
+
+const GOOGLE_WITHHELD_FOR_PROVIDER =
+  "Google Calendar and Google Tasks aren't shared with this AI provider. Only Mac calendars and Apple Reminders are available.";
+const GOOGLE_WITHHELD_EXTERNAL =
+  "Google Calendar isn't shared with outside AI tools, so only Mac calendars are included.";
+
+function registerReadOnlyTools(server: McpServer, scope: "assistant" | "external"): void {
+  const mayReadGoogle: GoogleDataGate =
+    scope === "assistant" ? assistantMayReadGoogle : async () => false;
+  const withheld = scope === "assistant" ? GOOGLE_WITHHELD_FOR_PROVIDER : GOOGLE_WITHHELD_EXTERNAL;
+  // The Assistant keeps list_tasks registered (its health check expects six tools) and answers
+  // per call; outside AI tools don't get it at all.
+  if (scope === "assistant")
+    server.registerTool(
+      "list_tasks",
+      {
+        title: "List tasks",
+        description: `List open Google Tasks across all task lists (up to ${MAX_LIST}), with list, due date, and notes.`,
+        inputSchema: {},
+      },
+      run("tasks", async () =>
+        (await mayReadGoogle())
+          ? text(capped(await listTasks(), "tasks"))
+          : text(GOOGLE_WITHHELD_FOR_PROVIDER),
+      ),
+    );
   server.registerTool(
     "list_reminders",
     {
@@ -304,7 +338,10 @@ function registerReadOnlyTools(server: McpServer): void {
     "list_events",
     {
       title: "List events",
-      description: `List upcoming events from the Google and iCloud calendars shown in the app (up to ${MAX_LIST}).`,
+      description:
+        scope === "assistant"
+          ? `List upcoming events from the Google and iCloud calendars shown in the app (up to ${MAX_LIST}).`
+          : `List upcoming events from the Mac (iCloud and local) calendars shown in the app (up to ${MAX_LIST}). Google Calendar isn't included.`,
       inputSchema: {
         days_ahead: z
           .number()
@@ -321,18 +358,24 @@ function registerReadOnlyTools(server: McpServer): void {
       start.setHours(0, 0, 0, 0);
       const end = new Date(start);
       end.setDate(end.getDate() + (days_ahead ?? calendarRangeDays(settings.calendar.range)));
-      return text(capped(await calendarEventsBetween(start, end), "events"));
+      const google = await mayReadGoogle();
+      const events = capped(await calendarEventsBetween(start, end, google), "events");
+      return text(google ? events : { note: withheld, ...events });
     }),
   );
   server.registerTool(
     "get_weekly_review",
     {
       title: "Weekly review",
-      description: `Everything finished in the past 7 days: completed tasks, completed reminders, and past events (up to ${MAX_LIST} each). Turned-off or disconnected sources are noted.`,
+      description:
+        scope === "assistant"
+          ? `Everything finished in the past 7 days: completed tasks, completed reminders, and past events (up to ${MAX_LIST} each). Turned-off or disconnected sources are noted.`
+          : `Everything finished in the past 7 days: completed Apple Reminders and past Mac calendar events (up to ${MAX_LIST} each). Google Tasks and Google Calendar aren't included.`,
       inputSchema: {},
     },
     async () => {
       const since = new Date(Date.now() - WEEK_MS);
+      const google = await mayReadGoogle().catch(() => false);
       const section = async <T>(source: SourceId, load: () => Promise<T[]>) => {
         const result = await run(source, async () => text(capped(await load(), "items")))({});
         return result.isError
@@ -340,12 +383,15 @@ function registerReadOnlyTools(server: McpServer): void {
           : JSON.parse(result.content[0]?.text ?? "{}");
       };
       const [tasks, reminders, events] = await Promise.all([
-        section("tasks", () => listCompletedTasks(since)),
+        google
+          ? section("tasks", () => listCompletedTasks(since))
+          : Promise.resolve({ unavailable: withheld }),
         section("reminders", () => listCompletedReminders(since)),
-        section("calendar", () => calendarEventsBetween(since, new Date())),
+        section("calendar", () => calendarEventsBetween(since, new Date(), google)),
       ]);
       return text({
         since: since.toISOString(),
+        ...(google ? {} : { note: withheld }),
         completedTasks: tasks,
         completedReminders: reminders,
         events,
@@ -382,7 +428,7 @@ function buildAssistantMcpServer(): McpServer {
     ),
     "Assistant",
   );
-  registerReadOnlyTools(server);
+  registerReadOnlyTools(server, "assistant");
   return server;
 }
 
@@ -394,60 +440,9 @@ function buildMcpServer(allowWrites: boolean): McpServer {
     ),
     null,
   );
-  registerReadOnlyTools(server);
+  registerReadOnlyTools(server, "external");
   registerAgentReadTools(server);
   if (!allowWrites) return server;
-
-  server.registerTool(
-    "create_task",
-    {
-      title: "Create task",
-      description: "Add a task to the default Google Tasks list.",
-      inputSchema: {
-        title: z.string().min(1),
-        notes: z.string().optional(),
-        due: date.optional(),
-      },
-    },
-    runWrite(
-      "tasks",
-      async ({ title, notes, due }: { title: string; notes?: string; due?: string }) => {
-        await createTask({ title, notes, due });
-        notifyChanged("tasks");
-        return text(`Created task "${title}".`);
-      },
-    ),
-  );
-
-  server.registerTool(
-    "complete_task",
-    {
-      title: "Complete task",
-      description:
-        "Mark a Google Task done (or reopen it with completed=false). IDs come from list_tasks.",
-      inputSchema: {
-        list_id: z.string().min(1),
-        task_id: z.string().min(1),
-        completed: z.boolean().default(true),
-      },
-    },
-    runWrite(
-      "tasks",
-      async ({
-        list_id,
-        task_id,
-        completed,
-      }: {
-        list_id: string;
-        task_id: string;
-        completed: boolean;
-      }) => {
-        await setTaskCompleted(list_id, task_id, completed);
-        notifyChanged("tasks");
-        return text(completed ? "Task marked done." : "Task reopened.");
-      },
-    ),
-  );
 
   server.registerTool(
     "create_reminder",
@@ -558,7 +553,7 @@ function buildMcpServer(allowWrites: boolean): McpServer {
     {
       title: "Create event",
       description:
-        "Add an event where DayBoard adds new events: the primary Google Calendar or the iCloud calendar chosen in Settings. Omit start_time for an all-day event.",
+        "Add an event to the Mac (iCloud) calendar DayBoard adds new events to. Outside AI tools can't add Google Calendar events. Omit start_time for an all-day event.",
       inputSchema: {
         title: z.string().min(1),
         date,
@@ -596,8 +591,12 @@ function buildMcpServer(allowWrites: boolean): McpServer {
           google.connected,
           access,
         );
-        if (destination.kind === "google") await createEvent(input);
-        else await createAppleEvent(input, destination.calendarId ?? undefined);
+        // Outside AI tools never write to Google Calendar through DayBoard's Google sign-in.
+        if (destination.kind === "google")
+          return failure(
+            'New events go to Google Calendar, which outside AI tools can\'t change through DayBoard. To let them add events, set "New events go to" to an iCloud calendar in DayBoard Settings → Sources.',
+          );
+        await createAppleEvent(input, destination.calendarId ?? undefined);
         notifyChanged("calendar");
         return text(`Created event "${args.title}" on ${args.date}.`);
       },

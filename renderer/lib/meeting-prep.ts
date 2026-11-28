@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { CalendarEventItem, MailItem, SourceResult } from "@main/shared-types";
 
+import { isGoogleCalendarEvent } from "../../shared/ai-google-data";
+import { mayShareGoogleData } from "./google-data";
 import { useAITask } from "./ai";
 import { PREP_SYSTEM, buildMeetingPrepPrompt } from "./ai-prompts";
 import { formatTimeOfDay } from "./dates";
@@ -82,6 +84,12 @@ export function useMeetingPrep(event: CalendarEventItem) {
     .slice(0, 10);
   const relatedMail = related.data?.state === "ok" ? related.data.items : null;
   const relatedReady = !mailOn || !related.isPending;
+  const googleData = mayShareGoogleData(settings?.ai.provider);
+  /** Why prep can't run for this event, or null when it can. */
+  const unavailable =
+    !googleData && isGoogleCalendarEvent(event)
+      ? "Meeting prep isn't available for Google Calendar events with your AI provider. Use an OpenAI, Anthropic, xAI, Groq or OpenRouter API key in Settings → AI."
+      : null;
 
   useEffect(() => {
     if (!ai.isDone) return;
@@ -98,9 +106,10 @@ export function useMeetingPrep(event: CalendarEventItem) {
   }, [ai.isDone, ai.output, event.id]);
 
   function generate() {
+    if (unavailable) return;
     void ai.run({
       system: PREP_SYSTEM,
-      prompt: buildMeetingPrepPrompt({ event, attendees, relatedMail, relatedTodos }),
+      prompt: buildMeetingPrepPrompt({ event, attendees, relatedMail, relatedTodos, googleData }),
       maxOutputTokens: 800,
     });
   }
@@ -124,6 +133,7 @@ export function useMeetingPrep(event: CalendarEventItem) {
     text: ai.isRunning || ai.isDone ? ai.output : (stored?.markdown ?? ""),
     relatedReady,
     contextSummary,
+    unavailable,
     generate,
   };
 }

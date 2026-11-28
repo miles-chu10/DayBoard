@@ -71,6 +71,7 @@ import { PanelSettings } from "./panel-settings";
 import { ALL, usePanelWrites, type PanelWrites } from "./panel-writes";
 import { taskGroups } from "./task-groups";
 import { canEditTodo } from "./todo-edit";
+import { mayShareGoogleData } from "../lib/google-data";
 
 type MenuBarView = "day" | "lists" | "month";
 type MenuBarPage = "settings" | "ask" | "catch-up";
@@ -400,6 +401,8 @@ export function MenuBarPanel() {
     mail: mail.data,
     triage: featureOn(settings, "triage") ? readTriageMap() : {},
     userEmail: accounts?.google.email ?? null,
+    // One-shot asks use the default provider, like every useAITask feature.
+    googleData: mayShareGoogleData(settings?.ai.provider),
   }));
 
   useEffect(

@@ -189,6 +189,7 @@ const baseInput = {
   userEmail: null,
   permission: "ask",
   canCreate: { task: true, reminder: false, event: false },
+  googleData: true,
 };
 test("stable policy excludes changing source data, while fresh snapshot remains untrusted", () => {
   const next = {
@@ -2222,4 +2223,49 @@ test("asError keeps an Error, prefers a message, and describes an object that ha
   assert.equal(streamErrors.asError("plain text").message, "plain text");
   assert.equal(streamErrors.asError(null).message, "null");
   assert.equal(streamErrors.asError(undefined).message, "undefined");
+});
+test("every OpenRouter request asks for providers that don't collect data; other providers are unchanged", async () => {
+  const providers = await load("main/services/ai/api-providers.ts", { fixtures: true });
+  const original = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, options) => {
+    seen.push({ url: String(url), body: JSON.parse(options.body) });
+    return globalThis.Response.json({
+      id: "synthetic",
+      object: "chat.completion",
+      created: 1,
+      model: "synthetic-model",
+      choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    });
+  };
+  try {
+    for (const provider of ["openrouter", "xai"]) {
+      const model = await providers.apiLanguageModel(provider, "synthetic-model");
+      await model.doGenerate({
+        prompt: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+      });
+    }
+  } finally {
+    globalThis.fetch = original;
+  }
+  assert.equal(seen[0].url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.deepEqual(seen[0].body.provider, { data_collection: "deny" });
+  assert.equal(seen[1].url, "https://api.x.ai/v1/chat/completions");
+  assert.equal(seen[1].body.provider, undefined);
+
+  const blocked = providers.noDataCollectionFetch(async () => {
+    throw new Error("must not send");
+  });
+  await assert.rejects(
+    blocked("https://openrouter.ai/api/v1/chat/completions", { method: "POST", body: "{" }),
+    /blocked/,
+  );
+  await assert.rejects(
+    blocked("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      body: new Uint8Array([1]),
+    }),
+    /blocked/,
+  );
 });

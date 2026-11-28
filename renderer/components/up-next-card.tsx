@@ -3,9 +3,11 @@ import { Button, Callout, Status, Text } from "@renderer/ui";
 import { Sparkles } from "lucide-react";
 import type { CalendarEventItem, MailItem, SourceId } from "@main/shared-types";
 
+import { mayShareGoogleData } from "../lib/google-data";
 import { extractJSON, useAITask } from "../lib/ai";
-import { PRIORITY_SYSTEM, buildPriorityPrompt } from "../lib/ai-prompts";
+import { PRIORITY_SYSTEM, buildPriorityPrompt, shareableTodos } from "../lib/ai-prompts";
 import { formatTimeOfDay, todayISO } from "../lib/dates";
+import { useSettings } from "../lib/settings";
 import { readStored, writeStored } from "../lib/storage";
 import { compareByDue, type Todo } from "../lib/todos";
 import { InlineHint, ListCard, RowsSkeleton, SectionCard } from "./section-card";
@@ -46,6 +48,7 @@ export function UpNextCard({
   onChoose?: (todo: Todo) => void;
 }) {
   const ai = useAITask();
+  const googleData = mayShareGoogleData(useSettings().data?.ai.provider);
   const keyMap = useRef(new Map<string, string>());
   const [stored, setStored] = useState(() => readStored(STORAGE_KEY, isStoredPriorities));
   const [parseFailed, setParseFailed] = useState(false);
@@ -113,7 +116,7 @@ export function UpNextCard({
 
   function prioritize() {
     runSignature.current = signature;
-    const candidates = [...openTodos]
+    const candidates = [...shareableTodos(openTodos, googleData)]
       .sort(compareByDue)
       .slice(0, 60)
       .map((todo, index) => ({ key: `i${index + 1}`, todo }));
@@ -121,7 +124,7 @@ export function UpNextCard({
     setParseFailed(false);
     void ai.run({
       system: PRIORITY_SYSTEM,
-      prompt: buildPriorityPrompt(candidates, todayEvents, messages),
+      prompt: buildPriorityPrompt(candidates, todayEvents, messages, googleData),
       maxOutputTokens: 700,
     });
   }

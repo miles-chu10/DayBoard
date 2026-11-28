@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 
+import { withOpenRouterNoDataCollection } from "../../../shared/ai-google-data.js";
 import type { ApiModelInfo, ApiProviderId, AppSettings } from "../../shared-types.js";
 import { getApiKey } from "./api-keys.js";
 
@@ -166,6 +167,26 @@ export async function resolveApiModel(
   throw new Error(`Choose a ${API_LABEL[provider]} model in Settings → AI.`);
 }
 
+/**
+ * Every OpenRouter request carries `provider.data_collection: "deny"`, so it is only routed to
+ * providers that don't store or train on prompts. A body it can't rewrite is refused.
+ */
+export function noDataCollectionFetch(base?: typeof fetch): typeof fetch {
+  const send: typeof fetch = (input, init) => (base ?? globalThis.fetch)(input, init);
+  return (input, init) => {
+    if (init?.body === undefined || init.body === null) return send(input, init);
+    if (typeof init.body !== "string")
+      return Promise.reject(new Error("OpenRouter request blocked: unexpected request body."));
+    let body: string;
+    try {
+      body = withOpenRouterNoDataCollection(init.body);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return send(input, { ...init, body });
+  };
+}
+
 export async function apiLanguageModel(provider: ApiProviderId, modelId: string) {
   const apiKey = await requireKey(provider);
   if (provider === "openai") return createOpenAI({ apiKey, baseURL: OPENAI_BASE_URL })(modelId);
@@ -176,6 +197,7 @@ export async function apiLanguageModel(provider: ApiProviderId, modelId: string)
       apiKey,
       baseURL: COMPATIBLE_BASE_URL[provider],
       name: provider,
+      ...(provider === "openrouter" ? { fetch: noDataCollectionFetch() } : {}),
     }).chat(modelId);
   return createGoogleGenerativeAI({ apiKey })(modelId);
 }
