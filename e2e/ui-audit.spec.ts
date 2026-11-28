@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import type { DayboardBridge } from "../shared/bridge-protocol";
-import { launchDemo } from "./fixtures";
+import { launchDemo, waitForWindowReady } from "./fixtures";
 import { auditLayout } from "./layout-audit";
 
 // Long titles, list names and pasted URLs must truncate or wrap inside their row: never run under
@@ -314,6 +314,10 @@ test("Meeting Notes import, candidate picker and follow-ups fit long Granola tex
       (next) => (globalThis as AppGlobal).dayboard.ipc.invoke("settings:update", next),
       { ...current, system: { ...system, meetings: { ...system.meetings, notesImport: true } } },
     );
+    // Home's "just ended" meeting card may already have asked for the notes status (no provider in
+    // demo mode), and that answer stays fresh for a minute; reload so the stand-in answers instead.
+    await page.reload();
+    await waitForWindowReady(page);
 
     await navigate(page, "Calendar");
     await page
