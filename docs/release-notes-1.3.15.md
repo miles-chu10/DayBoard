@@ -1,6 +1,6 @@
-# DayBoard 1.3.14 — Faster launches and What's New
+# DayBoard 1.3.15 — Faster launches and What's New
 
-DayBoard 1.3.14 shows your last dashboard as soon as it opens, tells you what changed after each
+DayBoard 1.3.15 shows your last dashboard as soon as it opens, tells you what changed after each
 update, and stops a burst of calendar changes from looking like lost Google access.
 
 ## New
