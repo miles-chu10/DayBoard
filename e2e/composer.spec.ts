@@ -303,7 +303,7 @@ test("@ mentions preserve Google chips for an eligible provider and withhold the
     });
     await demo.page.reload();
     await navigate(demo.page, "Assistant");
-    await demo.page.getByRole("button", { name: "New chat" }).click();
+    await expect(demo.page.locator('[data-from="user"]')).toHaveCount(0);
     const input = demo.page.getByRole("textbox", { name: /^Message / });
     const list = demo.page.getByRole("listbox", { name: "Mentions" });
     await input.fill("@sprint");
@@ -390,6 +390,7 @@ test("@ mentions preserve Google chips for an eligible provider and withhold the
         ).assistantRequest,
     );
     expect(request.channel).toBe("ai:assistant");
+    expect(request.args).toMatchObject({ expectedProvider: "claude" });
     const payload = JSON.stringify(request.args);
     expect(payload).toContain(
       "Google Calendar and Google Tasks are not shared with this AI provider",
