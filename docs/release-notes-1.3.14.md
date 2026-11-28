@@ -28,6 +28,12 @@ update, and stops a burst of calendar changes from looking like lost Google acce
 
 - The Inbox subtitle shows only your message counts, without "Gmail" in front (#184).
 
+## Security
+
+- **Harder to tamper with.** DayBoard now refuses to start if its app files were changed after
+  it was signed, stores its browser cookies encrypted, and closes two ways another program could
+  run its own code inside DayBoard (#187).
+
 ## Updating
 
 - **Gmail needs an app password since 1.3.10.** If your inbox shows **Connect Gmail**, open
