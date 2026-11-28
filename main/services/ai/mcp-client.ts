@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { logger } from "../../platform/index.js";
 import { APP_STORE_STDIO_MESSAGE, isAppStoreBuild } from "../../../shared/app-store-build.js";
 
@@ -50,11 +51,17 @@ interface McpConnection {
   close: () => Promise<void>;
 }
 
-async function connect(server: McpServerConfig): Promise<McpConnection> {
+type TransportForServer = (server: McpServerConfig) => Promise<Transport | null>;
+
+async function connect(
+  server: McpServerConfig,
+  transportForServer?: TransportForServer,
+): Promise<McpConnection> {
   if (isAppStoreBuild && server.transport === "stdio") throw new Error(APP_STORE_STDIO_MESSAGE);
   const client = new Client({ name: "dashboard", version: "1.0.0" });
   const transport =
-    server.transport === "stdio"
+    (await transportForServer?.(server)) ??
+    (server.transport === "stdio"
       ? new StdioClientTransport({
           command: server.command,
           args: server.args,
@@ -63,7 +70,7 @@ async function connect(server: McpServerConfig): Promise<McpConnection> {
         })
       : new StreamableHTTPClientTransport(new URL(server.url), {
           requestInit: { headers: server.headers },
-        });
+        }));
   const close = async () => {
     if (transport instanceof StreamableHTTPClientTransport && transport.sessionId) {
       await withTimeout(
@@ -143,7 +150,10 @@ export async function callMcpTool(
   }
 }
 
-export async function openMcpSession(servers: McpServerConfig[]): Promise<McpSession> {
+export async function openMcpSession(
+  servers: McpServerConfig[],
+  transportForServer?: TransportForServer,
+): Promise<McpSession> {
   const connections: McpConnection[] = [];
   const discovered: (Omit<McpToolHandle, "qualifiedName"> & { serverId: string })[] = [];
   const errors: string[] = [];
@@ -151,7 +161,7 @@ export async function openMcpSession(servers: McpServerConfig[]): Promise<McpSes
   await Promise.all(
     servers.map(async (server) => {
       try {
-        const connection = await connect(server);
+        const connection = await connect(server, transportForServer);
         connections.push(connection);
         const { client } = connection;
         const listed = await withTimeout(

@@ -5,6 +5,7 @@ import { ipcMain, logger } from "../platform/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -38,6 +39,7 @@ import {
 import { trackPendingWrite } from "./pending-writes.js";
 import { runAppOperation } from "./runtime-activity.js";
 import type {
+  AIProvider,
   CalendarEventItem,
   DataChangedEvent,
   McpServerConfig,
@@ -68,6 +70,7 @@ const ASSISTANT_MCP_TOOLS = [
   "read_email",
 ] as const;
 const assistantMcpToken = randomBytes(32).toString("base64url");
+const assistantMcpConfigs = new WeakSet<McpServerConfig>();
 const LISTEN_RETRY_MS = 5_000;
 let activeProjectId: string | null = null;
 let externalMcpStartError: string | null = null;
@@ -252,41 +255,30 @@ function capped<T>(items: T[], label: string) {
   return { total: items.length, [label]: items.slice(0, MAX_LIST) };
 }
 
-/**
- * Google Calendar and Google Tasks data goes only to AI that doesn't train on it (see
- * shared/ai-google-data.ts). DayBoard's Assistant checks its provider on every call. Outside AI
- * tools are unknown, so the external server never offers Google data.
- */
-type GoogleDataGate = () => Promise<boolean>;
-
-const assistantMayReadGoogle: GoogleDataGate = async () => {
-  const { ai } = await getSettings();
-  return aiMayReceiveGoogleData(ai.assistantProvider || ai.provider);
-};
-
 const GOOGLE_WITHHELD_FOR_PROVIDER =
   "Google Calendar and Google Tasks aren't shared with this AI provider. Only Mac calendars and Apple Reminders are available.";
 const GOOGLE_WITHHELD_EXTERNAL =
   "Google Calendar isn't shared with outside AI tools, so only Mac calendars are included.";
 
-function registerReadOnlyTools(server: McpServer, scope: "assistant" | "external"): void {
-  const mayReadGoogle: GoogleDataGate =
-    scope === "assistant" ? assistantMayReadGoogle : async () => false;
+function registerReadOnlyTools(
+  server: McpServer,
+  scope: "assistant" | "external",
+  includeGoogle = false,
+): void {
   const withheld = scope === "assistant" ? GOOGLE_WITHHELD_FOR_PROVIDER : GOOGLE_WITHHELD_EXTERNAL;
-  // The Assistant keeps list_tasks registered (its health check expects six tools) and answers
-  // per call; outside AI tools don't get it at all.
+  // The Assistant health check expects six tools, so list_tasks reports when access is withheld.
   if (scope === "assistant")
     server.registerTool(
       "list_tasks",
       {
         title: "List tasks",
-        description: `List open Google Tasks across all task lists (up to ${MAX_LIST}), with list, due date, and notes.`,
+        description: includeGoogle
+          ? `List open Google Tasks across all task lists (up to ${MAX_LIST}), with list, due date, and notes.`
+          : GOOGLE_WITHHELD_FOR_PROVIDER,
         inputSchema: {},
       },
       run("tasks", async () =>
-        (await mayReadGoogle())
-          ? text(capped(await listTasks(), "tasks"))
-          : text(GOOGLE_WITHHELD_FOR_PROVIDER),
+        includeGoogle ? text(capped(await listTasks(), "tasks")) : text(withheld),
       ),
     );
   server.registerTool(
@@ -338,10 +330,9 @@ function registerReadOnlyTools(server: McpServer, scope: "assistant" | "external
     "list_events",
     {
       title: "List events",
-      description:
-        scope === "assistant"
-          ? `List upcoming events from the Google and iCloud calendars shown in the app (up to ${MAX_LIST}).`
-          : `List upcoming events from the Mac (iCloud and local) calendars shown in the app (up to ${MAX_LIST}). Google Calendar isn't included.`,
+      description: includeGoogle
+        ? `List upcoming events from the Google and iCloud calendars shown in the app (up to ${MAX_LIST}).`
+        : `List upcoming events from the Mac (iCloud and local) calendars shown in the app (up to ${MAX_LIST}). Google Calendar isn't included.`,
       inputSchema: {
         days_ahead: z
           .number()
@@ -358,24 +349,21 @@ function registerReadOnlyTools(server: McpServer, scope: "assistant" | "external
       start.setHours(0, 0, 0, 0);
       const end = new Date(start);
       end.setDate(end.getDate() + (days_ahead ?? calendarRangeDays(settings.calendar.range)));
-      const google = await mayReadGoogle();
-      const events = capped(await calendarEventsBetween(start, end, google), "events");
-      return text(google ? events : { note: withheld, ...events });
+      const events = capped(await calendarEventsBetween(start, end, includeGoogle), "events");
+      return text(includeGoogle ? events : { note: withheld, ...events });
     }),
   );
   server.registerTool(
     "get_weekly_review",
     {
       title: "Weekly review",
-      description:
-        scope === "assistant"
-          ? `Everything finished in the past 7 days: completed tasks, completed reminders, and past events (up to ${MAX_LIST} each). Turned-off or disconnected sources are noted.`
-          : `Everything finished in the past 7 days: completed Apple Reminders and past Mac calendar events (up to ${MAX_LIST} each). Google Tasks and Google Calendar aren't included.`,
+      description: includeGoogle
+        ? `Everything finished in the past 7 days: completed tasks, completed reminders, and past events (up to ${MAX_LIST} each). Turned-off or disconnected sources are noted.`
+        : `Everything finished in the past 7 days: completed Apple Reminders and past Mac calendar events (up to ${MAX_LIST} each). Google Tasks and Google Calendar aren't included.`,
       inputSchema: {},
     },
     async () => {
       const since = new Date(Date.now() - WEEK_MS);
-      const google = await mayReadGoogle().catch(() => false);
       const section = async <T>(source: SourceId, load: () => Promise<T[]>) => {
         const result = await run(source, async () => text(capped(await load(), "items")))({});
         return result.isError
@@ -383,15 +371,15 @@ function registerReadOnlyTools(server: McpServer, scope: "assistant" | "external
           : JSON.parse(result.content[0]?.text ?? "{}");
       };
       const [tasks, reminders, events] = await Promise.all([
-        google
+        includeGoogle
           ? section("tasks", () => listCompletedTasks(since))
           : Promise.resolve({ unavailable: withheld }),
         section("reminders", () => listCompletedReminders(since)),
-        section("calendar", () => calendarEventsBetween(since, new Date(), google)),
+        section("calendar", () => calendarEventsBetween(since, new Date(), includeGoogle)),
       ]);
       return text({
         since: since.toISOString(),
-        ...(google ? {} : { note: withheld }),
+        ...(includeGoogle ? {} : { note: withheld }),
         completedTasks: tasks,
         completedReminders: reminders,
         events,
@@ -420,7 +408,7 @@ function hasBoundedMcpInput(input: unknown): boolean {
   return true;
 }
 
-function buildAssistantMcpServer(): McpServer {
+function buildAssistantMcpServer(includeGoogle = false): McpServer {
   const server = logToolCalls(
     new McpServer(
       { name: "dayboard-assistant", version: "1.0.0" },
@@ -428,7 +416,7 @@ function buildAssistantMcpServer(): McpServer {
     ),
     "Assistant",
   );
-  registerReadOnlyTools(server, "assistant");
+  registerReadOnlyTools(server, "assistant", includeGoogle);
   return server;
 }
 
@@ -772,7 +760,7 @@ function logToolCalls(server: McpServer, client: string | null): McpServer {
 }
 
 export function getAssistantMcpServerConfig(projectId: string): McpServerConfig {
-  return {
+  const config: McpServerConfig = {
     id: ASSISTANT_MCP_ID,
     name: "Dayboard",
     enabled: true,
@@ -783,6 +771,20 @@ export function getAssistantMcpServerConfig(projectId: string): McpServerConfig 
     url: `http://127.0.0.1:${stableMcpPort(projectId)}${ASSISTANT_MCP_PATH}`,
     headers: { Authorization: `Bearer ${assistantMcpToken}` },
   };
+  assistantMcpConfigs.add(config);
+  return config;
+}
+
+/** Google reads stay in the app process and use the provider selected for this run. */
+export async function createAssistantMcpTransport(
+  config: McpServerConfig,
+  provider: AIProvider,
+): Promise<InMemoryTransport | null> {
+  if (isDemoMode() || !assistantMcpConfigs.has(config) || !aiMayReceiveGoogleData(provider))
+    return null;
+  const [client, server] = InMemoryTransport.createLinkedPair();
+  await buildAssistantMcpServer(true).connect(server);
+  return client;
 }
 
 /** Address of the external-client endpoint, once the server is listening. */
