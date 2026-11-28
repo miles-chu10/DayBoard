@@ -285,7 +285,7 @@ function ExternalMcpSettings() {
   return (
     <FieldSet
       title="DayBoard MCP Server"
-      description="Let Claude Code, Codex, and other MCP clients on this Mac use your DayBoard sources while the app is running. Clients need your access key."
+      description="Let Claude Code, Codex, and other MCP clients on this Mac use your DayBoard sources while the app is running. Clients need your access key. Google Calendar and Google Tasks aren't shared with them."
     >
       <Field
         label="Allow MCP clients"
@@ -307,7 +307,7 @@ function ExternalMcpSettings() {
       </Field>
       <Field
         label="Allow changes"
-        description="Let clients add and complete tasks and reminders, create events, save reply drafts, and archive email. Off keeps clients read-only."
+        description="Let clients add and complete reminders, add events to Mac calendars, save reply drafts, and archive email. Off keeps clients read-only."
         disabled={!enabled}
       >
         <Switch

@@ -24,9 +24,13 @@ export async function createReplyDraft() { throw new Error("write should not run
 export async function createTask() { throw new Error("write should not run"); }
 export async function getMessageBody() { return "body"; }
 export async function listCompletedTasks() { return []; }
-export async function listEventsBetweenWithCoverage() { return { items: [], coverage: { complete: true, loaded: 0 } }; }
+export async function listEventsBetweenWithCoverage() {
+  globalThis.__mcpGoogleCalendarCalls = (globalThis.__mcpGoogleCalendarCalls ?? 0) + 1;
+  const items = globalThis.__mcpGoogleEvents ?? [];
+  return { items, coverage: { complete: true, loaded: items.length } };
+}
 export async function listInbox() { return []; }
-export async function listTasks() { return []; }
+export async function listTasks() { return globalThis.__mcpGoogleTasks ?? []; }
 export async function modifyMessage() { throw new Error("write should not run"); }
 export async function setTaskCompleted() { throw new Error("write should not run"); }
 `;
@@ -49,6 +53,7 @@ export async function getSettings() {
     mail: { maxMessages: 25 },
     calendar: { range: "next-7-days", visibility: {}, newEvents: "" },
     mcpServer: globalThis.__mcpServerSettings ?? { enabled: true, allowWrites: true },
+    ai: globalThis.__mcpAiSettings ?? { provider: "openai", assistantProvider: "" },
   };
 }
 `;
@@ -339,7 +344,7 @@ test("Assistant MCP exposes exactly six read-only tools and rejects unauthentica
           requestInit: { headers: EXTERNAL_AUTH },
         }),
       );
-      assert.equal((await externalClient.listTools()).tools.length, 20);
+      assert.equal((await externalClient.listTools()).tools.length, 17);
     } finally {
       await externalClient.close();
     }
@@ -570,7 +575,6 @@ test("External MCP is keyed, can be turned off, and hides or blocks writes when 
         "list_memories",
         "list_notes",
         "list_reminders",
-        "list_tasks",
         "read_email",
         "read_note",
       ]);
@@ -586,7 +590,11 @@ test("External MCP is keyed, can be turned off, and hides or blocks writes when 
     });
     try {
       await writer.connect(writerTransport);
-      assert.equal((await writer.listTools()).tools.length, 20);
+      const writerTools = (await writer.listTools()).tools.map((tool) => tool.name);
+      assert.equal(writerTools.length, 17);
+      // Outside AI tools get no Google Tasks at all.
+      for (const google of ["list_tasks", "create_task", "complete_task"])
+        assert.ok(!writerTools.includes(google), google);
       // An expired AI license neither blocks source writes nor starts the AI trial.
       globalThis.__mcpLicenseBlocked = true;
       globalThis.__mcpLicenseCalls = 0;
@@ -604,7 +612,10 @@ test("External MCP is keyed, can be turned off, and hides or blocks writes when 
       // Turning changes off applies to sessions that are already open.
       globalThis.__mcpServerSettings = { enabled: true, allowWrites: false };
       // The Allow changes switch still blocks writes, with the AI license still expired.
-      const blocked = await writer.callTool({ name: "create_task", arguments: { title: "nope" } });
+      const blocked = await writer.callTool({
+        name: "create_reminder",
+        arguments: { title: "nope" },
+      });
       assert.equal(blocked.isError, true);
       assert.match(blocked.content[0].text, /Allow changes/);
       assert.equal(globalThis.__mcpLicenseCalls, 0);
@@ -677,13 +688,13 @@ test("an existing MCP client cannot start source changes while update installati
     await client.connect(transport);
     await module.pauseAndDrainAppOperations();
     const result = await client.callTool({
-      name: "create_task",
+      name: "create_reminder",
       arguments: { title: "blocked fixture" },
     });
     assert.equal(result.isError, true);
     assert.match(result.content[0].text, /preparing to install/);
     module.resumeAppOperations();
-    const read = await client.callTool({ name: "list_tasks", arguments: {} });
+    const read = await client.callTool({ name: "list_reminders", arguments: {} });
     assert.notEqual(read.isError, true);
   } finally {
     module.resumeAppOperations();
@@ -760,6 +771,105 @@ test("MCP tools read and write DayBoard memory and notes, and every call lands i
     delete globalThis.__mcpAgent;
     await transport.terminateSession().catch(() => undefined);
     await client.close();
+    await close(server);
+  }
+});
+
+test("Google Calendar and Google Tasks reach only Assistant providers that don't train on them, and never outside AI tools", async () => {
+  const module = await loadMcpHarness();
+  const server = module.createMcpHttpServer();
+  const port = await listen(server);
+  const googleEvent = {
+    id: "g-1",
+    title: "Google board meeting",
+    start: "2026-11-28T09:00:00-08:00",
+    end: "2026-11-28T10:00:00-08:00",
+    allDay: false,
+    calendarId: "primary",
+    calendarName: "Work",
+  };
+  globalThis.__mcpGoogleEvents = [googleEvent];
+  globalThis.__mcpGoogleTasks = [{ id: "t-1", title: "Google tax filing" }];
+  globalThis.__mcpServerSettings = { enabled: true, allowWrites: true };
+  globalThis.__mcpGoogleStatus = { connected: true, email: "user@example.test" };
+  const connect = async (path, headers) => {
+    const client = new Client({ name: "google-gate", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://127.0.0.1:${port}${path}`),
+      { requestInit: { headers } },
+    );
+    await client.connect(transport);
+    return {
+      call: async (name, args = {}) =>
+        (await client.callTool({ name, arguments: args })).content[0].text,
+      result: (name, args = {}) => client.callTool({ name, arguments: args }),
+      close: async () => {
+        await transport.terminateSession().catch(() => undefined);
+        await client.close();
+      },
+    };
+  };
+  try {
+    const assistantHeaders = module.getAssistantMcpServerConfig("fixture").headers;
+    const cases = [
+      // [default provider, Assistant provider, Google data shared]
+      ["openai", "", true],
+      ["anthropic", "", true],
+      ["claude", "", false],
+      ["openai", "codex", false],
+      ["claude", "groq", true],
+      ["google", "", false],
+      ["deepseek", "", false],
+    ];
+    for (const [provider, assistantProvider, shared] of cases) {
+      globalThis.__mcpAiSettings = { provider, assistantProvider };
+      const assistant = await connect("/assistant-mcp", assistantHeaders);
+      try {
+        const label = `${provider}/${assistantProvider || "default"}`;
+        const tasks = await assistant.call("list_tasks");
+        const events = await assistant.call("list_events");
+        const review = await assistant.call("get_weekly_review");
+        assert.equal(tasks.includes("Google tax filing"), shared, `${label} tasks`);
+        assert.equal(events.includes("Google board meeting"), shared, `${label} events`);
+        assert.equal(review.includes("Google board meeting"), shared, `${label} review`);
+        if (!shared) {
+          assert.match(tasks, /aren't shared with this AI provider/);
+          assert.match(events, /aren't shared with this AI provider/);
+        }
+      } finally {
+        await assistant.close();
+      }
+    }
+
+    // Outside AI tools: Google Calendar isn't even read, and Google writes are refused.
+    globalThis.__mcpAiSettings = { provider: "openai", assistantProvider: "" };
+    globalThis.__mcpGoogleCalendarCalls = 0;
+    const external = await connect("/mcp", EXTERNAL_AUTH);
+    try {
+      const events = await external.call("list_events");
+      assert.ok(!events.includes("Google board meeting"));
+      assert.match(events, /Google Calendar isn't shared with outside AI tools/);
+      const review = await external.call("get_weekly_review");
+      assert.ok(!review.includes("Google board meeting"));
+      assert.equal(globalThis.__mcpGoogleCalendarCalls, 0, "Google Calendar was never called");
+      const created = await external.result("create_event", {
+        title: "nope",
+        date: "2026-12-01",
+      });
+      assert.equal(created.isError, true);
+      assert.match(created.content[0].text, /outside AI tools can't change/);
+      const tasks = await external.result("list_tasks");
+      assert.equal(tasks.isError, true);
+    } finally {
+      await external.close();
+    }
+  } finally {
+    delete globalThis.__mcpGoogleEvents;
+    delete globalThis.__mcpGoogleTasks;
+    delete globalThis.__mcpGoogleCalendarCalls;
+    delete globalThis.__mcpAiSettings;
+    delete globalThis.__mcpServerSettings;
+    delete globalThis.__mcpGoogleStatus;
     await close(server);
   }
 });

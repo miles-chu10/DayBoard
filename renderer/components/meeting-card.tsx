@@ -64,7 +64,11 @@ function UpNextMeeting({
             <Status variant="loading">Preparing your notes…</Status>
           ) : null}
           <div>
-            {prep.ai.isRunning ? (
+            {prep.unavailable ? (
+              <Text as="p" variant="small" color="tertiary">
+                {prep.unavailable}
+              </Text>
+            ) : prep.ai.isRunning ? (
               <Button size="small" onClick={prep.ai.stop}>
                 Stop
               </Button>

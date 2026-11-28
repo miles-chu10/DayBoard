@@ -10,6 +10,7 @@ import { TodoRow } from "../components/todo-row";
 import { HistoryNav } from "../components/history-nav";
 import { WindowActions } from "../components/view-actions";
 import { useAITask } from "../lib/ai";
+import { aiMayReceiveGoogleData } from "@shared/ai-google-data";
 import { REVIEW_SYSTEM, buildWeeklyReviewPrompt } from "../lib/ai-prompts";
 import { formatTimeOfDay, shortDate, todayISO } from "../lib/dates";
 import { useCalendar, useReminders, useReview, useTasks } from "../lib/queries";
@@ -112,6 +113,7 @@ export function ReviewView() {
         pastEvents,
         overdue,
         upcoming,
+        googleData: aiMayReceiveGoogleData(settings?.ai.provider),
       }),
       maxOutputTokens: 900,
     });

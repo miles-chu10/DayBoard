@@ -25,7 +25,7 @@ export function MeetingPrepProvider({ children }: { children: ReactNode }) {
 }
 
 function MeetingPrepDialog({ event, onClose }: { event: CalendarEventItem; onClose: () => void }) {
-  const { ai, attendees, stored, text, relatedReady, contextSummary, generate } =
+  const { ai, attendees, stored, text, relatedReady, contextSummary, unavailable, generate } =
     useMeetingPrep(event);
 
   return (
@@ -55,7 +55,7 @@ function MeetingPrepDialog({ event, onClose }: { event: CalendarEventItem; onClo
               Stop
             </Button>
           ) : (
-            <Button size="small" onClick={generate} disabled={!relatedReady}>
+            <Button size="small" onClick={generate} disabled={!relatedReady || !!unavailable}>
               <Sparkles />
               {stored ? "Regenerate" : "Prepare"}
             </Button>
@@ -67,6 +67,10 @@ function MeetingPrepDialog({ event, onClose }: { event: CalendarEventItem; onClo
             <Markdown isStreaming={ai.isRunning}>{text}</Markdown>
           ) : ai.isRunning ? (
             <Status variant="loading">Preparing your notes…</Status>
+          ) : unavailable ? (
+            <Text color="tertiary" as="p">
+              {unavailable}
+            </Text>
           ) : (
             <Text color="tertiary" as="p">
               Get the purpose, context from recent emails, open items, and talking points for this

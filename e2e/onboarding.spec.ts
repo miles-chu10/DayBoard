@@ -229,6 +229,10 @@ test("Turn on AI saves the chosen provider and moves on", async () => {
     await expect(consent.getByTestId("ai-disclosure")).toContainText(
       "that feature needs to Claude,",
     );
+    // A subscription CLI may train depending on the user's plan, so Google data is withheld.
+    await expect(consent.getByTestId("ai-disclosure")).toContainText(
+      "Google Calendar and Google Tasks aren't shared with this provider",
+    );
     await consent.getByRole("button", { name: "Turn On AI", exact: true }).click();
     await expect(consent).toHaveCount(0);
     await expect(dialog.getByRole("heading", { name: "You’re all set" })).toBeVisible();

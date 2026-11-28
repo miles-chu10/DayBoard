@@ -25,7 +25,7 @@ import type {
   AssistantResult,
   Note,
 } from "@main/shared-types";
-import type { AssistantHistory } from "../../shared/assistant-history";
+import type { AssistantHistory, AssistantMention } from "../../shared/assistant-history";
 
 import { AssistantComposer, type ContextUsage } from "../components/assistant-composer";
 import { LicenseGate } from "../components/license-gate";
@@ -44,7 +44,12 @@ import { BLOCKED_MESSAGE } from "../lib/ai";
 import { assistantProvider, useAssistantModel } from "../lib/ai-models";
 import { lastReplyLabel, modelSummary } from "../lib/model-choices";
 import { isRendererDemoMode } from "../lib/demo";
-import { buildAssistantSnapshot, buildAssistantSystem } from "../lib/ai-prompts";
+import {
+  buildAssistantSnapshot,
+  buildAssistantSystem,
+  shareableCalendar,
+  shareableTodos,
+} from "../lib/ai-prompts";
 import {
   ASSISTANT_SUGGESTIONS,
   loadLegacyConversation,
@@ -83,6 +88,24 @@ import {
 import { PROVIDER_LABEL, featureOn, providerUsesMcp, sourceOn, useSettings } from "../lib/settings";
 import { buildTodos } from "../lib/todos";
 import { readTriageMap } from "../lib/triage";
+import { aiMayReceiveGoogleData } from "@shared/ai-google-data";
+
+/**
+ * Earlier chips name Google events and tasks by title; drop them for a provider that may not
+ * receive Google data. Event chips don't record their calendar, so every event chip goes.
+ */
+function withoutGoogleMentions<T extends { mentions?: AssistantMention[] }>(messages: T[]): T[] {
+  return messages.map((message) =>
+    message.mentions
+      ? {
+          ...message,
+          mentions: message.mentions.filter(
+            (mention) => mention.kind !== "task" && mention.kind !== "event",
+          ),
+        }
+      : message,
+  );
+}
 
 function describeAction(action: AssistantAction): string {
   const time = action.time
@@ -336,6 +359,7 @@ function AssistantSession({
   const settings = useSettings().data;
   const enabled = featureOn(settings, "assistant");
   const provider = assistantProvider(settings);
+  const googleData = aiMayReceiveGoogleData(provider);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const mcpServers = useAssistantMcpServers();
@@ -373,8 +397,8 @@ function AssistantSession({
   const [attachments, setAttachments] = useState<AssistantAttachment[]>([]);
   const [mentions, setMentions] = useState<MentionItem[]>([]);
   const candidates = mentionCandidates({
-    calendar: mentionEvents.data,
-    todos: buildTodos(tasks.data, reminders.data),
+    calendar: shareableCalendar(mentionEvents.data, googleData),
+    todos: shareableTodos(buildTodos(tasks.data, reminders.data), googleData),
     mail: mail.data,
   });
   const [usage, setUsage] = useState<ContextUsage | null>(null);
@@ -485,7 +509,9 @@ function AssistantSession({
     };
     const assistantId = crypto.randomUUID();
     const sent = [...messages, userMessage].filter((message) => message.content.trim()).slice(-20);
-    const earlierMentions = earlierMentionSection(sent.slice(0, -1));
+    const earlierMentions = earlierMentionSection(
+      googleData ? sent.slice(0, -1) : withoutGoogleMentions(sent.slice(0, -1)),
+    );
     const requestMessages = sent.map((message) => ({
       role: message.role,
       content: message.role === "assistant" ? splitActions(message.content).body : message.content,
@@ -533,6 +559,7 @@ function AssistantSession({
             Object.entries(meetingNotes.data ?? {}).map(([key, record]) => [key, record.text]),
           )
         : undefined,
+      googleData,
     };
     const system = buildAssistantSystem(promptInput);
     const currentSnapshot = withMentions(
@@ -961,11 +988,15 @@ function AssistantSession({
             placement="viewport"
             media={<ProviderTile provider={provider} />}
             title={panel ? "Ask About Your Work" : "Ask About Your Day"}
-            description={
+            description={`${
               panel
                 ? "The assistant sees your tasks, reminders, inbox, and calendar, plus what's open beside it."
                 : "The assistant sees your tasks, reminders, inbox, and calendar, and can suggest items for you to add."
-            }
+            }${
+              googleData
+                ? ""
+                : ` Google Calendar and Google Tasks aren't shared with ${PROVIDER_LABEL[provider]}.`
+            }`}
             actions={suggestions.map((suggestion) => (
               <Button key={suggestion} size="small" onClick={() => void send(suggestion)}>
                 {suggestion}

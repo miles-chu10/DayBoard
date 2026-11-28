@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
+  Callout,
   Field,
   FieldSet,
   Label,
@@ -23,6 +24,7 @@ import type {
 } from "@main/shared-types";
 
 import { effortOptions } from "../../shared/ai-effort";
+import { GOOGLE_DATA_WITHHELD_NOTICE, aiMayReceiveGoogleData } from "../../shared/ai-google-data";
 import { isAppStoreBuild } from "../../shared/app-store-build";
 import {
   applyModelChoice,
@@ -477,6 +479,9 @@ export function AITab() {
                 ))}
               </RadioGroup>
             </Field>
+            {ai.providerChosen && !aiMayReceiveGoogleData(ai.provider) ? (
+              <Callout color="secondary">{GOOGLE_DATA_WITHHELD_NOTICE}</Callout>
+            ) : null}
             {ai.providerChosen && ai.provider === "claude" ? (
               <ClaudeOptions settings={settings} edit={edit} />
             ) : null}
