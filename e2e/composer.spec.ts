@@ -338,8 +338,16 @@ test("@ mentions preserve Google chips for an eligible provider and withhold the
     await input.fill("@sprint");
     await list.getByRole("option", { name: /^Sprint planning/ }).click();
     await expect(demo.page.getByRole("button", { name: "Remove Sprint planning" })).toBeVisible();
+    await expect(list).toHaveCount(0);
+
     await input.fill("@lun");
-    await list.getByRole("option", { name: /^Lunch today\?/ }).click();
+    const emailOption = list.getByRole("option", { name: /^Lunch today\?/ });
+    await emailOption.hover();
+    await expect(emailOption).toHaveAttribute("aria-selected", "true");
+    await emailOption.click();
+    const emailChip = demo.page.getByRole("button", { name: "Remove Lunch today?" });
+    await expect(emailChip).toBeVisible();
+    await expect(list).toHaveCount(0);
     await input.fill("What should I do next?");
 
     await demo.page.evaluate(async () => {
@@ -359,7 +367,7 @@ test("@ mentions preserve Google chips for an eligible provider and withhold the
     await expect(list.getByRole("option", { name: /^Lunch with Sam/ })).toHaveCount(0);
     await expect(user).toContainText("Lunch with Sam");
     await expect(demo.page.getByRole("button", { name: "Remove Sprint planning" })).toHaveCount(0);
-    await expect(demo.page.getByRole("button", { name: "Remove Lunch today?" })).toBeVisible();
+    await expect(emailChip).toBeVisible();
 
     // Capture the follow-up at the renderer-to-main boundary. Demo replies don't use the snapshot.
     await demo.app.evaluate(({ BrowserWindow }, channels) => {
