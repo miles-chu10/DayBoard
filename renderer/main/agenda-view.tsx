@@ -48,7 +48,7 @@ import {
 } from "../lib/calendar-identity";
 import { CALENDAR_OPTIONS } from "../lib/calendar-range-options";
 import { agendaSpanDays, type AgendaSearch, type AgendaSpan } from "../lib/agenda-search";
-import { aiMayReceiveGoogleData } from "@shared/ai-google-data";
+import { mayShareGoogleData } from "../lib/google-data";
 import { buildBriefingPrompt } from "../lib/ai-prompts";
 import { addDays, dayHeading, formatTimeOfDay, parseISODate, toISODate } from "../lib/dates";
 import { openSettings } from "../lib/ipc";
@@ -600,7 +600,7 @@ export function AgendaView({
                         calendar: calendar.data,
                         mail: mail.data,
                         triage: triage.map,
-                        googleData: aiMayReceiveGoogleData(settings?.ai.provider),
+                        googleData: mayShareGoogleData(settings?.ai.provider),
                       })
                     }
                   />

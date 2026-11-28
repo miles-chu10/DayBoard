@@ -24,7 +24,8 @@ import type {
 } from "@main/shared-types";
 
 import { effortOptions } from "../../shared/ai-effort";
-import { GOOGLE_DATA_WITHHELD_NOTICE, aiMayReceiveGoogleData } from "../../shared/ai-google-data";
+import { GOOGLE_DATA_WITHHELD_NOTICE } from "../../shared/ai-google-data";
+import { mayShareGoogleData } from "../lib/google-data";
 import { isAppStoreBuild } from "../../shared/app-store-build";
 import {
   applyModelChoice,
@@ -479,7 +480,7 @@ export function AITab() {
                 ))}
               </RadioGroup>
             </Field>
-            {ai.providerChosen && !aiMayReceiveGoogleData(ai.provider) ? (
+            {ai.providerChosen && !mayShareGoogleData(ai.provider) ? (
               <Callout color="secondary">{GOOGLE_DATA_WITHHELD_NOTICE}</Callout>
             ) : null}
             {ai.providerChosen && ai.provider === "claude" ? (

@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { CalendarEventItem, MailItem, SourceResult } from "@main/shared-types";
 
-import { aiMayReceiveGoogleData, isGoogleCalendarEvent } from "../../shared/ai-google-data";
+import { isGoogleCalendarEvent } from "../../shared/ai-google-data";
+import { mayShareGoogleData } from "./google-data";
 import { useAITask } from "./ai";
 import { PREP_SYSTEM, buildMeetingPrepPrompt } from "./ai-prompts";
 import { formatTimeOfDay } from "./dates";
@@ -83,7 +84,7 @@ export function useMeetingPrep(event: CalendarEventItem) {
     .slice(0, 10);
   const relatedMail = related.data?.state === "ok" ? related.data.items : null;
   const relatedReady = !mailOn || !related.isPending;
-  const googleData = aiMayReceiveGoogleData(settings?.ai.provider);
+  const googleData = mayShareGoogleData(settings?.ai.provider);
   /** Why prep can't run for this event, or null when it can. */
   const unavailable =
     !googleData && isGoogleCalendarEvent(event)

@@ -3,7 +3,7 @@ import { Button, Callout, Status, Text } from "@renderer/ui";
 import { Sparkles } from "lucide-react";
 import type { CalendarEventItem, MailItem, SourceId } from "@main/shared-types";
 
-import { aiMayReceiveGoogleData } from "@shared/ai-google-data";
+import { mayShareGoogleData } from "../lib/google-data";
 import { extractJSON, useAITask } from "../lib/ai";
 import { PRIORITY_SYSTEM, buildPriorityPrompt, shareableTodos } from "../lib/ai-prompts";
 import { formatTimeOfDay, todayISO } from "../lib/dates";
@@ -48,7 +48,7 @@ export function UpNextCard({
   onChoose?: (todo: Todo) => void;
 }) {
   const ai = useAITask();
-  const googleData = aiMayReceiveGoogleData(useSettings().data?.ai.provider);
+  const googleData = mayShareGoogleData(useSettings().data?.ai.provider);
   const keyMap = useRef(new Map<string, string>());
   const [stored, setStored] = useState(() => readStored(STORAGE_KEY, isStoredPriorities));
   const [parseFailed, setParseFailed] = useState(false);

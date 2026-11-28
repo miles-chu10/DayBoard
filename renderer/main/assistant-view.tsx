@@ -88,7 +88,7 @@ import {
 import { PROVIDER_LABEL, featureOn, providerUsesMcp, sourceOn, useSettings } from "../lib/settings";
 import { buildTodos } from "../lib/todos";
 import { readTriageMap } from "../lib/triage";
-import { aiMayReceiveGoogleData } from "@shared/ai-google-data";
+import { mayShareGoogleData } from "../lib/google-data";
 
 /**
  * Earlier chips name Google events and tasks by title; drop them for a provider that may not
@@ -359,7 +359,7 @@ function AssistantSession({
   const settings = useSettings().data;
   const enabled = featureOn(settings, "assistant");
   const provider = assistantProvider(settings);
-  const googleData = aiMayReceiveGoogleData(provider);
+  const googleData = mayShareGoogleData(provider);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const mcpServers = useAssistantMcpServers();

@@ -1,7 +1,8 @@
 import { AlertDialog } from "@renderer/ui";
 import type { AIProvider } from "@main/shared-types";
 
-import { GOOGLE_DATA_WITHHELD_NOTICE, aiMayReceiveGoogleData } from "@shared/ai-google-data";
+import { GOOGLE_DATA_WITHHELD_NOTICE } from "@shared/ai-google-data";
+import { mayShareGoogleData } from "../lib/google-data";
 import { PROVIDER_LABEL } from "../lib/settings";
 
 /**
@@ -39,7 +40,7 @@ export function AIConsentDialog({
           Assistant messages go to the provider you pick in the composer.
         </p>
         <p>
-          {aiMayReceiveGoogleData(provider)
+          {mayShareGoogleData(provider)
             ? "This can include your Google Calendar and Google Tasks, which DayBoard sends only to AI APIs whose terms say they don’t train on your data."
             : GOOGLE_DATA_WITHHELD_NOTICE}{" "}
           Data goes straight from this Mac to the provider and never passes through a DayBoard
