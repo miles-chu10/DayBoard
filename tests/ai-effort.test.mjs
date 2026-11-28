@@ -20,6 +20,7 @@ const stubs = {
   "codex-models.js": `export const listCodexModels=async()=>globalThis.__effortFixture.codexModels;`,
   "cli-providers.js": `export const runCliCompletion=async(options)=>{const f=globalThis.__effortFixture; f.cli.push(options); if (f.reports) options.onModel?.(f.reports); return 'CLI answer';};`,
   "assistant-mcp.js": `export const resolveAssistantMcpServers=()=>[];`,
+  "mcp-http-server.js": `export const createAssistantMcpTransport=async()=>{throw Error("MCP must not run")};`,
   "mcp-client.js": `export const openMcpSession=async()=>{throw Error('MCP must not run')};`,
   "provider-resolution.js": `export const resolveConfiguredProvider=async p=>p;`,
 };

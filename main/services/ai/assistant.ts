@@ -17,6 +17,7 @@ import type {
   AssistantResult,
 } from "../../shared-types.js";
 import { demoAssistantReply, isDemoMode } from "../demo-data.js";
+import { createAssistantMcpTransport } from "../mcp-http-server.js";
 import { getMcpServers, getSettings } from "../settings-store.js";
 import { isApiProvider } from "./api-keys.js";
 import { apiLanguageModel, resolveApiModel } from "./api-providers.js";
@@ -202,7 +203,9 @@ export async function runAssistant(
     return { text, usage: requestUsage, model: replyModel };
   }
 
-  const session = servers.length ? await openMcpSession(servers) : null;
+  const session = servers.length
+    ? await openMcpSession(servers, (config) => createAssistantMcpTransport(config, provider))
+    : null;
   try {
     const displayNames = new Map(
       session?.tools.map((handle) => [handle.qualifiedName, `${handle.server}: ${handle.tool}`]),
