@@ -1,3 +1,4 @@
+import type { AIProvider } from "@main/shared-types";
 import { useState } from "react";
 import { Button, Callout, Markdown, Status, Text } from "@renderer/ui";
 
@@ -26,7 +27,7 @@ export type AskSnapshot = Omit<AssistantPromptInput, "canCreate" | "permission">
  * Ask from the menu bar: one streamed, read-only answer about the day, shown in the panel. A
  * follow-up carries the previous question and answer so "and tomorrow?" makes sense.
  */
-export function usePanelAsk(snapshot: () => AskSnapshot) {
+export function usePanelAsk(snapshot: () => AskSnapshot, expectedProvider: AIProvider | undefined) {
   const ai = useAITask();
   const [thread, setThread] = useState<Exchange[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export function usePanelAsk(snapshot: () => AskSnapshot) {
       : "";
     void ai.run({
       system: SYSTEM,
+      expectedProvider,
       prompt: `${buildAssistantSnapshot({ ...snapshot(), canCreate: READ_ONLY, permission: "read-only" })}\n\n${earlier}Question: ${next}`,
       maxOutputTokens: 700,
     });

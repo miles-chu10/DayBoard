@@ -85,6 +85,7 @@ function apiSnapshot(snapshot: string | undefined, session: McpSession | null): 
 export async function runAssistant(
   params: {
     messages: AssistantMessageInput[];
+    expectedProvider?: string;
     system: string;
     snapshot?: string;
     attachments?: string[];
@@ -99,9 +100,10 @@ export async function runAssistant(
   }
   const settings = await getSettings();
   if (!settings.ai.enabled || !settings.ai.providerChosen) return { blocked: "not-configured" };
-  const provider = await resolveConfiguredProvider(
-    settings.ai.assistantProvider || settings.ai.provider,
-  );
+  const selectedProvider = settings.ai.assistantProvider || settings.ai.provider;
+  if (params.expectedProvider !== undefined && params.expectedProvider !== selectedProvider)
+    throw new Error("The AI provider changed. Try again to send with the current provider.");
+  const provider = await resolveConfiguredProvider(selectedProvider);
   if (!provider) return { blocked: "not-configured" };
   const codexModels = provider === "codex" ? await listCodexModels().catch(() => []) : [];
   const apiModel = isApiProvider(provider)

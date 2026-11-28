@@ -33,11 +33,13 @@ const RUN_TIMEOUT_MS = 3 * 60_000;
 export async function runCompletion({
   system,
   prompt,
+  expectedProvider,
   signal,
   onChunk,
 }: {
   system: string;
   prompt: string;
+  expectedProvider?: string;
   signal: AbortSignal;
   onChunk?: (chunk: AIStreamChunk) => void;
 }): Promise<{ text: string; usage?: RequestUsage }> {
@@ -45,6 +47,8 @@ export async function runCompletion({
   if (!settings.ai.enabled || !settings.ai.providerChosen)
     throw new Error("Choose and enable an AI provider in Settings → AI first.");
   const provider = settings.ai.provider;
+  if (expectedProvider !== undefined && expectedProvider !== provider)
+    throw new Error("The AI provider changed. Try again to send with the current provider.");
   if (!(await resolveConfiguredProvider(provider)))
     throw new Error(`Set up ${provider} in Settings → AI before using it.`);
   try {

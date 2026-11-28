@@ -1,6 +1,6 @@
 import type { RequestUsage } from "../../shared/ai-usage";
 import { useEffect, useRef, useState } from "react";
-import type { AIStreamChunk, AssistantModelInfo } from "@main/shared-types";
+import type { AIProvider, AIStreamChunk, AssistantModelInfo } from "@main/shared-types";
 
 import { errorMessage } from "./ipc";
 
@@ -12,6 +12,8 @@ export const BLOCKED_MESSAGE: Record<string, string> = {
 interface RunOptions {
   system: string;
   prompt: string;
+  /** Provider used to decide which source data belongs in this prompt. */
+  expectedProvider?: AIProvider;
   maxOutputTokens: number;
   /** Adds the user's saved memories to the prompt (reply drafts). */
   memory?: boolean;
@@ -60,6 +62,7 @@ export function useAITask() {
         {
           system: options.system,
           prompt: options.prompt,
+          expectedProvider: options.expectedProvider,
           ...(options.memory ? { memory: true } : {}),
         },
         (chunk) => {

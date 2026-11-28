@@ -1489,6 +1489,41 @@ test("Assistant tool steps total a counter only when every step reported it", as
   assert.equal(run.chunks.filter((chunk) => chunk.type === "usage").length, 1);
   assert.equal(globalThis.__cacheFixture.closed, 1);
 });
+test("AI requests reject a stale prompt provider before any provider dispatch", async () => {
+  const dispatched = [];
+  cliFixture("codex", {}, async (options) => {
+    dispatched.push(options.provider);
+    return "CLI answer";
+  });
+  const handlers = await load("main/handlers/ai.ts", { fixtures: true });
+  handlers.registerAIHandlers();
+  const { bodies } = await withFetch(async () => {
+    const run = globalThis.__cacheFixture.handlers;
+    const context = { signal: new AbortController().signal };
+    const request = { system: "policy", expectedProvider: "openai" };
+    const inputs = {
+      "ai:run": { ...request, prompt: "protected source fixture" },
+      "ai:assistant": {
+        ...request,
+        messages: [{ role: "user", content: "hello" }],
+        snapshot: "protected source fixture",
+      },
+    };
+    for (const [channel, input] of Object.entries(inputs)) {
+      await assert.rejects(
+        run[channel](input, () => {}, context),
+        /AI provider changed/,
+      );
+    }
+    assert.deepEqual(dispatched, []);
+    for (const [channel, input] of Object.entries(inputs)) {
+      const result = await run[channel]({ ...input, expectedProvider: "codex" }, () => {}, context);
+      assert.equal(result.text, "CLI answer");
+    }
+    assert.deepEqual(dispatched, ["codex", "codex"]);
+  });
+  assert.deepEqual(bodies, []);
+});
 test("one-shot usage comes from each step's raw usage even when the SDK aggregate has none", async () => {
   fixture();
   const handlers = await load("main/handlers/ai.ts", { fixtures: true, aggregateUsage: true });

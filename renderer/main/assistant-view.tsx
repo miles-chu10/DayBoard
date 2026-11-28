@@ -598,6 +598,7 @@ function AssistantSession({
       const result = await window.dayboard.ipc.stream<AIStreamChunk, AssistantResult>(
         "ai:assistant",
         {
+          expectedProvider: provider,
           messages: requestMessages,
           system,
           snapshot,

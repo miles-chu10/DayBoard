@@ -391,6 +391,10 @@ export function registerAIHandlers(): void {
       return runCompletion({
         system: input.memory === true ? await withMemory(system) : system,
         prompt,
+        expectedProvider:
+          input.expectedProvider === undefined
+            ? undefined
+            : requireString(input, "expectedProvider", channel, 64),
         signal: context.signal,
         onChunk: sendChunk,
       });
@@ -404,6 +408,10 @@ export function registerAIHandlers(): void {
       const input = asObject(payload, channel);
       return runAssistant(
         {
+          expectedProvider:
+            input.expectedProvider === undefined
+              ? undefined
+              : requireString(input, "expectedProvider", channel, 64),
           messages: parseMessages(input.messages, channel),
           system: await withMemory(requireString(input, "system", channel)),
           snapshot:

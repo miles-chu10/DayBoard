@@ -592,6 +592,7 @@ export function AgendaView({
                     }
                     ready={allReady && !mail.isPending}
                     autoGenerate={featureOn(settings, "autoBriefing") && startDate === today}
+                    expectedProvider={settings?.ai.provider}
                     buildPrompt={() =>
                       buildBriefingPrompt({
                         todos,
